@@ -152,9 +152,17 @@ export function hasQuoteTarget(html: string): boolean {
   return /id="quote"/.test(html) || /class="[^"]*\bpv-quote\b/.test(html);
 }
 
-/** "#quote" buttons on a page with no quote form went nowhere: send them to the quote landing page instead. */
+/** True when the page has a "#quote" button (so the quote drawer is worth mounting). */
+export function hasQuoteButtons(html: string): boolean {
+  return /<a\b[^>]*\shref=(["'])#quote\1/.test(html);
+}
+
+/**
+ * "#quote" buttons on a page with no quote form went nowhere. They now link to the quote page (so they work without
+ * JavaScript) and carry a marker that opens the quote drawer, so the visitor stays where they were reading.
+ */
 export function fixDeadQuoteLinks(html: string): string {
-  return html.replace(/href=(["'])#quote\1/g, 'href="/free-solar-quote"');
+  return html.replace(/<a\b([^>]*?\s)href=(["'])#quote\2([^>]*)>/g, '<a$1href="/free-solar-quote" data-quote-drawer="1"$3>');
 }
 
 /** The old black-and-yellow wordmark file, swapped for the current one (with the ®) wherever a saved CMS page still names it. */
@@ -171,6 +179,8 @@ export const LIVE_FIXES_CSS =
   'html,body{max-width:100%;overflow-x:clip;height:auto;min-height:0}' +
   // Where a testimonials block was taken out (withoutTestimonials): no empty gap.
   '.pv-testi-removed,div:has(>.pv-testi-removed:only-child){display:none}' +
+  // Pages published before the steps tile existed still carry hatched filler boxes: hide them (a republish replaces them with the tile).
+  '.pv-pstep-fill{display:none!important}' +
   // The site footer must always show, whatever an older published snapshot's styles say, with its bottom links in a row.
   'footer{display:block!important;background:#2c2820;color:#a69f8e}' +
   'footer a{color:#a69f8e}footer .base a{display:inline;margin:0}' +

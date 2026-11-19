@@ -513,12 +513,16 @@ body:not(.cms-ready) #modal{visibility:hidden!important}
 .pv-pstep .n{font-family:var(--mono);font-weight:600;font-size:.9rem;color:var(--ink);background:var(--solar);padding:5px 10px;border-radius:2px;display:inline-block;margin-bottom:14px;line-height:1}
 .pv-pstep h4{font-size:1.05rem;font-weight:700;margin:0}
 .pv-pstep p{margin-top:6px;color:var(--muted);font-size:.9rem}
+/* Spare cells in a steps grid become one call-to-action tile (the old hatched .pv-pstep-fill boxes stay styled for pages published before this). */
+.pv-pstep-cta{border-top:2px solid var(--solar);padding-top:16px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:10px}
+.pv-pstep-cta b{font-family:var(--display);font-size:1.05rem;font-weight:800}
+.pv-pstep-tel{font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 .pv-pstep-fill{border-top:2px solid var(--line);padding-top:16px;display:flex;min-height:0}
 .pv-pstep-fill-box{flex:1;min-height:76px;border-radius:4px;border:1px solid var(--line);background:repeating-linear-gradient(135deg,rgba(33,31,24,.05) 0 1px,transparent 1px 10px),var(--paper-2);position:relative}
 .pv-pstep-fill-box::after{content:"✦";position:absolute;inset:0;display:grid;place-items:center;color:var(--amber);opacity:.4;font-size:1.05rem}
 /* Steps never exceed 4 across (render caps the inline count); collapse on smaller
    screens — !important because the inline grid-template-columns would otherwise win. */
-@media(max-width:900px){.pv-steps{grid-template-columns:repeat(2,1fr)!important}.pv-pstep-fill{grid-column:span 1!important}.pv-pstep-fill.is-teven{display:none!important}}
+@media(max-width:900px){.pv-steps{grid-template-columns:repeat(2,1fr)!important}.pv-pstep-cta{grid-column:1/-1!important}.pv-pstep-fill{grid-column:span 1!important}.pv-pstep-fill.is-teven{display:none!important}}
 @media(max-width:560px){.pv-steps{grid-template-columns:1fr!important}.pv-pstep-fill{display:none!important}}
 .pv-testi{padding:76px 0;background:var(--paper);box-sizing:border-box;width:100%}
 .pv-testi .wrap{max-width:var(--pv-max,1160px);margin:0 auto;padding:0 var(--pv-gutter,24px);box-sizing:border-box;width:100%}

@@ -1,18 +1,20 @@
 import { CtaBand, QuoteForm, ScrollReveal, TALK_LINKS } from '@/components/home';
-import { fixDeadQuoteLinks, freshenLogo, hasQuoteTarget, splitCmsPage, withoutTestimonials } from '@/lib/cms-ctas';
+import { QuoteDrawer } from './QuoteDrawer';
+import { fixDeadQuoteLinks, freshenLogo, hasQuoteButtons, hasQuoteTarget, splitCmsPage, withoutTestimonials } from '@/lib/cms-ctas';
 
 /**
  * A published CMS page on the live website. Shows the page as published, with the current logo, and (without
  * republishing from the CMS) swaps the old quote form for the current step-by-step one, and on the homepage adds
- * the two call-to-action bands. Sample testimonials are taken out, and "#quote" buttons on a page with no quote form go
- * to /free-solar-quote. `display: contents` keeps the pieces laying out as one page.
+ * the two call-to-action bands. Sample testimonials are taken out, and "#quote" buttons on a page with no quote form open
+ * a quote drawer (and link to /free-solar-quote without JavaScript). `display: contents` keeps the pieces laying out as one page.
  */
 export function CmsBody({ html, className, ctas = false }: { html: string; className?: string; ctas?: boolean }) {
   const clean = withoutTestimonials(freshenLogo(html));
   const parts = splitCmsPage(clean, { ctas, quote: true });
   const hasQuote = parts.some((p) => typeof p !== 'string' && 'quote' in p);
-  // "#quote" buttons only work where there is a quote form on the page; elsewhere they go to the quote landing page.
-  const tidy = hasQuote || hasQuoteTarget(clean) ? (s: string) => s : fixDeadQuoteLinks;
+  // "#quote" buttons only work where there is a quote form on the page. Elsewhere they open the quote drawer (and link to the quote page without JavaScript).
+  const needsDrawer = !hasQuote && !hasQuoteTarget(clean) && hasQuoteButtons(clean);
+  const tidy = needsDrawer ? fixDeadQuoteLinks : (s: string) => s;
   return (
     <div className={className}>
       {parts.map((part, i) => {
@@ -44,6 +46,7 @@ export function CmsBody({ html, className, ctas = false }: { html: string; class
         );
       })}
       {hasQuote && <ScrollReveal />}
+      {needsDrawer && <QuoteDrawer />}
     </div>
   );
 }

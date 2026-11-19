@@ -14,6 +14,8 @@ window.initCmsFormRuntime = initCmsFormRuntime;
 window.initPvFaq = initPvFaq;
 initCmsFormRuntime();
 var CMS_INITIAL_SLUG = options?.initialPageSlug || null;
+/* Where Heliaxis works, in the words used on pages. One place, so it can be changed once (the facts sheet will own it). */
+var SERVICE_AREA='South Wales and the South West';
 /* ---- Supabase-backed storage shim: wires the page-builder to /api/cms ---- */
 window.storage = {
   async get(key){
@@ -152,7 +154,7 @@ let STATE, SEL=null, VIEW='desk';
 function uid(){return Math.random().toString(36).slice(2,8)}
 function defaultSite(){return {
   images:[],
-  topbar:{show:true,accreditationText:'MCS · RECC · NAPIT · TrustMark registered installer',ratingValue:'4.9',hoursText:'Mon–Sat 8am–6pm',phone:'01633 965205',phoneHref:'tel:01633965205'},
+  topbar:{show:true,accreditationText:'MCS · RECC · NAPIT · TrustMark registered installer',ratingValue:'',hoursText:'Mon–Fri 8am–6pm · Weekends 10am–3pm',phone:'01633 965205',phoneHref:'tel:01633965205'},
   logos:[
     {id:uid(),name:'GivEnergy',img:'',bnr:true},{id:uid(),name:'SolarEdge',img:'',bnr:true},
     {id:uid(),name:'Tesla Powerwall',img:'',bnr:true},{id:uid(),name:'JA Solar',img:'',bnr:true},
@@ -170,7 +172,7 @@ function defaultSite(){return {
 function footerDefaults(){return {
   logoImg:'/assets/heliaxis-logo-doc.png',
   brandText:'Heliaxis',
-  about:'MCS-certified solar, battery, heat pump, EV & LED installation for homes and businesses across South Wales.',
+  about:'MCS-certified solar, battery, heat pump, EV & LED installation for homes and businesses across '+SERVICE_AREA+'.',
   cols:[
     {title:'Services',links:[
       {label:'Solar panels',href:'/#services'},
@@ -205,18 +207,18 @@ function formVariant(p){if(p.variant==='contact')return 'contact';if(p.variant==
 var QUOTE_CHECK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 var QUOTE_SHIELD_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="f" d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" fill="var(--solar)" stroke="none"/><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>';
 function homeBlocks(){return [
- {id:uid(),t:'hero',p:{eyebrow:'MCS-certified · South Wales',headline:'Cut your energy bills with **Welsh sunshine.**',sub:'Solar, battery, heat pumps & EV — one local, accredited team. No pushy sales, ever.',dark:true,ctaLabel:'Get my free quote',ctaPulse:true,cta2:'Estimate my savings'}},
+ {id:uid(),t:'hero',p:{eyebrow:'MCS-certified · '+SERVICE_AREA,headline:'Cut your energy bills with **Welsh sunshine.**',sub:'Solar, battery, heat pumps & EV — one local, accredited team. No pushy sales, ever.',dark:true,ctaLabel:'Get my free quote',ctaPulse:true,cta2:'Estimate my savings'}},
  {id:uid(),t:'stats',p:{items:[{n:'1,200+',k:'Installs completed'},{n:'£1,200',k:'Avg. yearly saving'},{n:'4.9★',k:'Customer rating'},{n:'25 yr',k:'Workmanship guarantee'}]}},
  {id:uid(),t:'grid',p:{eyebrow:'What we install',title:'One team for your whole energy setup',anchor:'services',cols:3,items:[
    {icon:'solar',title:'Solar PV panels',desc:'Tier-one panels sized to your roof.'},{icon:'battery',title:'Battery storage',desc:'Store sunshine for after dark.'},{icon:'heatpump',title:'Heat pumps',desc:'Efficient low-carbon heating.'},
    {icon:'ev',title:'EV chargers',desc:'Charge from your own solar.'},{icon:'led',title:'LED lighting',desc:'Fast-payback lighting upgrades.'},{icon:'monitor',title:'Monitoring',desc:'Track savings from your phone.'}]}},
  {id:uid(),t:'banner',p:{heading:'Trusted technology we install'}},
  {id:uid(),t:'split',p:{lt:'For your home',ld:'Cut your bills, add battery backup and go greener.',lb:['Free, no-obligation home survey','0% VAT on residential solar to 2027','Finance to spread the cost'],lc:'Get my home quote',rt:'For your business',rd:'Turn your roof into lower running costs, with ROI, grants and finance.',rb:['Free commercial energy assessment','Grants, finance & PPA','Typical 3–6 year payback'],rc:'Explore business funding'}},
- {id:uid(),t:'testi',p:{eyebrow:'Real customers',title:'Trusted across South Wales',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',items:[
+ {id:uid(),t:'testi',p:{eyebrow:'Real customers',title:'What customers say',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',items:[
    {stars:5,quote:'Neat, tidy and genuinely no pressure. Our bills have dropped massively and the app makes it easy to see.',name:'Sarah M.',loc:'Cardiff · Solar + battery'},
    {stars:5,quote:'From survey to switch-on they were spot on. The team clearly knew what they were doing and cleaned up after.',name:'David R.',loc:'Swansea · Solar PV'},
    {stars:5,quote:'We use them for our commercial units. Straight answers, proper ROI figures, and a payback we\'re already hitting.',name:'Gareth L.',loc:'Newport · Commercial'}]}},
- {id:uid(),t:'gallery',p:{eyebrow:'Recent work',title:'Installs across South Wales',sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',featuredLabel:'Featured install',footnote:'Placeholder frames — swap in your real drone & install photography.',featuredIndex:0,items:[
+ {id:uid(),t:'gallery',p:{eyebrow:'Recent work',title:'Recent installs',sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',featuredLabel:'Featured install',footnote:'Placeholder frames — swap in your real drone & install photography.',featuredIndex:0,items:[
    {img:'',loc:'Cardiff · 6.4 kWp + 10kWh battery',featured:true},{img:'',loc:'Swansea · 4.0 kWp',featured:false},{img:'',loc:'Newport · Commercial 55 kWp',featured:false},
    {img:'',loc:'Bridgend · 5.3 kWp + EV',featured:false},{img:'',loc:'Vale of Glamorgan · Heat pump',featured:false}]}},
  {id:uid(),t:'funding',p:{eyebrow:'Funding & finance',title:'Solar within reach, whatever your budget',sub:'Buy outright, spread the cost, or pay nothing upfront — plus the Welsh grants worth knowing about.',items:[
@@ -229,9 +231,9 @@ function homeBlocks(){return [
    {q:'How much could I save?',a:'It depends on your roof, usage and whether you add a battery — but many homes save four figures a year. The quickest way to find out is our 20-second estimator, or a free survey for exact figures.'},
    {q:'Will I need planning permission?',a:'For most homes solar is classed as permitted development, so no permission is needed. Listed buildings, conservation areas and some commercial sites are exceptions — we\'ll confirm at survey.'},
    {q:'Is there really no hard sell?',a:'Correct. We\'re engineers, not commission-driven salespeople. You\'ll get honest advice, a clear quote, and no pressure — book a survey and decide in your own time.'},
-   {q:'Do you cover my area?',a:'We install right across South Wales — Cardiff, Swansea, Newport, Bridgend, the Vale of Glamorgan, RCT and surrounding areas. If you\'re nearby, just ask.'}]}},
+   {q:'Do you cover my area?',a:'We cover '+SERVICE_AREA+'. Tell us your postcode and we will confirm we can help.'}]}},
  {id:uid(),t:'form',p:quoteFormDefaults()},
- {id:uid(),t:'cta',p:{headline:'Your lower bills start with one free survey.',sub:'Join 1,200+ South Wales homes and businesses already powering up with Heliaxis.',btn:'Get my free quote',btnHref:'#quote',pulse:true,ctaDisabled:false,btn2:'Call 01633 965205',btn2Href:'tel:01633965205',cta2Disabled:false}},
+ {id:uid(),t:'cta',p:{headline:'Your lower bills start with one free survey.',sub:'Book a free survey and see what solar, battery or a heat pump could do for you.',btn:'Get my free quote',btnHref:'#quote',pulse:true,ctaDisabled:false,btn2:'Call 01633 965205',btn2Href:'tel:01633965205',cta2Disabled:false}},
  {id:uid(),t:'footer',p:footerDefaults()}
 ]}
 function newState(){return {pages:[{id:uid(),name:'Home',slug:'/',type:'page',blocks:homeBlocks()}],current:0,site:defaultSite()}}
@@ -280,6 +282,8 @@ async function boot(){
   if(ensureHomeFunding())save();
   if(ensureFaqCustomize())save();
   if(ensureHomeQuoteForm())save();
+  if(ensureSplitLinks())save();
+  if(ensureAreaDefaults())save();
   if(ensureFormCustomize())save();
   if(ensureCtaCustomize())save();
   if(ensureHeroCustomize())save();
@@ -450,9 +454,13 @@ function renderBlock(b,edit){
    var btnrow=btns?'<div class="cbtns">'+btns+'</div>':'';
    var mt=p.microtrust!==undefined?p.microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees';
    var mthtml=(!p.hideMicrotrust&&mt&&String(mt).trim())?('<p class="microtrust"'+ce(id+'.microtrust',edit)+'>'+esc(mt)+'</p>'):'';
-   var rtVal=p.ratingValue||'4.9';
-   var rtInst=p.ratingInstalls||'1200';
-   var rthtml=!p.hideRating?('<div class="rating"><div class="r"><span class="big"'+ce(id+'.ratingValue',edit)+'>'+esc(rtVal)+'</span><span class="stars">★★★★★</span><span>Google &amp; Trustpilot</span></div><div class="r"><span class="big"><span'+ce(id+'.ratingInstalls',edit)+'>'+esc(rtInst)+'</span>+</span><span>installs across South Wales</span></div></div>'):'';
+   var rtVal=String(p.ratingValue||'').trim(),rtSrc=String(p.ratingSource||'').trim();
+   var rtInst=String(p.ratingInstalls||'').trim(),rtLbl=String(p.ratingInstallsLabel||'').trim();
+   /* A rating shows only with its value AND where it comes from; an install figure only with its value AND what it counts. Nothing is filled in for you. */
+   var rtCells='';
+   if(rtVal&&rtSrc)rtCells+='<div class="r"><span class="big"'+ce(id+'.ratingValue',edit)+'>'+esc(rtVal)+'</span><span class="stars">★★★★★</span><span'+ce(id+'.ratingSource',edit)+'>'+esc(rtSrc)+'</span></div>';
+   if(rtInst&&rtLbl)rtCells+='<div class="r"><span class="big"'+ce(id+'.ratingInstalls',edit)+'>'+esc(rtInst)+'</span><span'+ce(id+'.ratingInstallsLabel',edit)+'>'+esc(rtLbl)+'</span></div>';
+   var rthtml=(!p.hideRating&&rtCells)?('<div class="rating">'+rtCells+'</div>'):'';
    var eyebrowHtml = p.eyebrow ? '<span class="eyebrow on-dark"'+ce(id+'.eyebrow',edit)+'>'+SPARK.replace('<svg ','<svg class="spark-ico" ')+esc(p.eyebrow)+'</span>' : '';
    var markHtml='';
    if(!hideMark){
@@ -482,11 +490,11 @@ function renderBlock(b,edit){
  if(t==='split'){
     const lIc = p.lIcon ? '<div class="pv-sc-ic">'+icon(p.lIcon)+'</div>' : '';
     const rIc = p.rIcon ? '<div class="pv-sc-ic dark">'+icon(p.rIcon)+'</div>' : '';
-    return '<div class="pv-split"><div class="pv-splitcard">'+lIc+'<h3'+ce(id+'.lt',edit)+'>'+accentText(p.lt)+'</h3><p'+ce(id+'.ld',edit,1)+'>'+esc(p.ld)+'</p><ul>'+p.lb.map((x,i)=>'<li'+ce(id+'.lb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.lc,'dark',false,null,id+'.lc',edit,p.lcHref||'#quote')+'</div><div class="pv-splitcard dark">'+rIc+'<h3'+ce(id+'.rt',edit)+'>'+accentText(p.rt)+'</h3><p'+ce(id+'.rd',edit,1)+'>'+esc(p.rd)+'</p><ul>'+p.rb.map((x,i)=>'<li'+ce(id+'.rb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.rc,'solar',false,null,id+'.rc',edit,p.rcHref||'/commercial-funding')+'</div></div>';
+    return '<div class="pv-split"><div class="pv-splitcard">'+lIc+'<h3'+ce(id+'.lt',edit)+'>'+accentText(p.lt)+'</h3><p'+ce(id+'.ld',edit,1)+'>'+esc(p.ld)+'</p><ul>'+p.lb.map((x,i)=>'<li'+ce(id+'.lb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.lc,'dark',false,null,id+'.lc',edit,p.lcHref||'#quote')+'</div><div class="pv-splitcard dark">'+rIc+'<h3'+ce(id+'.rt',edit)+'>'+accentText(p.rt)+'</h3><p'+ce(id+'.rd',edit,1)+'>'+esc(p.rd)+'</p><ul>'+p.rb.map((x,i)=>'<li'+ce(id+'.rb.'+i,edit)+'>'+esc(x)+'</li>').join('')+'</ul>'+btn(p.rc,'solar',false,null,id+'.rc',edit,p.rcHref||'#quote')+'</div></div>';
   }
  if(t==='testi'){
    var teb=(p.eyebrow!=null&&String(p.eyebrow).trim()!=='')?p.eyebrow:'Real customers';
-   var ttl=p.title||'Trusted across South Wales';
+   var ttl=p.title||'What customers say';
    var fn=p.footnote===''?null:(p.footnote||'Illustrative testimonials — replace with your real Google & Trustpilot reviews.');
    function tq(q){var s=String(q||'');if(!s)return '""';if(/^["'“”]/.test(s))return esc(s);return '"'+esc(s)+'"';}
    const cards=p.items.map((tt,i)=>'<div class="tcard"><div class="stars">'+'★'.repeat(tt.stars||5)+'</div><blockquote'+ce(id+'.items.'+i+'.quote',edit)+'>'+tq(tt.quote)+'</blockquote><div class="who"><b'+ce(id+'.items.'+i+'.name',edit)+'>'+esc(tt.name)+'</b> <span>· <span'+ce(id+'.items.'+i+'.loc',edit)+'>'+esc(tt.loc)+'</span></span></div></div>');
@@ -497,7 +505,7 @@ function renderBlock(b,edit){
    return '<div class="pv-testi"><div class="wrap"><div class="shead center">'+eyebrow(teb,id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+accentText(ttl)+'</h2></div>'+body+fnHtml+'</div></div>';}
  if(t==='gallery'){
    var geb=(p.eyebrow!=null&&String(p.eyebrow).trim()!=='')?p.eyebrow:'Recent work';
-   var gtl=(p.title!=null&&String(p.title).trim()!=='')?p.title:'Installs across South Wales';
+   var gtl=(p.title!=null&&String(p.title).trim()!=='')?p.title:'Recent installs';
    var gsub=p.sub===''?null:(p.sub!=null&&String(p.sub).trim()!==''?p.sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.');
    var gfn=p.footnote===''?null:(p.footnote!=null&&String(p.footnote).trim()!==''?p.footnote:'Placeholder frames — swap in your real drone & install photography.');
    var gfl=p.featuredLabel!=null?p.featuredLabel:'Featured install';
@@ -631,7 +639,7 @@ if(t==='media'){const im=p.img?mediaFrameHtml(p.img,edit,id+'.img',p.fit,mediaGr
    var form='<form class="pv-qcard pv-cms-form" action="/api/quote" method="post" novalidate>'+seg+rows+'<div class="pv-form-msg" hidden></div><div class="pv-form-actions">'+cta+'</div>'+foot+legal+'</form>';
    return '<div class="pv-quote is-split" id="'+esc(anchor)+'"><div class="wrap"><div class="pv-qgrid">'+why+form+'</div></div></div>';}
 if(t==='pricing')return '<div class="pv-sec"><div class="shead center">'+eyebrow(p.eyebrow||'Options',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+accentText(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+p.plans.length+',1fr);gap:14px">'+p.plans.map((pl,i)=>'<div class="pv-card'+(pl.hl?' pv-plan-hl':'')+'"><div style="font-family:var(--mono);font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:var(--amber-2)"'+ce(id+'.plans.'+i+'.name',edit)+'>'+esc(pl.name)+'</div><div style="font-family:var(--display);font-weight:900;font-size:1.9rem;margin:6px 0"'+ce(id+'.plans.'+i+'.price',edit)+'>'+esc(pl.price)+'</div><div style="color:var(--muted);font-size:.8rem;margin-bottom:12px"'+ce(id+'.plans.'+i+'.per',edit)+'>'+esc(pl.per)+'</div>'+pl.feats.map((f,fi)=>'<div style="display:flex;gap:8px;padding:5px 0;font-size:.87rem;border-top:1px solid var(--line)"><span style="color:var(--ok)">✓</span><span'+ce(id+'.plans.'+i+'.feats.'+fi,edit)+'>'+esc(f)+'</span></div>').join('')+'<div style="margin-top:14px">'+btn(pl.cta,pl.hl?'solar':'dark ghost',false,null,id+'.plans.'+i+'.cta',edit,pl.ctaHref||'#quote')+'</div></div>').join('')+'</div></div>';
- if(t==='steps'){var _sn=p.items.length;var _sfill='';if(_sn>4&&_sn%4!==0){_sfill='<div class="pv-pstep-fill'+(_sn%2===0?' is-teven':'')+'" style="grid-column:span '+((4-_sn%4)%4)+'" aria-hidden="true"><span class="pv-pstep-fill-box"></span></div>';}return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow||'How it works',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+accentText(p.title)+'</h2></div><div class="pv-steps" style="grid-template-columns:repeat('+Math.min(p.items.length,4)+',1fr)">'+p.items.map((s,i)=>'<div class="pv-pstep"><div class="n">'+String(i+1).padStart(2,'0')+'</div><h4'+ce(id+'.items.'+i+'.title',edit)+'>'+accentText(s.title)+'</h4><p'+ce(id+'.items.'+i+'.text',edit)+'>'+esc(s.text).replace(/\n/g,'<br>')+'</p></div>').join('')+_sfill+'</div></div>';}
+ if(t==='steps'){var _sn=p.items.length;var _sfill='';if(_sn>4&&_sn%4!==0){_sfill='<div class="pv-pstep-cta" style="grid-column:span '+((4-_sn%4)%4)+'"><b>Ready when you are</b><a class="pv-btn solar" href="#quote"'+(edit?' onclick="event.preventDefault()"':'')+'>Book my free survey</a><a class="pv-pstep-tel" href="tel:01633965205"'+(edit?' onclick="event.preventDefault()"':'')+'>01633 965205</a></div>';}return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow||'How it works',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+accentText(p.title)+'</h2></div><div class="pv-steps" style="grid-template-columns:repeat('+Math.min(p.items.length,4)+',1fr)">'+p.items.map((s,i)=>'<div class="pv-pstep"><div class="n">'+String(i+1).padStart(2,'0')+'</div><h4'+ce(id+'.items.'+i+'.title',edit)+'>'+accentText(s.title)+'</h4><p'+ce(id+'.items.'+i+'.text',edit)+'>'+esc(s.text).replace(/\n/g,'<br>')+'</p></div>').join('')+_sfill+'</div></div>';}
  if(t==='casestudy')return '<div class="pv-sec"><div class="shead">'+eyebrow(p.eyebrow||'Our work',id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+accentText(p.title)+'</h2></div><div style="display:grid;grid-template-columns:repeat('+Math.min(p.items.length,3)+',1fr);gap:14px">'+p.items.map((cs,i)=>'<div class="pv-card" style="padding:0;overflow:hidden">'+(cs.img?imgTag(cs.img,'width:100%;height:150px;object-fit:cover;display:block',edit,id+'.items.'+i+'.img'):(edit?'<div class="pv-casestudy-empty is-pick" role="button" tabindex="0" onclick="pvImgPick(event,\''+id+'.items.'+i+'.img\')" title="Click to add an image" style="height:150px;background:linear-gradient(135deg,#26324c,#171d2b);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;color:var(--muted)">＋ ADD IMAGE</div>':'<div style="height:150px;background:linear-gradient(135deg,#26324c,#171d2b)"></div>'))+'<div style="padding:18px"><div style="font-family:var(--mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)"'+ce(id+'.items.'+i+'.loc',edit)+'>'+esc(cs.loc)+'</div><h3 style="font-size:1.02rem;font-weight:600;margin-top:4px"'+ce(id+'.items.'+i+'.title',edit)+'>'+accentText(cs.title)+'</h3><div style="font-family:var(--display);font-weight:900;color:var(--amber-2);font-size:1.4rem;margin-top:10px"'+ce(id+'.items.'+i+'.stat',edit)+'>'+esc(cs.stat)+'</div><div style="font-size:.76rem;color:var(--muted)"'+ce(id+'.items.'+i+'.statlabel',edit)+'>'+esc(cs.statlabel)+'</div></div></div>').join('')+'</div></div>';
  if(t==='clientbanner'){const cs=p.clients||[];const chip=c=>'<span class="pv-brand">'+(c.img?'<img src="'+c.img+'" alt="'+esc(c.name||'')+'">':esc(c.name))+'</span>';
    if(!cs.length)return '<div class="pv-banner'+(p.dark?' dk':'')+'"><div class="bh"'+ce(id+'.heading',edit)+'>'+accentText(p.heading)+'</div><div class="pv-bmarq"><div class="trk"></div></div></div>';
@@ -740,7 +748,7 @@ function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='
    h+='</div>';
    h+=chk('Disable primary button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Primary button is hidden.</div>':txt('Primary button',p.ctaLabel,id+'.ctaLabel')+routeFld('Primary button link',p.ctaHref||'#quote',id+'.ctaHref')+chk('Pulse animation on button',p.ctaPulse,id+'.ctaPulse'));
    h+=chk('Disable secondary button',!!p.cta2Disabled,id+'.cta2Disabled')+(p.cta2Disabled?'<div class="hint">Secondary button is hidden.</div>':txt('Secondary button',p.cta2,id+'.cta2')+routeFld('Secondary button link',p.cta2Href||'',id+'.cta2Href'));
-   h+=txt('Microtrust bar',p.microtrust!=null?p.microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees',id+'.microtrust')+txt('Rating value',p.ratingValue||'4.9',id+'.ratingValue')+txt('Installs count',p.ratingInstalls||'1200',id+'.ratingInstalls');}
+   h+=txt('Microtrust bar',p.microtrust!=null?p.microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees',id+'.microtrust')+'<div class="hint"><b>Rating row</b> Shows only when the value and its source are both filled in (and the install figure with its label). Leave empty until the figures are verified.</div>'+txt('Rating value',p.ratingValue||'',id+'.ratingValue')+txt('Rating source (for example Google)',p.ratingSource||'',id+'.ratingSource')+txt('Installs figure',p.ratingInstalls||'',id+'.ratingInstalls')+txt('Installs label (what it counts)',p.ratingInstallsLabel||'',id+'.ratingInstallsLabel');}
  else if(bt==='stats'){h+='<div class="hint">Stat tiles</div>';p.items.forEach((s,i)=>{h+='<div class="sub"><div class="sh"><b>Tile '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Number',s.n,id+'.items.'+i+'.n')+txt('Label',s.k,id+'.items.'+i+'.k')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{n:\'0\',k:\'Label\'})">+ Add tile</button>';}
  else if(bt==='footer'){h+=imagePicker(p.logoImg||'',id+'.logoImg','Footer logo',true)+'<div class="hint">Leave empty to show the brand name as text.</div>'+txt('Brand name (fallback)',p.brandText||'Heliaxis',id+'.brandText')+area('About text',p.about,id+'.about');
    (p.cols||[]).forEach(function(col,ci){
@@ -759,10 +767,10 @@ function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='
    p.items.forEach((it,i)=>{h+='<div class="sub"><div class="sh"><b>Item '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+iconPicker(it.icon,id+'.items.'+i+'.icon')+txt('Title',it.title,id+'.items.'+i+'.title')+txt('Description',it.desc,id+'.items.'+i+'.desc')+'</div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{icon:\'solar\',title:\'New item\',desc:\'Description\'})">+ Add item</button>'+accentHint();}
  else if(bt==='split'){h+='<div class="hint"><b>Left card</b></div>'+iconPicker(p.lIcon||'home',id+'.lIcon')+txt('Title',p.lt,id+'.lt')+area('Text',p.ld,id+'.ld')+bulletsEd(id,'lb',p.lb)+txt('Button',p.lc,id+'.lc')+routeFld('Button link',p.lcHref||'#quote',id+'.lcHref');
-    h+='<div class="hint"><b>Right card (dark)</b></div>'+iconPicker(p.rIcon||'building',id+'.rIcon')+txt('Title',p.rt,id+'.rt')+area('Text',p.rd,id+'.rd')+bulletsEd(id,'rb',p.rb)+txt('Button',p.rc,id+'.rc')+routeFld('Button link',p.rcHref||'/commercial-funding',id+'.rcHref')+accentHint();}
+    h+='<div class="hint"><b>Right card (dark)</b></div>'+iconPicker(p.rIcon||'building',id+'.rIcon')+txt('Title',p.rt,id+'.rt')+area('Text',p.rd,id+'.rd')+bulletsEd(id,'rb',p.rb)+txt('Button',p.rc,id+'.rc')+routeFld('Button link',p.rcHref||'#quote',id+'.rcHref')+((p.lc&&p.rc&&String(p.lc).trim().toLowerCase()===String(p.rc).trim().toLowerCase())?'<div class="hint" style="color:#b3261e"><b>Both buttons say the same thing.</b> Give each its own label so a reader knows which one to press.</div>':'')+accentHint();}
  else if(bt==='estband'){h+=accentArea('Headline',p.headline,id+'.headline')+area('Subtext',p.sub,id+'.sub')+txt('Button label',p.btnLabel,id+'.btnLabel')+routeFld('Button link',p.btnHref||'#quote',id+'.btnHref');}
  else if(bt==='gallery'){var gfi=galleryFeaturedIndex(p);
-   h+=txt('Eyebrow',p.eyebrow||'Recent work',id+'.eyebrow')+accentArea('Title',p.title||'Installs across South Wales',id+'.title')+area('Subtext (leave empty to hide)',p.sub!=null?p.sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',id+'.sub')+txt('Featured placeholder label',p.featuredLabel!=null?p.featuredLabel:'Featured install',id+'.featuredLabel')+area('Footnote (leave empty to hide)',p.footnote!=null?p.footnote:'Placeholder frames — swap in your real drone & install photography.',id+'.footnote')+'<div class="hint">Click the <b>camera icon</b> in the preview to upload a photo directly. One <b>featured</b> large frame + smaller frames.</div>';
+   h+=txt('Eyebrow',p.eyebrow||'Recent work',id+'.eyebrow')+accentArea('Title',p.title||'Recent installs',id+'.title')+area('Subtext (leave empty to hide)',p.sub!=null?p.sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',id+'.sub')+txt('Featured placeholder label',p.featuredLabel!=null?p.featuredLabel:'Featured install',id+'.featuredLabel')+area('Footnote (leave empty to hide)',p.footnote!=null?p.footnote:'Placeholder frames — swap in your real drone & install photography.',id+'.footnote')+'<div class="hint">Click the <b>camera icon</b> in the preview to upload a photo directly. One <b>featured</b> large frame + smaller frames.</div>';
    p.items.forEach(function(it,i){h+='<div class="sub"><div class="sh"><b>Frame '+(i+1)+'</b><span style="display:flex;gap:4px;align-items:center"><button type="button" class="rm" onclick="moveGalItem(\''+id+'\',\'items\','+i+',-1)"'+(i===0?' disabled style="opacity:.35"':'')+' title="Move up">↑</button><button type="button" class="rm" onclick="moveGalItem(\''+id+'\',\'items\','+i+',1)"'+(i===p.items.length-1?' disabled style="opacity:.35"':'')+' title="Move down">↓</button><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></span></div>';
    if(gfi!==i)h+='<button type="button" class="miniadd" style="margin-bottom:8px" onclick="setGalleryFeatured(\''+id+'\','+i+')">Make large featured frame</button>';
    else h+='<div class="hint" style="color:var(--ok);margin-bottom:8px">✓ Large featured frame</div>';
@@ -777,7 +785,7 @@ function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='
    p.items.forEach(function(it,i){h+='<div class="sub"><div class="sh"><b>Option '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+imagePicker(it.img,id+'.items.'+i+'.img','Photo for this option',true)+'<div class="hint" style="font-size:.76rem;margin:-4px 0 8px">Left “film still” for this option. Leave blank for a placeholder plate.</div>'+accentArea('Title',it.title,id+'.items.'+i+'.title')+area('Description',it.text,id+'.items.'+i+'.text')+txt('Button (leave empty to hide)',it.cta||'',id+'.items.'+i+'.cta')+(it.cta&&String(it.cta).trim()?routeFld('Button link',it.ctaHref||'#quote',id+'.items.'+i+'.ctaHref'):'')+'</div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{title:\'New option\',text:\'Description.\',img:\'\',cta:\'\',ctaHref:\'#quote\'})">+ Add option</button>'+accentHint();
    if(p.items.length>8)h+='<div class="hint" style="color:var(--amber-2)">Only the first 8 options render on the page.</div>';}
- else if(bt==='testi'){h+=txt('Eyebrow',p.eyebrow||'Real customers',id+'.eyebrow')+accentArea('Title',p.title||'Trusted across South Wales',id+'.title')+area('Footnote (leave empty to hide)',p.footnote!=null?p.footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',id+'.footnote')+'<div class="hint">Add testimonials. <b>More than 3 turns it into an auto-scrolling slider.</b></div>';
+ else if(bt==='testi'){h+=txt('Eyebrow',p.eyebrow||'Real customers',id+'.eyebrow')+accentArea('Title',p.title||'What customers say',id+'.title')+area('Footnote (leave empty to hide)',p.footnote!=null?p.footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',id+'.footnote')+'<div class="hint">Add testimonials. <b>More than 3 turns it into an auto-scrolling slider.</b></div>';
    h+='<div class="fld"><label>Slider speed — '+(p.speed||36)+'s per loop (lower = faster)</label><input type="range" min="12" max="80" value="'+(p.speed||36)+'" oninput="updT(\''+id+'.speed\',+this.value)"></div>';
    p.items.forEach((tt,i)=>{h+='<div class="sub"><div class="sh"><b>#'+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+area('Quote',tt.quote,id+'.items.'+i+'.quote')+'<div class="row2">'+txt('Name',tt.name,id+'.items.'+i+'.name')+txt('Location',tt.loc,id+'.items.'+i+'.loc')+'</div><div class="fld"><label>Stars — '+(tt.stars||5)+'</label><div class="seg">'+[1,2,3,4,5].map(s=>'<button class="'+((tt.stars||5)===s?'on':'')+'" onclick="upd(\''+id+'.items.'+i+'.stars\','+s+')">'+s+'★</button>').join('')+'</div></div></div>';});
    h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{stars:5,quote:\'Great service.\',name:\'Name\',loc:\'Town · Solar\'})">+ Add testimonial</button>';
@@ -841,14 +849,14 @@ function addFooterLink(id,ci){var p=findBlock(id).p;if(!p.cols||!p.cols[ci])retu
 function rmFooterCol(id,ci){var p=findBlock(id).p;if(!p.cols)return;p.cols.splice(ci,1);renderPreview();renderBuild();save();}
 function selectBlock(id){if(SEL===id)return;SEL=id;tplHide();renderPreview();renderBuild();}
 function blockDefs(){const defs={
-  hero:{eyebrow:'Eyebrow',headline:'Your headline here',sub:'Supporting sentence.',dark:true,ctaLabel:'Get a quote',ctaHref:'#quote',ctaPulse:false,cta2:'',cta2Href:'',ctaDisabled:false,cta2Disabled:false,textWide:false,tags:'',hideMark:false,hideSun:false,hideRating:false,hideMicrotrust:false,markImg:'',bgImg:'',bgOverlay:62,ratingValue:'4.9',ratingInstalls:'1200',microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees'},
+  hero:{eyebrow:'Eyebrow',headline:'Your headline here',sub:'Supporting sentence.',dark:true,ctaLabel:'Get a quote',ctaHref:'#quote',ctaPulse:false,cta2:'',cta2Href:'',ctaDisabled:false,cta2Disabled:false,textWide:false,tags:'',hideMark:false,hideSun:false,hideRating:false,hideMicrotrust:false,markImg:'',bgImg:'',bgOverlay:62,ratingValue:'',ratingSource:'',ratingInstalls:'',ratingInstallsLabel:'',microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees'},
   stats:{items:[{n:'100+',k:'Installs'},{n:'£1,200',k:'Saved / yr'},{n:'4.9★',k:'Rating'}]},
   grid:{eyebrow:'Section',title:'Section title',anchor:'',cols:3,fill:'none',contactHeading:'Get in touch',contactText:'Not sure which option fits? Tell us your setup and we\'ll point you the right way.',contactBtn:'Contact us',contactHref:'#quote',items:[{icon:'solar',title:'Item one',desc:'Description.'},{icon:'battery',title:'Item two',desc:'Description.'},{icon:'ev',title:'Item three',desc:'Description.'}]},
   footer:footerDefaults(),
   split:{lIcon:'home',lt:'For your home',ld:'Text.',lb:['Point one','Point two'],lc:'Home quote',lcHref:'#quote',rIcon:'building',rt:'For your business',rd:'Text.',rb:['Point one','Point two'],rc:'Business quote',rcHref:'/commercial-funding'},
   estband:{headline:'See your savings in 20 seconds.',sub:'No forms, no phone calls — just a quick estimate of system size, savings and payback.',btnLabel:'Try the free estimator',btnHref:'#quote'},
-  testi:{eyebrow:'Real customers',title:'Trusted across South Wales',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',items:[{stars:5,quote:'Great service.',name:'Name',loc:'Town · Solar'}]},
-  gallery:{eyebrow:'Recent work',title:'Installs across South Wales',sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',featuredLabel:'Featured install',footnote:'Placeholder frames — swap in your real drone & install photography.',featuredIndex:0,items:[{img:'',loc:'Cardiff · 6.4 kWp + 10kWh battery',featured:true},{img:'',loc:'Swansea · 4.0 kWp',featured:false},{img:'',loc:'Newport · Commercial 55 kWp',featured:false},{img:'',loc:'Bridgend · 5.3 kWp + EV',featured:false},{img:'',loc:'Vale of Glamorgan · Heat pump',featured:false}]},
+  testi:{eyebrow:'Real customers',title:'What customers say',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',items:[{stars:5,quote:'Great service.',name:'Name',loc:'Town · Solar'}]},
+  gallery:{eyebrow:'Recent work',title:'Recent installs',sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',featuredLabel:'Featured install',footnote:'Placeholder frames — swap in your real drone & install photography.',featuredIndex:0,items:[{img:'',loc:'Cardiff · 6.4 kWp + 10kWh battery',featured:true},{img:'',loc:'Swansea · 4.0 kWp',featured:false},{img:'',loc:'Newport · Commercial 55 kWp',featured:false},{img:'',loc:'Bridgend · 5.3 kWp + EV',featured:false},{img:'',loc:'Vale of Glamorgan · Heat pump',featured:false}]},
   funding:{eyebrow:'Funding & finance',title:'Solar within reach, whatever your budget',sub:'Buy outright, spread the cost, or pay nothing upfront — plus the Welsh grants worth knowing about.',items:[{title:'0% VAT on home solar',text:'Residential installs carry 0% VAT until 31 March 2027 — a saving worth locking in.'},{title:'Finance & PPA options',text:'Spread the cost, or let a funder cover it entirely with Solar-as-a-Service for businesses.'},{title:'Welsh & local grants',text:'From the Nest scheme to Newport\'s SME decarbonisation grant — we\'ll help you find and time it.'}],cta:'0% VAT ends March 2027 — see all funding routes →',ctaHref:'/commercial-funding',ctaDisabled:false},
   banner:{heading:'Trusted technology we install'},
   cta:{headline:'Ready to start?',sub:'Book a free survey today.',btn:'Get my free quote',btnHref:'#quote',pulse:true,ctaDisabled:false,btn2:'Call us',btn2Href:'tel:01633965205',cta2Disabled:false},
@@ -856,7 +864,7 @@ function blockDefs(){const defs={
   rich:{html:'<p>Write anything here…</p>'},
   media:{img:'',side:'right',eyebrow:'Why choose us',title:'A section title',text:'Describe the benefit here — pair it with a real photo of your work.',cta:'Learn more',ctaHref:'#quote',ctaDisabled:false,textWide:false,imgGradient:false,imgGradientDir:'bottom',imgGradientTone:'ink',imgGradientStrength:60},
   form:quoteFormDefaults(),
-  trustbar:{logos:'MCS, RECC, NAPIT, TrustMark',rating:'Rated excellent by South Wales homeowners & businesses'}
+  trustbar:{logos:'MCS, RECC, NAPIT, TrustMark',rating:'Free survey, no obligation'}
 };
  Object.assign(defs,window.EXTRA_DEFAULTS||{});return defs;}
 function makeBlock(t){const defs=blockDefs();return {id:uid(),t,p:JSON.parse(JSON.stringify(defs[t]))};}
@@ -2020,7 +2028,7 @@ const CAMPAIGNS=[
  ['Battery storage','Store your solar, use it after dark','Add a battery and use more of your own power — with backup when the grid drops.',['Use up to ~72% of your generation','Backup power in an outage','Works with new or existing solar','Beat rising grid prices'],'Get a battery quote'],
  ['PPA / Power Purchase Agreement','Solar with zero upfront cost','A funder installs and owns the system; you simply buy the power — usually below grid price.',['No capital outlay','Immediate savings from day one','Funder carries maintenance risk','15–25 year price certainty'],'See if a PPA fits'],
  ['Solar-as-a-Service','Clean energy, billed as a service','All the benefits of on-site solar with none of the capex — one simple monthly service.',['£0 to install','Predictable energy costs','Maintenance included','Buy out any time'],'Explore Solar-as-a-Service'],
- ['Grant funding','Find the solar & energy grants you qualify for','We help South Wales homes and businesses find, time and apply for the right funding.',['Newport Net Zero — up to £30k','Welsh Government schemes','0% VAT on home solar','We prepare the technical docs'],'Check my grant options'],
+ ['Grant funding','Find the solar & energy grants you qualify for','We help homes and businesses find, time and apply for the right funding.',['Newport Net Zero — up to £30k','Welsh Government schemes','0% VAT on home solar','We prepare the technical docs'],'Check my grant options'],
  ['EV charging (home)','Charge your EV from your own solar','Smart home charging that tops up from your panels and off-peak tariffs.',['OZEV-approved installers','Charge from surplus solar','Smart scheduling & app','Tidy, certified installs'],'Get an EV charger quote'],
  ['EV & fleet (commercial)','Electrify your fleet, powered by your roof','Workplace and depot charging, sized to your vehicles and paired with solar.',['Workplace & depot charging','Solar-powered where possible','Load management built in','Grants & finance available'],'Plan my fleet charging'],
  ['Heat pumps / BUS Grant','Low-carbon heating, part-funded','Efficient air-source heat pumps — we\'ll check every grant and scheme you can claim.',['Grant eligibility checked for you','Lower running costs','MCS-certified installation','Works with solar & battery'],'Check heat pump funding'],
@@ -2034,11 +2042,11 @@ const CAMPAIGNS=[
 function landingBlocks(c,tpl){const[name,headline,sub,benefits,cta]=c;tpl=tpl||'product';if(tpl!=='product')return altLanding(c,tpl);
  const grid=benefits.map((b,i)=>({icon:['shield','coin','solar','battery','ev','clock'][i%6],title:b,desc:''}));
  return [
-  {id:uid(),t:'hero',p:{eyebrow:'MCS-certified · South Wales',headline,sub,dark:true,ctaLabel:cta,ctaPulse:true,cta2:''}},
+  {id:uid(),t:'hero',p:{eyebrow:'MCS-certified · '+SERVICE_AREA,headline,sub,dark:true,ctaLabel:cta,ctaPulse:true,cta2:''}},
   {id:uid(),t:'stats',p:{items:[{n:'1,200+',k:'Installs'},{n:'4.9★',k:'Rated'},{n:'25 yr',k:'Warranty'},{n:'£0',k:'Survey cost'}]}},
   {id:uid(),t:'grid',p:{eyebrow:'Why '+name.toLowerCase(),title:'What you get',cols:benefits.length===4?2:3,items:grid}},
   {id:uid(),t:'banner',p:{heading:'Trusted technology we install'}},
-  {id:uid(),t:'testi',p:{eyebrow:'Real customers',title:'Trusted across South Wales',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',items:[{stars:5,quote:'Neat, tidy and genuinely no pressure. Our bills have dropped massively and the app makes it easy to see.',name:'Sarah M.',loc:'Cardiff · Solar + battery'},{stars:5,quote:'From survey to switch-on they were spot on. The team clearly knew what they were doing and cleaned up after.',name:'David R.',loc:'Swansea · Solar PV'},{stars:5,quote:'We use them for our commercial units. Straight answers, proper ROI figures, and a payback we\'re already hitting.',name:'Gareth L.',loc:'Newport · Commercial'}]}},
+  {id:uid(),t:'testi',p:{eyebrow:'Real customers',title:'What customers say',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',items:[{stars:5,quote:'Neat, tidy and genuinely no pressure. Our bills have dropped massively and the app makes it easy to see.',name:'Sarah M.',loc:'Cardiff · Solar + battery'},{stars:5,quote:'From survey to switch-on they were spot on. The team clearly knew what they were doing and cleaned up after.',name:'David R.',loc:'Swansea · Solar PV'},{stars:5,quote:'We use them for our commercial units. Straight answers, proper ROI figures, and a payback we\'re already hitting.',name:'Gareth L.',loc:'Newport · Commercial'}]}},
   {id:uid(),t:'faq',p:{items:[{q:'Is the survey really free?',a:'Yes — free, no obligation, and no pushy sales.'},{q:'How fast can you install?',a:'Most projects move within a few weeks of your survey and design sign-off.'}]}},
   {id:uid(),t:'cta',p:{headline:cta+' today',sub:'One quick step — we\'ll do the rest.',btn:cta,pulse:true}}
  ];
@@ -2501,6 +2509,28 @@ function ensureGridAnchor(){
   });
   return changed;
 }
+/** The home page's business button went to /commercial-funding by default. The default is now the quote form, so keep the home page's link explicit. */
+function ensureSplitLinks(){
+  var changed=false;
+  (STATE.pages||[]).forEach(function(pg){
+    if(normSlug(pg.slug||'/')!=='/')return;
+    (pg.blocks||[]).forEach(function(bl){
+      if(bl.t==='split'&&bl.p&&bl.p.rcHref==null){bl.p.rcHref='/commercial-funding';changed=true;}
+    });
+  });
+  return changed;
+}
+/** Footers still carrying the old default "across South Wales" text get the service-area wording. Only an exact match is changed. */
+var OLD_FOOTER_ABOUT='MCS-certified solar, battery, heat pump, EV & LED installation for homes and businesses across South Wales.';
+function ensureAreaDefaults(){
+  var changed=false;
+  (STATE.pages||[]).forEach(function(pg){
+    (pg.blocks||[]).forEach(function(bl){
+      if(bl.t==='footer'&&bl.p&&bl.p.about===OLD_FOOTER_ABOUT){bl.p.about='MCS-certified solar, battery, heat pump, EV & LED installation for homes and businesses across '+SERVICE_AREA+'.';changed=true;}
+    });
+  });
+  return changed;
+}
 /** Backfill hero editor fields on saved pages. */
 function ensureHeroCustomize(){
   var changed=false;
@@ -2515,8 +2545,11 @@ function ensureHeroCustomize(){
       if(p.markImg==null){p.markImg='';changed=true;}
       if(p.bgImg==null){p.bgImg='';changed=true;}
       if(p.bgOverlay==null){p.bgOverlay=62;changed=true;}
-      if(p.ratingValue==null){p.ratingValue='4.9';changed=true;}
-      if(p.ratingInstalls==null){p.ratingInstalls='1200';changed=true;}
+      /* 4.9 and 1200 were sample figures this step used to write into every hero. They were never verified, so they go. */
+      if(p.ratingValue==null){p.ratingValue='';changed=true;}else if(p.ratingValue==='4.9'&&!p.ratingSource){p.ratingValue='';changed=true;}
+      if(p.ratingInstalls==null){p.ratingInstalls='';changed=true;}else if(p.ratingInstalls==='1200'&&!p.ratingInstallsLabel){p.ratingInstalls='';changed=true;}
+      if(p.ratingSource==null){p.ratingSource='';changed=true;}
+      if(p.ratingInstallsLabel==null){p.ratingInstallsLabel='';changed=true;}
       if(p.textWide==null){p.textWide=false;changed=true;}
     });
   });
@@ -2591,7 +2624,7 @@ window.EXTRA_DEFAULTS={
  pricing:{eyebrow:'Ways to pay',title:'Choose how you fund it',plans:[{name:'Buy outright',price:'From £5,900',per:'one-off',feats:['Own it outright','Best lifetime return','25-year warranty'],cta:'Get a quote',ctaHref:'#quote',hl:false},{name:'Finance',price:'£0 upfront',per:'spread monthly',feats:['Spread the cost','Often bill-neutral','Flexible terms'],cta:'Check finance',ctaHref:'#quote',hl:true},{name:'PPA',price:'£0 upfront',per:'pay per unit',feats:['No capital outlay','Funder-owned & maintained','Savings from day one'],cta:'See PPA',ctaHref:'/commercial-funding',hl:false}]},
  steps:{eyebrow:'How it works',title:'From enquiry to switch-on',items:[{title:'Free survey',text:'We assess your roof, usage and goals.'},{title:'Design & quote',text:'A clear proposal with honest figures.'},{title:'Install',text:'MCS-certified, tidy and on schedule.'},{title:'Switch on',text:'Start saving — tracked from your phone.'}]},
  casestudy:{eyebrow:'Our work',title:'Recent projects',items:[{img:'',loc:'Cardiff',title:'4-bed home retrofit',stat:'£1,400/yr',statlabel:'Estimated saving'},{img:'',loc:'Newport',title:'Warehouse rooftop',stat:'55 kWp',statlabel:'System installed'},{img:'',loc:'Swansea',title:'Care home',stat:'42%',statlabel:'Grid reduction'}]},
- gallery:{eyebrow:'Recent work',title:'Installs across South Wales',sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',featuredLabel:'Featured install',footnote:'Placeholder frames — swap in your real drone & install photography.',featuredIndex:0,items:[{img:'',loc:'Cardiff · 6.4 kWp + 10kWh battery',featured:true},{img:'',loc:'Swansea · 4.0 kWp',featured:false},{img:'',loc:'Newport · Commercial 55 kWp',featured:false},{img:'',loc:'Bridgend · 5.3 kWp + EV',featured:false},{img:'',loc:'Vale of Glamorgan · Heat pump',featured:false}]},
+ gallery:{eyebrow:'Recent work',title:'Recent installs',sub:'A few of the homes and businesses we\'ve powered up. Real drone & install photos drop straight into these frames.',featuredLabel:'Featured install',footnote:'Placeholder frames — swap in your real drone & install photography.',featuredIndex:0,items:[{img:'',loc:'Cardiff · 6.4 kWp + 10kWh battery',featured:true},{img:'',loc:'Swansea · 4.0 kWp',featured:false},{img:'',loc:'Newport · Commercial 55 kWp',featured:false},{img:'',loc:'Bridgend · 5.3 kWp + EV',featured:false},{img:'',loc:'Vale of Glamorgan · Heat pump',featured:false}]},
  funding:{eyebrow:'Funding & finance',title:'Solar within reach, whatever your budget',sub:'Buy outright, spread the cost, or pay nothing upfront — plus the Welsh grants worth knowing about.',items:[{title:'0% VAT on home solar',text:'Residential installs carry 0% VAT until 31 March 2027 — a saving worth locking in.'},{title:'Finance & PPA options',text:'Spread the cost, or let a funder cover it entirely with Solar-as-a-Service for businesses.'},{title:'Welsh & local grants',text:'From the Nest scheme to Newport\'s SME decarbonisation grant — we\'ll help you find and time it.'}],cta:'0% VAT ends March 2027 — see all funding routes →',ctaHref:'/commercial-funding',ctaDisabled:false},
  clientbanner:{heading:'Trusted by businesses across South Wales',clients:[{name:'Morgan Ltd',img:''},{name:'Valley Foods',img:''},{name:'Cambrian Care',img:''},{name:'Severn Logistics',img:''},{name:'Tafwyl Retail',img:''}]},
  accbanner:{heading:'Our Accreditations',items:[{name:'MCS',img:''},{name:'RECC',img:''}]},
@@ -2603,11 +2636,11 @@ window.EXTRA_DEFAULTS={
  ]}
 };
 function altLanding(c,tpl){const[name,headline,sub,benefits,cta]=c;const U=()=>uid();
- const hero={id:U(),t:'hero',p:{eyebrow:'MCS-certified · South Wales',headline,sub,dark:true,ctaLabel:cta,ctaPulse:true,cta2:''}};
+ const hero={id:U(),t:'hero',p:{eyebrow:'MCS-certified · '+SERVICE_AREA,headline,sub,dark:true,ctaLabel:cta,ctaPulse:true,cta2:''}};
  const stats={id:U(),t:'stats',p:{items:[{n:'1,200+',k:'Installs'},{n:'4.9★',k:'Rated'},{n:'25 yr',k:'Warranty'},{n:'£0',k:'Survey'}]}};
  const bgrid={id:U(),t:'grid',p:{eyebrow:'Why '+name.toLowerCase(),title:'What you get',cols:benefits.length===4?2:3,fill:'contact',items:benefits.map((b,i)=>({icon:['shield','coin','solar','battery','ev','clock'][i%6],title:b,desc:''}))}};
  const media=(side)=>({id:U(),t:'media',p:{img:'',side:side||'right',eyebrow:name,title:headline,text:sub+' Pair this with a real photo of one of your installs.',cta}});
- const testi={id:U(),t:'testi',p:{eyebrow:'Real customers',title:'Trusted across South Wales',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',speed:36,items:[{stars:5,quote:'Neat, tidy and genuinely no pressure. Our bills have dropped massively and the app makes it easy to see.',name:'Sarah M.',loc:'Cardiff · Solar + battery'},{stars:5,quote:'From survey to switch-on they were spot on. The team clearly knew what they were doing and cleaned up after.',name:'David R.',loc:'Swansea · Solar PV'},{stars:5,quote:'We use them for our commercial units. Straight answers, proper ROI figures, and a payback we\'re already hitting.',name:'Gareth L.',loc:'Newport · Commercial'}]}};
+ const testi={id:U(),t:'testi',p:{eyebrow:'Real customers',title:'What customers say',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',speed:36,items:[{stars:5,quote:'Neat, tidy and genuinely no pressure. Our bills have dropped massively and the app makes it easy to see.',name:'Sarah M.',loc:'Cardiff · Solar + battery'},{stars:5,quote:'From survey to switch-on they were spot on. The team clearly knew what they were doing and cleaned up after.',name:'David R.',loc:'Swansea · Solar PV'},{stars:5,quote:'We use them for our commercial units. Straight answers, proper ROI figures, and a payback we\'re already hitting.',name:'Gareth L.',loc:'Newport · Commercial'}]}};
  const faq={id:U(),t:'faq',p:{items:[{q:'Is the survey really free?',a:'Yes — free, no obligation, and no pushy sales.'},{q:'How fast can you install?',a:'Most projects move within a few weeks of design sign-off.'}]}};
  const ctablk={id:U(),t:'cta',p:{headline:cta+' today',sub:'One quick step — we\'ll do the rest.',btn:cta,pulse:true}};
  const banner={id:U(),t:'banner',p:{heading:'Trusted technology we install'}};
@@ -2615,7 +2648,7 @@ function altLanding(c,tpl){const[name,headline,sub,benefits,cta]=c;const U=()=>u
  const steps={id:U(),t:'steps',p:JSON.parse(JSON.stringify(EXTRA_DEFAULTS.steps))};
  const cases={id:U(),t:'casestudy',p:JSON.parse(JSON.stringify(EXTRA_DEFAULTS.casestudy))};
 var mediaL={id:U(),t:'media',p:{img:'',side:'left',eyebrow:name,title:'Real installs, real results',text:'Pair this with a drone or install photo — image-led pages convert hardest in solar.',cta:cta}};
- var lighthero={id:U(),t:'hero',p:{eyebrow:'MCS-certified · South Wales',headline:headline,sub:sub,dark:false,ctaLabel:cta,ctaPulse:true,cta2:''}};
+ var lighthero={id:U(),t:'hero',p:{eyebrow:'MCS-certified · '+SERVICE_AREA,headline:headline,sub:sub,dark:false,ctaLabel:cta,ctaPulse:true,cta2:''}};
  if(tpl==='dark')return[hero,stats,bgrid,media('right'),testi,faq,ctablk];
  if(tpl==='image')return[hero,mediaL,media('right'),cases,testi,ctablk];
  if(tpl==='minimal')return[lighthero,steps,faq,ctablk];
@@ -2625,7 +2658,7 @@ var mediaL={id:U(),t:'media',p:{img:'',side:'left',eyebrow:name,title:'Real inst
  return[hero,stats,bgrid,media('right'),banner,testi,faq,ctablk];
 }
 /* section hover preview (reuses #tplpop) */
-const SAMPLES={hero:{eyebrow:'Eyebrow',headline:'A punchy headline',sub:'Supporting line of copy.',dark:true,ctaLabel:'Get a quote',ctaPulse:false,cta2:'Learn more'},trustbar:{logos:'MCS, RECC, NAPIT, TrustMark',rating:'Rated excellent'},estband:{headline:'See your savings in 20 seconds.',sub:'No forms, no phone calls — just a quick estimate.',btnLabel:'Try the free estimator'},stats:{items:[{n:'1,200+',k:'Installs'},{n:'4.9★',k:'Rated'},{n:'25 yr',k:'Warranty'}]},grid:{eyebrow:'Section',title:'Grid section',cols:3,items:[{icon:'solar',title:'Item one',desc:'Description.'},{icon:'battery',title:'Item two',desc:'Description.'},{icon:'ev',title:'Item three',desc:'Description.'}]},split:{lIcon:'home',lt:'For your home',ld:'Text.',lb:['Point one','Point two'],lc:'Home quote',rIcon:'building',rt:'For your business',rd:'Text.',rb:['Point one','Point two'],rc:'Business quote'},media:{img:'',side:'right',eyebrow:'Why us',title:'Image + text',text:'A benefit paired with a photo.',cta:'Learn more',ctaDisabled:false,textWide:false},testi:{eyebrow:'Real customers',title:'Trusted across South Wales',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',speed:36,items:[{stars:5,quote:'Neat, tidy and genuinely no pressure. Our bills have dropped massively and the app makes it easy to see.',name:'Sarah M.',loc:'Cardiff · Solar + battery'},{stars:5,quote:'From survey to switch-on they were spot on.',name:'David R.',loc:'Swansea · Solar PV'},{stars:5,quote:'Straight answers, proper ROI figures.',name:'Gareth L.',loc:'Newport · Commercial'}]},banner:{heading:'Trusted technology we install'},form:{heading:'Book your free survey',sub:'No obligation.',btn:'Send',pulse:false,fName:true,fEmail:true,fPhone:true,fPost:false,fMsg:true},cta:{headline:'Ready to start?',sub:'Book a free survey.',btn:'Get a quote',pulse:false},faq:{eyebrow:'Good to know',title:'Your questions, answered',anchor:'faq',items:[{q:'A question?',a:'An answer.'},{q:'Another?',a:'Another answer.'}]},rich:{html:'<p>Rich text paragraph…</p>'},footer:footerDefaults()};
+const SAMPLES={hero:{eyebrow:'Eyebrow',headline:'A punchy headline',sub:'Supporting line of copy.',dark:true,ctaLabel:'Get a quote',ctaPulse:false,cta2:'Learn more'},trustbar:{logos:'MCS, RECC, NAPIT, TrustMark',rating:'Rated excellent'},estband:{headline:'See your savings in 20 seconds.',sub:'No forms, no phone calls — just a quick estimate.',btnLabel:'Try the free estimator'},stats:{items:[{n:'1,200+',k:'Installs'},{n:'4.9★',k:'Rated'},{n:'25 yr',k:'Warranty'}]},grid:{eyebrow:'Section',title:'Grid section',cols:3,items:[{icon:'solar',title:'Item one',desc:'Description.'},{icon:'battery',title:'Item two',desc:'Description.'},{icon:'ev',title:'Item three',desc:'Description.'}]},split:{lIcon:'home',lt:'For your home',ld:'Text.',lb:['Point one','Point two'],lc:'Home quote',rIcon:'building',rt:'For your business',rd:'Text.',rb:['Point one','Point two'],rc:'Business quote'},media:{img:'',side:'right',eyebrow:'Why us',title:'Image + text',text:'A benefit paired with a photo.',cta:'Learn more',ctaDisabled:false,textWide:false},testi:{eyebrow:'Real customers',title:'What customers say',footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',speed:36,items:[{stars:5,quote:'Neat, tidy and genuinely no pressure. Our bills have dropped massively and the app makes it easy to see.',name:'Sarah M.',loc:'Cardiff · Solar + battery'},{stars:5,quote:'From survey to switch-on they were spot on.',name:'David R.',loc:'Swansea · Solar PV'},{stars:5,quote:'Straight answers, proper ROI figures.',name:'Gareth L.',loc:'Newport · Commercial'}]},banner:{heading:'Trusted technology we install'},form:{heading:'Book your free survey',sub:'No obligation.',btn:'Send',pulse:false,fName:true,fEmail:true,fPhone:true,fPost:false,fMsg:true},cta:{headline:'Ready to start?',sub:'Book a free survey.',btn:'Get a quote',pulse:false},faq:{eyebrow:'Good to know',title:'Your questions, answered',anchor:'faq',items:[{q:'A question?',a:'An answer.'},{q:'Another?',a:'Another answer.'}]},rich:{html:'<p>Rich text paragraph…</p>'},footer:footerDefaults()};
 Object.assign(SAMPLES,EXTRA_DEFAULTS);
 function popAt(elm,title,inner){let pop=document.getElementById('tplpop');if(!pop){pop=document.createElement('div');pop.id='tplpop';document.body.appendChild(pop);}
  pop.style.cssText='position:fixed;z-index:300;width:320px;background:var(--paper);border:1px solid var(--ink);border-radius:4px;box-shadow:0 20px 50px -20px rgba(0,0,0,.5);overflow:hidden;pointer-events:none';

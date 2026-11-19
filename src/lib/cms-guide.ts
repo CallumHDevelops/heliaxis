@@ -141,7 +141,8 @@ export const LESSONS: Lesson[] = [
       { kind: 'watch', title: 'Example wording in templates', text: 'Some sections and templates arrive with example content, such as 1,200+ installs, a 4.9 star rating, made-up customers and sample prices. Replace every one with real, true details, or delete the section.' },
       { kind: 'watch', title: 'Testimonials', text: 'A Testimonials section is hidden on the live website until there are real customer stories to show, so there is no point adding one. Never type in a review that a customer did not write.' },
       { kind: 'tip', title: 'The footer belongs to each page', text: 'Each page has its own Site footer section. Changing it on one page does not change the others.' },
-      { kind: 'tip', title: 'Buttons that go nowhere', text: 'If a button points at #quote on a page with no quote form, the live site now sends visitors to the free quote page instead. Still set the link properly.' },
+      { kind: 'tip', title: 'Buttons that go nowhere', text: 'If a button points at #quote on a page with no quote form, the live site now opens the quote form in a pop-up on that page (and goes to the free quote page if the pop-up cannot load). A page with its own quote form block scrolls to it instead. Still set every link properly.' },
+      { kind: 'watch', title: 'The hero rating row', text: 'The row under a hero only shows when you fill in the rating and where it comes from (for example Google), and the install figure with what it counts. Nothing is filled in for you, and the old sample 4.9 and 1,200 figures are cleared. Leave it empty until the figures are verified.' },
     ],
     quiz: [
       {

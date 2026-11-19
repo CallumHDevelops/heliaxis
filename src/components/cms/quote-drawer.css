@@ -1,0 +1,8 @@
+/* The quote drawer on CMS pages without a form (QuoteDrawer.tsx). */
+/* margin: auto because the site's CSS reset zeroes margins, which would otherwise pin a modal dialog to the top-left corner. */
+.qd { margin: auto; border: 0; padding: 0; border-radius: 14px; width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; background: var(--paper, #f7f2e7); color: var(--ink, #211f18); }
+.qd::backdrop { background: rgba(33, 31, 24, 0.62); }
+.qd-box { padding: 18px 18px 22px; }
+.qd-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.qd-head b { font-size: 1.05rem; }
+body:has(dialog.qd[open]) { overflow: hidden; }

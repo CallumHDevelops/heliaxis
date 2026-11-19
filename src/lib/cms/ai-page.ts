@@ -29,10 +29,10 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
   faq: { eyebrow: 'Good to know', title: 'Your questions, answered', anchor: 'faq', items: [{ q: 'A question?', a: 'An answer.' }] },
   cta: { headline: 'Ready to start?', sub: 'Book a free survey today.', btn: 'Get my free quote', btnHref: '#quote', pulse: true, ctaDisabled: false, btn2: '', btn2Href: '', cta2Disabled: false },
   rich: { html: '<p>Write anything here…</p>' },
-  testi: { eyebrow: 'Real customers', title: 'Trusted across South Wales', footnote: '', speed: 36, items: [{ stars: 5, quote: 'Great service.', name: 'Name', loc: 'Town · Solar' }] },
+  testi: { eyebrow: 'Real customers', title: 'What customers say', footnote: '', speed: 36, items: [{ stars: 5, quote: 'Great service.', name: 'Name', loc: 'Town · Solar' }] },
   pricing: { eyebrow: 'Options', title: 'Choose how you fund it', plans: [{ name: 'Plan', price: 'From £0', per: 'one-off', feats: ['Feature one'], cta: 'Get a quote', ctaHref: '#quote', hl: false }] },
   casestudy: { eyebrow: 'Our work', title: 'Recent projects', items: [{ img: '', loc: 'Location', title: 'Project', stat: '00%', statlabel: 'Result' }] },
-  gallery: { eyebrow: 'Recent work', title: 'Installs across South Wales', sub: '', featuredLabel: 'Featured install', footnote: '', featuredIndex: 0, items: [{ img: '', loc: 'Location', featured: true }] },
+  gallery: { eyebrow: 'Recent work', title: 'Recent installs', sub: '', featuredLabel: 'Featured install', footnote: '', featuredIndex: 0, items: [{ img: '', loc: 'Location', featured: true }] },
 };
 
 const ALLOWED = new Set(Object.keys(DEFAULTS));

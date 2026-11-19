@@ -220,11 +220,15 @@ function renderBlock(b: LooseBlock): string {
       !p.hideMicrotrust && mt.trim()
         ? `<p class="microtrust">${esc(mt)}</p>`
         : '';
-    const rtVal = String(p.ratingValue || '4.9');
-    const rtInst = String(p.ratingInstalls || '1200');
-    const rthtml = !p.hideRating
-      ? `<div class="rating"><div class="r"><span class="big">${esc(rtVal)}</span><span class="stars">★★★★★</span><span>Google &amp; Trustpilot</span></div><div class="r"><span class="big"><span>${esc(rtInst)}</span>+</span><span>installs across South Wales</span></div></div>`
-      : '';
+    // A rating shows only with its value and where it comes from; an install figure only with its value and what it counts.
+    const rtVal = String(p.ratingValue || '').trim();
+    const rtSrc = String(p.ratingSource || '').trim();
+    const rtInst = String(p.ratingInstalls || '').trim();
+    const rtLbl = String(p.ratingInstallsLabel || '').trim();
+    const rtCells =
+      (rtVal && rtSrc ? `<div class="r"><span class="big">${esc(rtVal)}</span><span class="stars">★★★★★</span><span>${esc(rtSrc)}</span></div>` : '') +
+      (rtInst && rtLbl ? `<div class="r"><span class="big">${esc(rtInst)}</span><span>${esc(rtLbl)}</span></div>` : '');
+    const rthtml = !p.hideRating && rtCells ? `<div class="rating">${rtCells}</div>` : '';
     const eyebrowHtml = p.eyebrow
       ? `<span class="eyebrow on-dark">${SPARK.replace('<svg ', '<svg class="spark-ico" ')}${esc(p.eyebrow)}</span>`
       : '';
@@ -344,7 +348,7 @@ function renderBlock(b: LooseBlock): string {
       '<div class="pv-split"><div class="pv-splitcard">' +
       `<h3>${accentText(p.lt)}</h3><p>${esc(p.ld)}</p><ul>${lb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.lc, 'dark', false, p.lcHref || '#quote')}` +
       '</div><div class="pv-splitcard dark">' +
-      `<h3>${accentText(p.rt)}</h3><p>${esc(p.rd)}</p><ul>${rb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.rc, 'solar', false, p.rcHref || '/commercial-funding')}` +
+      `<h3>${accentText(p.rt)}</h3><p>${esc(p.rd)}</p><ul>${rb.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>${btn(p.rc, 'solar', false, p.rcHref || '#quote')}` +
       '</div></div>'
     );
   }
@@ -530,7 +534,7 @@ function renderBlock(b: LooseBlock): string {
       : [];
     const teb =
       p.eyebrow != null && String(p.eyebrow).trim() !== '' ? String(p.eyebrow) : 'Real customers';
-    const ttl = String(p.title || 'Trusted across South Wales');
+    const ttl = String(p.title || 'What customers say');
     const fn =
       p.footnote === '' ? null : String(p.footnote || 'Illustrative testimonials — replace with your real Google & Trustpilot reviews.');
     const tq = (q: unknown) => {
@@ -545,7 +549,7 @@ function renderBlock(b: LooseBlock): string {
           `<div class="tcard"><div class="stars">${'★'.repeat(tt.stars || 5)}</div><blockquote>${tq(tt.quote)}</blockquote><div class="who"><b>${esc(tt.name)}</b> <span>· <span>${esc(tt.loc)}</span></span></div></div>`,
       )
       .join('');
-    let body =
+    const body =
       items.length > 3
         ? `<div class="pv-tmarquee"><div class="trk" style="animation-duration:${Number(p.speed) || 36}s">${cards}${cards}</div></div>`
         : `<div class="tgrid">${cards}</div>`;
@@ -564,7 +568,7 @@ function renderBlock(b: LooseBlock): string {
     const gtl =
       p.title != null && String(p.title).trim() !== ''
         ? String(p.title)
-        : 'Installs across South Wales';
+        : 'Recent installs';
     const gsub =
       p.sub === ''
         ? null
@@ -732,7 +736,7 @@ function renderBlock(b: LooseBlock): string {
     const sn = items.length;
     const sfill =
       sn > 4 && sn % 4 !== 0
-        ? `<div class="pv-pstep-fill${sn % 2 === 0 ? ' is-teven' : ''}" style="grid-column:span ${(4 - (sn % 4)) % 4}" aria-hidden="true"><span class="pv-pstep-fill-box"></span></div>`
+        ? `<div class="pv-pstep-cta" style="grid-column:span ${(4 - (sn % 4)) % 4}"><b>Ready when you are</b><a class="pv-btn solar" href="#quote">Book my free survey</a><a class="pv-pstep-tel" href="tel:01633965205">01633 965205</a></div>`
         : '';
     return (
       `<div class="pv-sec"><div class="shead">${eyebrow(p.eyebrow || 'How it works')}<h2>${accentText(p.title)}</h2></div>` +

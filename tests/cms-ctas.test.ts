@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { balancedAt, fixDeadQuoteLinks, freshenLogo, hasQuoteTarget, splitCmsPage, splitForCtas, withoutTestimonials } from '@/lib/cms-ctas';
+import { balancedAt, fixDeadQuoteLinks, freshenLogo, hasQuoteButtons, hasQuoteTarget, splitCmsPage, splitForCtas, withoutTestimonials } from '@/lib/cms-ctas';
 
 /** The shape the CMS really publishes: one outer page wrapper, one spacing wrapper per block. */
 const wrap = (b: string) => `<div style="padding:0">${b}</div>`;
@@ -106,8 +106,11 @@ describe('live fixes: testimonials and dead quote links', () => {
     expect(hasQuoteTarget('<section id="quote"></section>')).toBe(true);
     expect(hasQuoteTarget('<div class="pv-quote x"></div>')).toBe(true);
     expect(hasQuoteTarget('<a href="#quote">Go</a>')).toBe(false);
-    expect(fixDeadQuoteLinks(`<a class="btn" href="#quote">A</a><a href='#quote'>B</a><a href="/#quote">C</a>`)).toBe(
-      `<a class="btn" href="/free-solar-quote">A</a><a href="/free-solar-quote">B</a><a href="/#quote">C</a>`,
+    // They link to the quote page (works without JavaScript) and carry the marker the quote drawer listens for.
+    expect(fixDeadQuoteLinks(`<a class="btn" href="#quote">A</a><a href='#quote'>B</a><a href="/#quote">C</a><a data-href="#quote">D</a>`)).toBe(
+      `<a class="btn" href="/free-solar-quote" data-quote-drawer="1">A</a><a href="/free-solar-quote" data-quote-drawer="1">B</a><a href="/#quote">C</a><a data-href="#quote">D</a>`,
     );
+    expect(hasQuoteButtons('<a class="btn" href="#quote">A</a>')).toBe(true);
+    expect(hasQuoteButtons('<a href="/#quote">C</a><a data-href="#quote">D</a>')).toBe(false);
   });
 });
