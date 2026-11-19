@@ -5,6 +5,7 @@ import { cleanTaskInput, TASK_COLUMNS, type Task, type TaskJob } from '@/lib/tas
 import { notify } from '@/lib/notify';
 import { rearmDueReminder } from '@/lib/tasks-server';
 import { removeTaskCalendar, syncTaskCalendar } from '@/lib/tasks-timed';
+import { defaultOwnerId } from '@/lib/crm/default-owner';
 import { canAccess } from '@/lib/portals';
 
 export const dynamic = 'force-dynamic';
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
   // Offline-created tasks bring their own id, so a retried create can't duplicate.
   const id = typeof body?.id === 'string' && UUID.test(body.id) ? body.id : undefined;
   const admin = createAdminClient();
+  if (!input.assignee_id && !input.assignee_name) input.assignee_id = (await defaultOwnerId(admin)) || session.user.id;
   const { data, error } = await admin
     .from('tasks')
     .insert({ ...input, ...(id ? { id } : {}), created_by: session.user.id })

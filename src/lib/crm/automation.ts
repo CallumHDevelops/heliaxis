@@ -479,7 +479,13 @@ export async function runCrmAutomations() {
 /** Give a new lead to the next person in the rotation (CRM → Settings) and tell them. */
 export async function assignNewLead(projectId: string, customerName: string, enquiryId?: string) {
   const s = await getCrmSettings();
-  if (!s.leadRotation.length) return null;
+  if (!s.leadRotation.length) {
+    // No rotation set up (one person in the business): the job is theirs. Already told about the new lead, so no second notification.
+    const { defaultOwnerId } = await import('./default-owner');
+    const only = await defaultOwnerId();
+    if (only) await createAdminClient().from('crm_projects').update({ owner_id: only }).eq('id', projectId).is('owner_id', null);
+    return only;
+  }
   const owner = s.leadRotation[s.rotationIndex % s.leadRotation.length];
   const { saveCrmSettings } = await import('./crm-settings');
   await saveCrmSettings({ ...s, rotationIndex: (s.rotationIndex + 1) % s.leadRotation.length });

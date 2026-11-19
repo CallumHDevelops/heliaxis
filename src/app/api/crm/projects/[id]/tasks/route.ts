@@ -5,6 +5,7 @@ import { cleanTaskInput, TASK_COLUMNS } from '@/lib/tasks';
 import { notify } from '@/lib/notify';
 import { canAccess } from '@/lib/portals';
 import { syncTaskCalendar } from '@/lib/tasks-timed';
+import { defaultOwnerId } from '@/lib/crm/default-owner';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,8 +21,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const input = cleanTaskInput((await req.json().catch(() => ({}))) ?? {});
   if (!input.title) return json({ error: 'Give the task a title.' }, 400);
   const db = createAdminClient();
-  const { data: p } = await db.from('crm_projects').select('enquiry_id, title').eq('id', id).maybeSingle();
+  const { data: p } = await db.from('crm_projects').select('enquiry_id, title, owner_id').eq('id', id).maybeSingle();
   if (!p) return json({ error: 'Not found' }, 404);
+  // Nobody picked: the job's owner, else the person whose business it is. A task nobody owns reminds nobody.
+  if (!input.assignee_id && !input.assignee_name) input.assignee_id = ((p.owner_id as string | null) ?? null) || (await defaultOwnerId(db)) || null;
   const { data: task, error } = await db
     .from('tasks')
     .insert({ ...input, status: 'todo', crm_project_id: id, created_by: s.user.id })
