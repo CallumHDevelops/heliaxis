@@ -14,7 +14,7 @@ On the CMS dashboard, under **Site & admin**, click **Mega menu**. The page show
 **Top bar (thin strip above the logo)** is the dark strip at the very top of every page. Untick **Show** to hide it. You can change:
 
 - **Accreditations (left text)**
-- **Rating value** and **Opening hours**
+- **Rating value** and **Opening hours**. The website doesn’t show the rating at the moment, because there are no reviews behind it, so changing **Rating value** has no effect.
 - **Phone (shown)** and **Phone link (tel:)**. Typing the phone number fills in the link for you.
 
 ## Menu items

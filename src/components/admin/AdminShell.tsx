@@ -40,6 +40,7 @@ type Tab =
   | 'subcontractors'
   | 'tasks'
   | 'builds'
+  | 'cmsguide'
   | 'assistant'
   | 'design'
   | 'social'
@@ -55,6 +56,11 @@ export const icons = {
   home: (
     <svg {...ICON}>
       <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+    </svg>
+  ),
+  guide: (
+    <svg {...ICON}>
+      <path d="M4 5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2zM4 20a2 2 0 0 1 2-2h13v3H6a2 2 0 0 1-2-1M8 7h7M8 11h5" />
     </svg>
   ),
   builds: (
@@ -475,6 +481,7 @@ export async function AdminShell({
       items: [
         { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms'), reload: true, section: 'Website' },
         { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms'), section: 'Website' },
+        { href: '/admin/cms-guide', label: 'CMS guide', short: 'Guide', icon: icons.guide, active: active === 'cmsguide', show: can('cms'), section: 'Website' },
         { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics'), section: 'Analytics' },
         { href: '/admin/analytics/seo', label: 'SEO and AI report', short: 'SEO report', icon: icons.analytics, show: can('analytics'), section: 'Analytics' },
         { href: '/admin/analytics/heatmap', label: 'Heatmap', icon: icons.heatmap, active: active === 'heatmap', show: can('analytics'), section: 'Analytics' },

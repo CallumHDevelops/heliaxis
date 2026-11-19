@@ -16,8 +16,8 @@ Open the page in the editor and click the **SEO** tab on the left. It’s headed
 | **Page title** | The page’s name in the CMS. Must be unique. Changing it also changes the **URL slug** to match (except on the homepage). |
 | **Page type** | **Page**, **Landing** or **Case study**. Only used for the badges and filter on the CMS dashboard. The homepage and blog articles are set for you. |
 | **Theme** | **Light** or **Dark**. |
-| **Page title (SEO)** | The title shown in Google results, for example `Solar Panels Cardiff \| Heliaxis`. |
-| **Meta description** | The short description under the title in Google results. Aim for 150–160 characters. |
+| **Page title (SEO)** | The title shown in Google results, for example `Solar Panels Cardiff`. Don’t add `\| Heliaxis`: the website adds the name to every title, so typing it makes it show twice. |
+| **Meta description** | The short description under the title in Google results. Aim for about 120 to 155 characters. |
 | **URL slug** | The page’s web address after heliaxis.co.uk, for example `/solar-panels-cardiff`. Must be unique. |
 | **Social share image URL** | The picture to show when the page is shared on social media. See the note below. |
 | **Canonical URL** | Only needed if the same content lives at another address. See the note below. |

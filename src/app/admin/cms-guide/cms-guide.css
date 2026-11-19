@@ -1,0 +1,98 @@
+/* CMS › CMS guide: the interactive course. */
+.cg { display: grid; gap: 1rem; color: var(--text); }
+.cg, .cg * { box-sizing: border-box; }
+.cg-head h1 { margin: 0 0 4px; font-size: 1.6rem; }
+.cg-head p { margin: 0; color: var(--muted); max-width: 72ch; }
+.cg-muted { color: var(--muted); font-size: 0.86rem; }
+
+.cg-body { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 1.2rem; align-items: start; }
+
+/* The lesson list */
+.cg-rail { position: sticky; top: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-self: start; max-height: calc(100vh - 24px); overflow-y: auto; padding-right: 2px; }
+.cg-total { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; justify-items: start; }
+.cg-total__row { display: flex; align-items: baseline; gap: 10px; }
+.cg-total__row b { font-size: 1.7rem; line-height: 1; }
+.cg-total__row span { color: var(--muted); font-size: 0.86rem; }
+.cg-bar { width: 100%; height: 7px; border-radius: 999px; background: var(--bg); overflow: hidden; }
+.cg-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--solar, #f8bc1e), var(--ok)); border-radius: inherit; transition: width 0.4s ease; }
+.cg-nav { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.cg-nav__item { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: center; cursor: pointer; padding: 8px 10px; border-radius: 10px; border: 1px solid transparent; }
+.cg-nav__item:hover { background: var(--surface); border-color: var(--border); }
+.cg-nav__item:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.cg-nav__item.is-on { background: var(--surface); border-color: var(--text); }
+.cg-dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 0.82rem; font-weight: 800; background: var(--bg); border: 1.5px solid var(--border); }
+.cg-nav__item.is-on .cg-dot { background: var(--solar, #f8bc1e); border-color: var(--solar, #f8bc1e); color: #211f18; }
+.cg-nav__item.is-done .cg-dot { background: var(--ok); border-color: var(--ok); color: #fff; }
+.cg-nav__t { font-size: 0.9rem; font-weight: 700; line-height: 1.25; display: grid; gap: 1px; }
+.cg-nav__t small { font-weight: 400; color: var(--muted); font-size: 0.76rem; }
+.cg-tools { display: grid; gap: 8px; justify-items: start; padding: 4px 2px; }
+.cg-name { display: grid; gap: 4px; width: 100%; font-size: 0.78rem; font-weight: 700; color: var(--muted); }
+.cg-name .crm-input { width: 100%; font: inherit; font-weight: 400; color: var(--text); }
+
+/* The lesson */
+.cg-lesson { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.4rem 1.5rem 1.6rem; display: grid; gap: 0.9rem; min-width: 0; scroll-margin-top: 12px; }
+.cg-kicker { margin: 0; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 800; color: var(--muted); }
+.cg-lesson h2 { margin: 0; font-size: 1.55rem; line-height: 1.2; }
+.cg-lesson p { margin: 0; line-height: 1.55; max-width: 74ch; }
+.cg-goal { font-size: 1.06rem; font-weight: 600; }
+
+.cg-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.cg-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.cg-table th, .cg-table td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.cg-table thead th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); background: var(--bg); }
+.cg-table tbody th { width: 28%; font-weight: 700; }
+.cg-table tr:last-child th, .cg-table tr:last-child td { border-bottom: 0; }
+
+.cg-sec { display: grid; gap: 8px; }
+.cg-sec__head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; border-bottom: 2px solid var(--text); padding-bottom: 4px; }
+.cg-sec__head h3 { margin: 0; font-size: 1.02rem; }
+.cg-count { font-size: 0.8rem; color: var(--muted); font-weight: 700; white-space: nowrap; }
+
+.cg-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cg-step { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); transition: background 0.15s, border-color 0.15s; }
+.cg-step.is-done { background: rgb(var(--ok-rgb, 22 163 74) / 0.09); border-color: rgb(var(--ok-rgb, 22 163 74) / 0.45); }
+.cg-step label { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; cursor: pointer; flex: 1 1 340px; line-height: 1.5; }
+.cg-step input[type='checkbox'] { width: 18px; height: 18px; margin: 3px 0 0; accent-color: var(--ok); cursor: pointer; }
+.cg-step input[type='checkbox']:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.cg-step.is-done label span { color: var(--muted); }
+.cg-admin { display: inline-block; margin-left: 8px; font-style: normal; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 8px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+.cg-open { align-self: center; white-space: nowrap; text-decoration: none; }
+
+.cg-note { border-left: 4px solid var(--solar, #f8bc1e); background: rgb(248 188 30 / 0.12); border-radius: 0 12px 12px 0; padding: 10px 14px; display: grid; gap: 3px; }
+.cg-note--watch { border-left-color: var(--danger); background: rgb(var(--danger-rgb) / 0.08); }
+.cg-note b { font-size: 0.9rem; }
+.cg-note p { font-size: 0.92rem; }
+
+.cg-q { border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px 12px; margin: 0; display: grid; gap: 8px; min-width: 0; }
+.cg-q legend { padding: 0 6px; font-weight: 700; line-height: 1.4; max-width: 100%; }
+.cg-opts { display: grid; gap: 6px; }
+.cg-opt { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 26px 1fr; gap: 10px; align-items: start; cursor: pointer; padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg); line-height: 1.4; font-size: 0.93rem; }
+.cg-opt:hover:not(:disabled) { border-color: var(--text); }
+.cg-opt:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.cg-opt:disabled { cursor: default; opacity: 0.75; }
+.cg-letter { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 0.74rem; font-weight: 800; background: var(--surface); border: 1.5px solid var(--border); }
+.cg-opt.is-right { opacity: 1; border-color: var(--ok); background: rgb(var(--ok-rgb, 22 163 74) / 0.12); }
+.cg-opt.is-right .cg-letter { background: var(--ok); border-color: var(--ok); color: #fff; }
+.cg-opt.is-wrong { border-color: var(--danger); background: rgb(var(--danger-rgb) / 0.08); }
+.cg-opt.is-wrong .cg-letter { background: var(--danger); border-color: var(--danger); color: #fff; }
+.cg-feedback { min-height: 1.3em; margin: 0; font-size: 0.9rem; }
+.cg-ok { color: var(--ok); }
+.cg-bad { color: var(--danger); }
+
+.cg-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--border); }
+.cg-foot.is-done { border: 1px solid var(--ok); background: rgb(var(--ok-rgb, 22 163 74) / 0.09); }
+.cg-foot p { margin: 0; font-size: 0.92rem; }
+.cg-foot__btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.cg-finish { border: 2px solid var(--ok); border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px; justify-items: start; background: rgb(var(--ok-rgb, 22 163 74) / 0.08); }
+.cg-finish h3 { margin: 0; }
+.cg-help { font-size: 0.88rem; color: var(--muted); }
+.cg-help .crm-link { color: var(--text); }
+
+@media (max-width: 960px) {
+  /* minmax(0, 1fr): without it the wide lesson strip below stretches the whole page past the screen. */
+  .cg-body { grid-template-columns: minmax(0, 1fr); }
+  .cg-rail { position: static; max-height: none; overflow: visible; min-width: 0; }
+  .cg-nav { grid-auto-flow: column; grid-auto-columns: 220px; overflow-x: auto; padding-bottom: 6px; max-width: 100%; }
+  .cg-lesson { padding: 1.1rem 1rem 1.3rem; }
+}
+@media (prefers-reduced-motion: reduce) { .cg-bar span, .cg-step { transition: none; } }
