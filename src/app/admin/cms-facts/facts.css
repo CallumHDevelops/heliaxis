@@ -1,0 +1,36 @@
+/* CMS › Facts sheet and Page checks. */
+.fx { display: grid; gap: 1rem; color: var(--text); max-width: 1000px; }
+.fx, .fx * { box-sizing: border-box; }
+.fx-head h1 { margin: 0 0 4px; font-size: 1.6rem; }
+.fx-head p { margin: 0 0 4px; color: var(--muted); max-width: 72ch; }
+.fx-muted { color: var(--muted); font-size: 0.86rem; margin: 0; }
+.fx section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.1rem; display: grid; gap: 0.7rem; min-width: 0; }
+.fx section h2 { margin: 0; font-size: 1.1rem; }
+.fx-gaps { background: var(--surface); border: 1px solid var(--solar, #f8bc1e); border-radius: 14px; padding: 0.8rem 1.1rem; }
+.fx-gaps ul { margin: 6px 0 0 1.1rem; padding: 0; }
+.fx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 0.7rem; }
+.fx label { display: grid; gap: 3px; font-size: 0.8rem; font-weight: 700; color: var(--muted); min-width: 0; }
+.fx label small { font-weight: 400; }
+.fx input:not([type='checkbox']), .fx textarea, .fx select { width: 100%; font: inherit; font-weight: 400; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.6rem; }
+.fx input:disabled, .fx textarea:disabled, .fx select:disabled { opacity: 0.75; }
+.fx-check { display: flex !important; align-items: center; gap: 8px; }
+.fx-list { display: grid; gap: 0.7rem; }
+.fx-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 0.6rem; border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem; align-items: end; }
+.fx-row .fx-wide { grid-column: 1 / -1; }
+.fx-add, .fx-x, .fx-save { font: inherit; font-weight: 700; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); padding: 0.45rem 0.8rem; cursor: pointer; justify-self: start; }
+.fx-save { background: var(--solar, #f8bc1e); color: #211f18; border-color: var(--solar, #f8bc1e); }
+.fx-save:disabled { opacity: 0.6; cursor: default; }
+.fx-bar { position: sticky; bottom: 0; display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0.7rem 1rem; }
+.fx-ok { color: var(--ok); font-weight: 700; }
+.fx-bad { color: #c0392b; font-weight: 700; }
+
+/* Page checks */
+.fx-sum { display: flex; flex-wrap: wrap; gap: 10px; }
+.fx-pill { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-weight: 700; }
+.fx-page { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 0.7rem 1rem; }
+.fx-page summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.fx-page ul { margin: 8px 0 0 1.1rem; padding: 0; display: grid; gap: 4px; font-size: 0.88rem; }
+.fx-tag { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; border-radius: 6px; padding: 1px 6px; border: 1px solid var(--border); }
+.fx-tag.is-block { border-color: #c0392b; color: #c0392b; }
+.fx-err { color: #c0392b; font-weight: 700; }
+.fx-warn { color: var(--muted); font-weight: 700; }

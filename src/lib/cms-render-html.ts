@@ -222,12 +222,12 @@ function renderBlock(b: LooseBlock): string {
         : '';
     // A rating shows only with its value and where it comes from; an install figure only with its value and what it counts.
     const rtVal = String(p.ratingValue || '').trim();
-    const rtSrc = String(p.ratingSource || '').trim();
+    const rtSrc = String(p.ratingPlatform || '').trim();
     const rtInst = String(p.ratingInstalls || '').trim();
     const rtLbl = String(p.ratingInstallsLabel || '').trim();
     const rtCells =
       (rtVal && rtSrc ? `<div class="r"><span class="big">${esc(rtVal)}</span><span class="stars">★★★★★</span><span>${esc(rtSrc)}</span></div>` : '') +
-      (rtInst && rtLbl ? `<div class="r"><span class="big">${esc(rtInst)}</span><span>${esc(rtLbl)}</span></div>` : '');
+      (rtInst && rtLbl ? `<div class="r"><span class="big">${esc(rtInst)}${esc(String(p.ratingInstallsSuffix || ''))}</span><span>${esc(rtLbl)}</span></div>` : '');
     const rthtml = !p.hideRating && rtCells ? `<div class="rating">${rtCells}</div>` : '';
     const eyebrowHtml = p.eyebrow
       ? `<span class="eyebrow on-dark">${SPARK.replace('<svg ', '<svg class="spark-ico" ')}${esc(p.eyebrow)}</span>`
@@ -555,7 +555,7 @@ function renderBlock(b: LooseBlock): string {
         : `<div class="tgrid">${cards}</div>`;
     const fnHtml = fn ? `<p class="pv-testi-note">${esc(fn)}</p>` : '';
     return (
-      `<div class="pv-testi"><div class="wrap"><div class="shead center">${eyebrow(teb)}<h2>${accentText(ttl)}</h2></div>${body}${fnHtml}</div></div>`
+      `<div class="pv-testi"${p.approved === true ? ' data-approved="1"' : ''}><div class="wrap"><div class="shead center">${eyebrow(teb)}<h2>${accentText(ttl)}</h2></div>${body}${fnHtml}</div></div>`
     );
   }
 

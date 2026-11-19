@@ -454,12 +454,12 @@ function renderBlock(b,edit){
    var btnrow=btns?'<div class="cbtns">'+btns+'</div>':'';
    var mt=p.microtrust!==undefined?p.microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees';
    var mthtml=(!p.hideMicrotrust&&mt&&String(mt).trim())?('<p class="microtrust"'+ce(id+'.microtrust',edit)+'>'+esc(mt)+'</p>'):'';
-   var rtVal=String(p.ratingValue||'').trim(),rtSrc=String(p.ratingSource||'').trim();
+   var rtVal=String(p.ratingValue||'').trim(),rtSrc=String(p.ratingPlatform||'').trim();
    var rtInst=String(p.ratingInstalls||'').trim(),rtLbl=String(p.ratingInstallsLabel||'').trim();
    /* A rating shows only with its value AND where it comes from; an install figure only with its value AND what it counts. Nothing is filled in for you. */
    var rtCells='';
-   if(rtVal&&rtSrc)rtCells+='<div class="r"><span class="big"'+ce(id+'.ratingValue',edit)+'>'+esc(rtVal)+'</span><span class="stars">★★★★★</span><span'+ce(id+'.ratingSource',edit)+'>'+esc(rtSrc)+'</span></div>';
-   if(rtInst&&rtLbl)rtCells+='<div class="r"><span class="big"'+ce(id+'.ratingInstalls',edit)+'>'+esc(rtInst)+'</span><span'+ce(id+'.ratingInstallsLabel',edit)+'>'+esc(rtLbl)+'</span></div>';
+   if(rtVal&&rtSrc)rtCells+='<div class="r"><span class="big"'+ce(id+'.ratingValue',edit)+'>'+esc(rtVal)+'</span><span class="stars">★★★★★</span><span'+ce(id+'.ratingPlatform',edit)+'>'+esc(rtSrc)+'</span></div>';
+   if(rtInst&&rtLbl)rtCells+='<div class="r"><span class="big"><span'+ce(id+'.ratingInstalls',edit)+'>'+esc(rtInst)+'</span>'+esc(p.ratingInstallsSuffix||'')+'</span><span'+ce(id+'.ratingInstallsLabel',edit)+'>'+esc(rtLbl)+'</span></div>';
    var rthtml=(!p.hideRating&&rtCells)?('<div class="rating">'+rtCells+'</div>'):'';
    var eyebrowHtml = p.eyebrow ? '<span class="eyebrow on-dark"'+ce(id+'.eyebrow',edit)+'>'+SPARK.replace('<svg ','<svg class="spark-ico" ')+esc(p.eyebrow)+'</span>' : '';
    var markHtml='';
@@ -502,7 +502,7 @@ function renderBlock(b,edit){
    if(p.items.length>3){body='<div class="pv-tmarquee"><div class="trk" style="animation-duration:'+(p.speed||36)+'s">'+cards.join('')+cards.join('')+'</div></div>';}
    else{body='<div class="tgrid">'+cards.join('')+'</div>';}
    var fnHtml=fn?'<p class="pv-testi-note"'+ce(id+'.footnote',edit)+'>'+esc(fn)+'</p>':'';
-   return '<div class="pv-testi"><div class="wrap"><div class="shead center">'+eyebrow(teb,id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+accentText(ttl)+'</h2></div>'+body+fnHtml+'</div></div>';}
+   return '<div class="pv-testi"'+(p.approved===true?' data-approved="1"':'')+'><div class="wrap"><div class="shead center">'+eyebrow(teb,id+'.eyebrow',edit)+'<h2'+ce(id+'.title',edit)+'>'+accentText(ttl)+'</h2></div>'+body+fnHtml+'</div></div>';}
  if(t==='gallery'){
    var geb=(p.eyebrow!=null&&String(p.eyebrow).trim()!=='')?p.eyebrow:'Recent work';
    var gtl=(p.title!=null&&String(p.title).trim()!=='')?p.title:'Recent installs';
@@ -748,7 +748,7 @@ function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='
    h+='</div>';
    h+=chk('Disable primary button',!!p.ctaDisabled,id+'.ctaDisabled')+(p.ctaDisabled?'<div class="hint">Primary button is hidden.</div>':txt('Primary button',p.ctaLabel,id+'.ctaLabel')+routeFld('Primary button link',p.ctaHref||'#quote',id+'.ctaHref')+chk('Pulse animation on button',p.ctaPulse,id+'.ctaPulse'));
    h+=chk('Disable secondary button',!!p.cta2Disabled,id+'.cta2Disabled')+(p.cta2Disabled?'<div class="hint">Secondary button is hidden.</div>':txt('Secondary button',p.cta2,id+'.cta2')+routeFld('Secondary button link',p.cta2Href||'',id+'.cta2Href'));
-   h+=txt('Microtrust bar',p.microtrust!=null?p.microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees',id+'.microtrust')+'<div class="hint"><b>Rating row</b> Shows only when the value and its source are both filled in (and the install figure with its label). Leave empty until the figures are verified.</div>'+txt('Rating value',p.ratingValue||'',id+'.ratingValue')+txt('Rating source (for example Google)',p.ratingSource||'',id+'.ratingSource')+txt('Installs figure',p.ratingInstalls||'',id+'.ratingInstalls')+txt('Installs label (what it counts)',p.ratingInstallsLabel||'',id+'.ratingInstallsLabel');}
+   h+=txt('Microtrust bar',p.microtrust!=null?p.microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees',id+'.microtrust')+'<div class="hint"><b>Rating row</b> Shows only when the value and its source are both filled in (and the install figure with its label). Leave empty until the figures are verified.</div>'+txt('Rating value',p.ratingValue||'',id+'.ratingValue')+txt('Rating source (for example Google)',p.ratingPlatform||'',id+'.ratingPlatform')+txt('Installs figure',p.ratingInstalls||'',id+'.ratingInstalls')+txt('Installs label (what it counts)',p.ratingInstallsLabel||'',id+'.ratingInstallsLabel');}
  else if(bt==='stats'){h+='<div class="hint">Stat tiles</div>';p.items.forEach((s,i)=>{h+='<div class="sub"><div class="sh"><b>Tile '+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+txt('Number',s.n,id+'.items.'+i+'.n')+txt('Label',s.k,id+'.items.'+i+'.k')+'</div>';});h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{n:\'0\',k:\'Label\'})">+ Add tile</button>';}
  else if(bt==='footer'){h+=imagePicker(p.logoImg||'',id+'.logoImg','Footer logo',true)+'<div class="hint">Leave empty to show the brand name as text.</div>'+txt('Brand name (fallback)',p.brandText||'Heliaxis',id+'.brandText')+area('About text',p.about,id+'.about');
    (p.cols||[]).forEach(function(col,ci){
@@ -788,7 +788,7 @@ function inspector(bl){const p=bl.p,id=bl.id;const bt=blockTypeKey(bl.t);let h='
  else if(bt==='testi'){h+=txt('Eyebrow',p.eyebrow||'Real customers',id+'.eyebrow')+accentArea('Title',p.title||'What customers say',id+'.title')+area('Footnote (leave empty to hide)',p.footnote!=null?p.footnote:'Illustrative testimonials — replace with your real Google & Trustpilot reviews.',id+'.footnote')+'<div class="hint">Add testimonials. <b>More than 3 turns it into an auto-scrolling slider.</b></div>';
    h+='<div class="fld"><label>Slider speed — '+(p.speed||36)+'s per loop (lower = faster)</label><input type="range" min="12" max="80" value="'+(p.speed||36)+'" oninput="updT(\''+id+'.speed\',+this.value)"></div>';
    p.items.forEach((tt,i)=>{h+='<div class="sub"><div class="sh"><b>#'+(i+1)+'</b><button class="rm" onclick="rmItem(\''+id+'\',\'items\','+i+')">remove</button></div>'+area('Quote',tt.quote,id+'.items.'+i+'.quote')+'<div class="row2">'+txt('Name',tt.name,id+'.items.'+i+'.name')+txt('Location',tt.loc,id+'.items.'+i+'.loc')+'</div><div class="fld"><label>Stars — '+(tt.stars||5)+'</label><div class="seg">'+[1,2,3,4,5].map(s=>'<button class="'+((tt.stars||5)===s?'on':'')+'" onclick="upd(\''+id+'.items.'+i+'.stars\','+s+')">'+s+'★</button>').join('')+'</div></div></div>';});
-   h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{stars:5,quote:\'Great service.\',name:\'Name\',loc:\'Town · Solar\'})">+ Add testimonial</button>';
+   h+='<button class="miniadd" onclick="addItem(\''+id+'\',\'items\',{stars:5,quote:\'Great service.\',name:\'Name\',loc:\'Town · Solar\'})">+ Add testimonial</button>'+'<button class="miniadd" onclick="useApprovedTestimonials(\''+id+'\')">Use approved testimonials from the facts sheet</button><div class="hint" id="tst-msg-'+id+'">Only testimonials approved on the facts sheet can show on the live site. Anything else is hidden, and stops the page publishing.</div>';
    if(p.items.length>3)h+='<div class="hint" style="color:var(--ok)">✓ Slider active ('+p.items.length+' testimonials)</div>';}
  else if(bt==='banner'){h+=accentArea('Heading',p.heading,id+'.heading')+'<div class="hint">Logos are managed in the <b>Logos</b> tab. Any logo ticked “Include in banner” shows here automatically.</div>';}
  else if(bt==='cta'){h+=accentArea('Headline',p.headline,id+'.headline')+area('Subtext',p.sub,id+'.sub');
@@ -849,7 +849,7 @@ function addFooterLink(id,ci){var p=findBlock(id).p;if(!p.cols||!p.cols[ci])retu
 function rmFooterCol(id,ci){var p=findBlock(id).p;if(!p.cols)return;p.cols.splice(ci,1);renderPreview();renderBuild();save();}
 function selectBlock(id){if(SEL===id)return;SEL=id;tplHide();renderPreview();renderBuild();}
 function blockDefs(){const defs={
-  hero:{eyebrow:'Eyebrow',headline:'Your headline here',sub:'Supporting sentence.',dark:true,ctaLabel:'Get a quote',ctaHref:'#quote',ctaPulse:false,cta2:'',cta2Href:'',ctaDisabled:false,cta2Disabled:false,textWide:false,tags:'',hideMark:false,hideSun:false,hideRating:false,hideMicrotrust:false,markImg:'',bgImg:'',bgOverlay:62,ratingValue:'',ratingSource:'',ratingInstalls:'',ratingInstallsLabel:'',microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees'},
+  hero:{eyebrow:'Eyebrow',headline:'Your headline here',sub:'Supporting sentence.',dark:true,ctaLabel:'Get a quote',ctaHref:'#quote',ctaPulse:false,cta2:'',cta2Href:'',ctaDisabled:false,cta2Disabled:false,textWide:false,tags:'',hideMark:false,hideSun:false,hideRating:false,hideMicrotrust:false,markImg:'',bgImg:'',bgOverlay:62,ratingValue:'',ratingPlatform:'',ratingInstalls:'',ratingInstallsLabel:'',microtrust:'Free survey · No obligation · No salespeople · Insurance-backed guarantees'},
   stats:{items:[{n:'100+',k:'Installs'},{n:'£1,200',k:'Saved / yr'},{n:'4.9★',k:'Rating'}]},
   grid:{eyebrow:'Section',title:'Section title',anchor:'',cols:3,fill:'none',contactHeading:'Get in touch',contactText:'Not sure which option fits? Tell us your setup and we\'ll point you the right way.',contactBtn:'Contact us',contactHref:'#quote',items:[{icon:'solar',title:'Item one',desc:'Description.'},{icon:'battery',title:'Item two',desc:'Description.'},{icon:'ev',title:'Item three',desc:'Description.'}]},
   footer:footerDefaults(),
@@ -2131,6 +2131,7 @@ function openPublish(){
     +'<button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="openPublishPreview()">Preview before publish</button>'
     +'<button class="tbtn solar" style="color:var(--ink)" onclick="doPublish()">Publish now</button>'
     +'<button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="exportJSON()">Download data (JSON)</button>'
+    +'<a class="tbtn" style="color:var(--ink);border-color:var(--line);text-decoration:none;display:inline-flex;align-items:center" href="/admin/cms-checks" target="_blank" rel="noopener">Page checks</a>'
     +'</div>';
   document.getElementById('modal').classList.add('show');
 }
@@ -2177,7 +2178,7 @@ async function openPublishPreview(pageIdx,opts){
     else console.error(err);
   }
 }
-async function doPublish(){
+async function doPublish(overrideReason){
   if(!document.getElementById('modal')||!document.getElementById('modal').classList.contains('show')||!document.getElementById('pubmsg'))openPublish();
   var m=document.getElementById('pubmsg');
   if(!m)return;
@@ -2204,10 +2205,11 @@ async function doPublish(){
     });
     // Send live STATE (incl. site.menu) so publish does not re-read a stale draft.
     var r=await fetch('/api/cms/publish',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',
-      body:JSON.stringify({state:STATE,rendered:{css:css,pages:pages}})});
+      body:JSON.stringify({state:STATE,rendered:{css:css,pages:pages},override:overrideReason?{reason:String(overrideReason)}:undefined})});
     if(!r.ok){
-      var em='Publish failed';
-      try{em=(await r.json()).error||em;}catch(e){}
+      var em='Publish failed';var ej=null;
+      try{ej=await r.json();em=(ej&&ej.error)||em;}catch(e){}
+      if(r.status===422&&ej&&ej.blocked){if(typeof m!=='undefined'&&m){showPublishBlocked(m,ej);return;}em+=' Fix them under CMS, Page checks, or publish from the editor Publish box.';}
       if(r.status===401)throw new Error('You must be signed in as an approved admin to publish.');
       if(r.status===413||/payload|too large|entity|FUNCTION_PAYLOAD_TOO_LARGE/i.test(String(em))){
         throw new Error('Publish payload too large. Try uploading fewer or smaller images, then publish again.');
@@ -2231,6 +2233,40 @@ async function doPublish(){
     m.style.color='var(--amber-2)';
     m.textContent='⚠ '+(e&&e.message?e.message:'Publish failed');
   }
+}
+/** Publish stopped by the page checks: say which pages and why, and let an admin publish past them with a reason (kept on record). */
+function showPublishBlocked(m,ej){
+  var h='<div style="color:var(--amber-2);font-weight:700">'+esc(ej.error||'Publishing stopped.')+'</div>';
+  h+='<div style="margin-top:8px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-size:.82rem;color:var(--ink)">';
+  (ej.pages||[]).forEach(function(pg){
+    h+='<div style="margin-bottom:8px"><b>'+esc(pg.name||pg.slug)+'</b> <span style="color:var(--muted)">'+esc(pg.slug)+(pg.draft?' · draft':'')+'</span><ul style="margin:3px 0 0 16px;padding:0">'+(pg.errors||[]).map(function(e){return '<li>'+esc(e.message)+'</li>';}).join('')+(pg.more?'<li style="color:var(--muted)">and '+pg.more+' more</li>':'')+'</ul></div>';
+  });
+  h+='</div>';
+  h+='<div style="margin-top:8px;font-size:.82rem;color:var(--muted)">Fix these, or delete the pages, then publish again. The full list, with warnings, is on <a href="/admin/cms-checks" target="_blank" rel="noopener" style="color:var(--amber-2);font-weight:700">Page checks</a>.</div>';
+  if(ej.canOverride){
+    h+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line);font-size:.82rem"><b>Admins only:</b> publish anyway. Every page listed goes live exactly as it is.<textarea id="pub-why" rows="2" placeholder="Why is it safe to publish these? At least 10 characters, kept on record." style="width:100%;margin-top:6px;font:inherit"></textarea><div id="pub-why-err" style="color:var(--amber-2);min-height:1.2em"></div><button class="tbtn" style="color:var(--ink);border-color:var(--line)" onclick="doPublishAnyway()">Publish anyway</button></div>';
+  }
+  m.style.color='var(--ink)';m.innerHTML=h;
+}
+function doPublishAnyway(){
+  var t=document.getElementById('pub-why');var v=t?String(t.value||'').trim():'';
+  var er=document.getElementById('pub-why-err');
+  if(v.length<10){if(er)er.textContent='Write a reason of at least 10 characters.';return;}
+  doPublish(v);
+}
+/** Fill a Testimonials block with the testimonials approved on the facts sheet, and mark it approved (only those may show on the live site). */
+async function useApprovedTestimonials(id){
+  var msg=document.getElementById('tst-msg-'+id);
+  try{
+    var r=await fetch('/api/cms/facts',{credentials:'same-origin',cache:'no-store'});
+    var d=await r.json();
+    var list=(d&&d.facts&&d.facts.testimonials)||[];
+    if(!list.length){if(msg)msg.textContent='The facts sheet has no approved testimonials yet. An admin adds them under CMS, Facts sheet.';return;}
+    var b=findBlock(id);if(!b)return;
+    b.p.items=list.map(function(t){return {stars:5,quote:t.quote,name:t.name,loc:(t.town||'')+(t.product?(t.town?' · ':'')+t.product:'')};});
+    b.p.approved=true;
+    renderPreview();renderBuild();save();
+  }catch(e){if(msg)msg.textContent='Could not read the facts sheet. Try again.';}
 }
 function closeModal(){
   var m=document.getElementById('modal');
@@ -2546,10 +2582,10 @@ function ensureHeroCustomize(){
       if(p.bgImg==null){p.bgImg='';changed=true;}
       if(p.bgOverlay==null){p.bgOverlay=62;changed=true;}
       /* 4.9 and 1200 were sample figures this step used to write into every hero. They were never verified, so they go. */
-      if(p.ratingValue==null){p.ratingValue='';changed=true;}else if(p.ratingValue==='4.9'&&!p.ratingSource){p.ratingValue='';changed=true;}
-      if(p.ratingInstalls==null){p.ratingInstalls='';changed=true;}else if(p.ratingInstalls==='1200'&&!p.ratingInstallsLabel){p.ratingInstalls='';changed=true;}
-      if(p.ratingSource==null){p.ratingSource='';changed=true;}
-      if(p.ratingInstallsLabel==null){p.ratingInstallsLabel='';changed=true;}
+      if(p.ratingValue==null){p.ratingValue='';changed=true;}else if(p.ratingValue==='4.9'&&(!p.ratingPlatform||p.ratingPlatform==='Google & Trustpilot')){p.ratingValue='';changed=true;}
+      if(p.ratingInstalls==null){p.ratingInstalls='';changed=true;}else if(p.ratingInstalls==='1200'&&(!p.ratingInstallsLabel||p.ratingInstallsLabel==='installs across South Wales')){p.ratingInstalls='';changed=true;}
+      if(p.ratingPlatform==null||p.ratingPlatform==='Google & Trustpilot'){p.ratingPlatform='';changed=true;}
+      if(p.ratingInstallsLabel==null||p.ratingInstallsLabel==='installs across South Wales'){p.ratingInstallsLabel='';changed=true;}
       if(p.textWide==null){p.textWide=false;changed=true;}
     });
   });
@@ -3268,8 +3304,9 @@ async function publishMegaMenu(){
       body:JSON.stringify({state:STATE})
     });
     if(!r.ok){
-      var em='Publish failed';
-      try{em=(await r.json()).error||em;}catch(e){}
+      var em='Publish failed';var ej=null;
+      try{ej=await r.json();em=(ej&&ej.error)||em;}catch(e){}
+      if(r.status===422&&ej&&ej.blocked){if(typeof m!=='undefined'&&m){showPublishBlocked(m,ej);return;}em+=' Fix them under CMS, Page checks, or publish from the editor Publish box.';}
       if(r.status===401)throw new Error('Sign in as an approved admin to publish.');
       throw new Error(em);
     }
@@ -3487,6 +3524,8 @@ w.exportHTML = exportHTML;
 w.openPublish = openPublish;
 w.openPublishPreview = openPublishPreview;
 w.doPublish = doPublish;
+w.doPublishAnyway = doPublishAnyway;
+w.useApprovedTestimonials = useApprovedTestimonials;
 w.tab = tab;
 w.setView = setView;
 w.selectBlock = selectBlock;

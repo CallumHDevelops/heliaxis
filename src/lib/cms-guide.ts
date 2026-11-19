@@ -139,7 +139,7 @@ export const LESSONS: Lesson[] = [
     ],
     callouts: [
       { kind: 'watch', title: 'Example wording in templates', text: 'Some sections and templates arrive with example content, such as 1,200+ installs, a 4.9 star rating, made-up customers and sample prices. Replace every one with real, true details, or delete the section.' },
-      { kind: 'watch', title: 'Testimonials', text: 'A Testimonials section is hidden on the live website until there are real customer stories to show, so there is no point adding one. Never type in a review that a customer did not write.' },
+      { kind: 'watch', title: 'Testimonials', text: 'A Testimonials section is hidden on the live website unless it was filled with the button Use approved testimonials from the facts sheet. Only an admin adds approved testimonials, with the customer’s permission. Never type in a review that a customer did not write.' },
       { kind: 'tip', title: 'The footer belongs to each page', text: 'Each page has its own Site footer section. Changing it on one page does not change the others.' },
       { kind: 'tip', title: 'Buttons that go nowhere', text: 'If a button points at #quote on a page with no quote form, the live site now opens the quote form in a pop-up on that page (and goes to the free quote page if the pop-up cannot load). A page with its own quote form block scrolls to it instead. Still set every link properly.' },
       { kind: 'watch', title: 'The hero rating row', text: 'The row under a hero only shows when you fill in the rating and where it comes from (for example Google), and the install figure with what it counts. Nothing is filled in for you, and the old sample 4.9 and 1,200 figures are cleared. Leave it empty until the figures are verified.' },
@@ -295,6 +295,7 @@ export const LESSONS: Lesson[] = [
       { text: 'A second person, or the owner, has read the page.' },
     ],
     callouts: [
+      { kind: 'tip', title: 'The facts sheet and Page checks', text: 'CMS › Facts sheet lists everything a page may say about Heliaxis: credentials, warranties, offers, approved reviews. CMS › Page checks tests every page against it. A new or changed page with an error will not publish, so fix what it lists. Only an admin can change the facts sheet.' },
       { kind: 'tip', title: 'Not sure? Leave it out', text: 'If you do not have a fact, leave the sentence out and ask the owner. A page with fewer claims that are all true beats a longer page with one wrong one.' },
       { kind: 'watch', title: 'Why this matters', text: 'Fake or misleading reviews and claims that cannot be proved break UK consumer law and advertising rules. A false credential also damages trust the moment a customer checks it.' },
     ],
@@ -338,6 +339,7 @@ export const LESSONS: Lesson[] = [
     ],
     callouts: [
       { kind: 'watch', title: 'Everyone with Website CMS can publish', text: 'That includes publishing the whole site by accident. Agree in the office who publishes, and when.' },
+      { kind: 'watch', title: 'If Publish stops with a list of problems', text: 'The page checks found errors on a new or changed page. Fix what each line says, or delete the page, then publish again. An admin can publish anyway, but must write down why, and it is kept on record.' },
       { kind: 'tip', title: 'If publishing fails', text: 'You must be signed in as an approved admin to publish: sign in again and retry. Publish payload too large means too many big pictures: upload fewer or smaller ones, then publish again.' },
       { kind: 'tip', title: 'Deleting and the menu', text: 'A deleted page stays on the live site until the next publish, and menu or top bar changes only show after a publish. Publishing is always the last step.' },
       { kind: 'watch', title: 'Publish from the CMS screen', text: 'Pages are drawn in your browser when you publish, so it has to be done from the CMS screen. An AI assistant or a command-line tool cannot do it for you.' },
