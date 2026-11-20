@@ -367,6 +367,8 @@ export type HandoverView = {
   sendsAt: string;
   prep: { label: string; done: boolean }[];
   stage: string;
+  /** The job's technologies (Job details). None: the pack can't tell what applies, so the tab asks first. */
+  products: string[];
   /** Something can be made, attached, released or rebuilt now: the tab asks for a refresh. */
   dirty: boolean;
   /** "Tell the customer" ticked by default on uploads (CRM settings). */
@@ -476,6 +478,7 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
     sendsAt: at.getTime() <= Date.now() + 60_000 ? 'now' : sendTimeWords(at),
     prep: prepList(l, views),
     stage: f.job.stage,
+    products: f.job.products,
     dirty: isDirty(l, views, made),
     tellDefault: f.settings.tellOnUpload,
   };

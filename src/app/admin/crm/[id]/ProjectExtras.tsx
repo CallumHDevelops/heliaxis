@@ -35,6 +35,8 @@ export type CrmDoc = {
   archived_at?: string | null;
   /** The handover pack item it is (handover.sql, the registry): null = not in the pack. */
   handover_slot?: string | null;
+  /** handover.sql: 'with_pack' = held back and released into the portal when the handover pack is sent. */
+  release?: string | null;
 };
 type LibDoc = { id: string; name: string; description: string | null };
 type Snippet = { id: string; title: string; body: string };
@@ -63,6 +65,9 @@ const PACK_CHOICES = PACK_ITEMS.filter((p) => p.code !== 'HX-HO-01');
 
 /** Quotes and contracts can be signed by the customer (in the portal, or ticked as signed outside it). */
 const SIGNABLE = ['quote', 'contract'];
+
+/** A handover pack document held back until the pack is sent (not hidden by hand). */
+const heldForPack = (d: CrmDoc) => !d.visible && d.release === 'with_pack' && !!d.handover_slot && d.handover_slot !== 'PACK';
 
 const short = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
@@ -381,8 +386,19 @@ export function DocumentsTab({
                       {PRINT_LABEL}
                     </a>
                   )}
-                  <button type="button" className={`crm-chipbtn${d.visible ? ' on' : ''}`} onClick={() => patch(d.id, { visible: !d.visible })}>
-                    {d.visible ? '👁 In portal' : 'Private'}
+                  <button
+                    type="button"
+                    className={`crm-chipbtn${d.visible ? ' on' : ''}`}
+                    onClick={() => patch(d.id, { visible: !d.visible })}
+                    title={
+                      !d.visible && heldForPack(d)
+                        ? 'Held back: it goes into their portal when you send the handover pack. Tap to show it to them now.'
+                        : d.visible
+                          ? 'In their portal. Tap to hide it.'
+                          : 'Only you can see it. Tap to show it in their portal.'
+                    }
+                  >
+                    {d.visible ? '👁 In portal' : heldForPack(d) ? '⏳ Goes with the pack' : 'Private'}
                   </button>
                   {signable && !isSignedQuote && (
                     <button type="button" className={`crm-chipbtn${d.needs_signature ? ' on' : ''}`} onClick={() => patch(d.id, { needs_signature: !d.needs_signature })}>

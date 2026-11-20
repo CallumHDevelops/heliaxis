@@ -413,6 +413,8 @@ export function HandoverTab({
         </div>
       </section>
 
+      {!v.products.some((x) => x in TECH_ICON) && <TechPicker projectId={projectId} onSaved={() => { onChanged(); void reload(); }} />}
+
       {!v.send.ok && !sent && (
         <p className="hv-hold">
           <b>Can be sent once these are in:</b> {v.send.blocking.map((b) => b.title).join(', ')}.
@@ -627,5 +629,61 @@ export function HandoverTab({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A job with no technologies ticked can't say which items it needs: every solar, battery and heat
+ * pump item would sit under "Not for this job" (and documents filed in them with it). Ask first.
+ */
+function TechPicker({ projectId, onSaved }: { projectId: string; onSaved: () => void }) {
+  const [pick, setPick] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const TECHS: [string, string][] = [
+    ['solar', 'Solar PV'],
+    ['battery', 'Battery'],
+    ['heatpump', 'Heat pump'],
+    ['ev', 'EV charger'],
+  ];
+  return (
+    <section className="crm-banner crm-banner--err hv-techpick" aria-label="What we installed">
+      <p>
+        <b>What did we install on this job?</b> No technologies are ticked on Job details, so the pack can’t tell which documents it needs: the
+        solar, battery and heat pump items are all hidden until you choose.
+      </p>
+      <div className="hv-acts__row">
+        {TECHS.map(([k, label]) => (
+          <button
+            key={k}
+            type="button"
+            className={`crm-chipbtn${pick.includes(k) ? ' on' : ''}`}
+            aria-pressed={pick.includes(k)}
+            onClick={() => setPick((p) => (p.includes(k) ? p.filter((x) => x !== k) : [...p, k]))}
+          >
+            {TECH_ICON[k as Tech]} {label}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="crm-btn crm-btn--solar crm-btn--small"
+          disabled={!pick.length || busy}
+          onClick={async () => {
+            setBusy(true);
+            setErr('');
+            try {
+              await send(`/api/crm/projects/${projectId}`, 'PATCH', { products: pick });
+              onSaved();
+            } catch (e) {
+              setErr(e instanceof Error ? e.message : 'Not saved');
+            }
+            setBusy(false);
+          }}
+        >
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+      {err && <p className="crm-small">{err}</p>}
+    </section>
   );
 }

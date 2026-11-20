@@ -280,8 +280,12 @@ export type WarrantyInput = JobHead & { years: number; start: string; startRule:
 export function warrantyInput(f: HandoverFacts): Made<WarrantyInput> {
   const s = f.settings;
   if (!warrantyReady(s)) return missing('Set the warranty term, start and wording in CRM settings, or upload your own.', 'settings');
-  const start = s.warrantyStart === 'commissioning' ? f.job.commissionedOn : f.job.handedOverOn;
-  if (!start) return waiting(s.warrantyStart === 'commissioning' ? 'Dated once the system is switched on.' : 'Dated when the pack goes to the customer.');
+  // Switched on: the commissioning date on Job details, else the day the electrician signed it off.
+  const start = s.warrantyStart === 'commissioning' ? (f.job.commissionedOn ?? f.electrician?.signedOn ?? null) : f.job.handedOverOn;
+  if (!start)
+    return s.warrantyStart === 'commissioning'
+      ? missing('Add the switch-on (commissioning) date on Job details: the warranty is dated from it.', 'job')
+      : waiting('Dated when the pack goes to the customer.');
   const p = f.paperwork;
   return {
     ok: true,
@@ -616,18 +620,21 @@ export const SWITCH_FIELDS: { key: 'cu' | 'ac' | 'dc' | 'battery'; label: string
   { key: 'dc', label: 'DC isolator', hint: 'e.g. Built into the inverter', for: 'solar' },
   { key: 'battery', label: 'Battery isolator', hint: 'e.g. On the side of the battery', for: 'battery' },
 ];
+/** Where each switch usually is, used until the office or the electrician says exactly where. */
+export const SWITCH_DEFAULTS: Record<'cu' | 'ac' | 'dc' | 'battery', string> = {
+  cu: 'the circuit breaker labelled for your solar or battery system',
+  ac: 'the switch labelled AC isolator, next to your inverter',
+  dc: 'the switch labelled DC isolator, on or next to your inverter',
+  battery: 'the isolator on or next to your battery',
+};
 export type SwitchInput = JobHead & { steps: string[]; backup: boolean; procedures: string[] };
 export function switchInput(f: HandoverFacts): Made<SwitchInput> {
   if (!approved(f.settings, 'shutdown')) return missing('Approve the switching-off wording in CRM settings.', 'settings');
   const v = f.electrician?.values ?? {};
   const dcSite = Array.isArray(v.pvt_iso_where) ? str((v.pvt_iso_where as unknown[])[0]) : str(v.pvt_iso_where);
   const where: Record<string, string | null> = { cu: val(f, 'HX-HO-09', 'cu'), ac: val(f, 'HX-HO-09', 'ac'), dc: val(f, 'HX-HO-09', 'dc') ?? dcSite, battery: val(f, 'HX-HO-09', 'battery') };
-  const wanted = SWITCH_FIELDS.filter((x) => !x.for || has(f, x.for));
-  const gaps = wanted.filter((x) => !where[x.key]);
-  if (gaps.length) {
-    if (f.electrician && !signed(f)) return waitElectrician(f);
-    return missing(`Say where the switches are: ${list(gaps.map((g) => g.label.toLowerCase()))}.`, 'switches');
-  }
+  // Not told where a switch is: the standard place, so the page is always made (the office can say exactly where on the Handover tab).
+  for (const x of SWITCH_FIELDS) if (!where[x.key]) where[x.key] = SWITCH_DEFAULTS[x.key];
   const lines = DRAFTS.shutdown.text.split('\n');
   const kept = lines
     .filter((l) => (!/^3\./.test(l) || has(f, 'solar')) && (!/^4\./.test(l) || has(f, 'battery')))

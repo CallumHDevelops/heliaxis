@@ -36,16 +36,16 @@ function eq(name, got, want) {
 // The owner's list, in his order, by Heliaxis's codes.
 const OWNER_LIST = ['HX-HO-01', 'HX-BAT-01', 'HX-HO-06', 'HX-PV-02', 'HX-BAT-02', 'HX-PV-01', 'HX-PV-03', 'HX-HO-02', 'HX-BAT-04', 'HX-HO-08', 'HX-HO-15', 'HX-HO-10', 'HX-BAT-03', 'HX-HO-11', 'HX-HO-12', 'HX-HO-16', 'HX-HO-09', 'HX-HO-17', 'HX-HO-13', 'HX-HO-18', 'HX-HO-05', 'HX-HO-04', 'HX-HO-14', 'HX-HO-07', 'HX-HO-03', 'HX-HO-19'];
 eq('every document in the owner’s list has a slot', OWNER_LIST.filter((c) => !S.slotDef(c)), []);
-eq('26 items plus the combined PACK', [S.PACK_ITEMS.length, S.SLOTS.length], [26, 27]);
+eq('32 items plus the combined PACK (the 26, the construction phase plan, the EV/heat pump grid notice and four heat pump papers)', [S.PACK_ITEMS.length, S.SLOTS.length], [32, 33]);
 eq('titles in Heliaxis’s own words', [S.slotDef('HX-HO-16').title, S.slotDef('HX-HO-07').title, S.slotDef('HX-BAT-04').title, S.slotDef('HX-HO-02').title, S.slotDef('HX-HO-08').title], ['Grid connection papers (G99)', 'Warranty insurance', 'Battery location statement (PAS 63100)', 'System summary and sign-off', 'Completion sign-off']);
-eq('every code is Heliaxis’s own', S.PACK_ITEMS.filter((s) => !/^HX-(HO|PV|BAT)-\d\d$/.test(s.code)).map((s) => s.code), []);
+eq('every code is Heliaxis’s own', S.PACK_ITEMS.filter((s) => !/^HX-(HO|PV|BAT|HP)-\d\d$/.test(s.code)).map((s) => s.code), []);
 eq('every item has a customer line and a contents group', S.PACK_ITEMS.filter((s) => !s.customer || !s.group).map((s) => s.code), []);
 eq(
   'pack order is the customer order (HANDOVER 2.6)',
   [...S.PACK_ITEMS].sort((a, b) => a.order - b.order).map((s) => s.code),
-  ['HX-HO-01', 'HX-HO-02', 'HX-HO-03', 'HX-HO-04', 'HX-BAT-04', 'HX-HO-05', 'HX-HO-06', 'HX-HO-07', 'HX-HO-08', 'HX-HO-09', 'HX-HO-10', 'HX-HO-11', 'HX-HO-12', 'HX-HO-13', 'HX-HO-14', 'HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-BAT-03', 'HX-HO-15', 'HX-HO-16', 'HX-HO-17', 'HX-HO-18', 'HX-HO-19']
+  ['HX-HO-01', 'HX-HO-02', 'HX-HO-03', 'HX-HO-04', 'HX-BAT-04', 'HX-HO-05', 'HX-HP-04', 'HX-HO-06', 'HX-HO-07', 'HX-HO-08', 'HX-HO-09', 'HX-HO-10', 'HX-HO-11', 'HX-HO-12', 'HX-HO-13', 'HX-HO-14', 'HX-HP-05', 'HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-BAT-03', 'HX-HP-02', 'HX-HP-03', 'HX-HO-15', 'HX-HO-16', 'HX-HO-21', 'HX-HO-17', 'HX-HO-18', 'HX-HO-20', 'HX-HO-19']
 );
-eq('"Which is it?" ends with Something else; the office’s uploads (the G98 notice, the estimate page, the PAS 63100 papers) are offered', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Battery location statement (PAS 63100)', 'Building Regulations certificate', 'Warranty insurance policy', 'Solar estimate, shading and care', 'Wiring diagram (schematic)', 'Design calculations', 'Battery location check (PAS 63100)', 'G98 notice as sent', 'G99 papers', 'Final invoice', 'Something else']);
+eq('"Which is it?" ends with Something else; the office’s uploads (the G98 notice, the estimate page, the PAS 63100 papers) are offered', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Battery location statement (PAS 63100)', 'Building Regulations certificate', 'Heat pump handover certificate', 'Warranty insurance policy', 'Solar estimate, shading and care', 'Wiring diagram (schematic)', 'Design calculations', 'Ground loop design', 'Battery location check (PAS 63100)', 'Heat pump commissioning checklist', 'Cylinder commissioning checklist', 'G98 notice as sent', 'G99 papers', 'DNO notice for an EV charger or heat pump', 'Final invoice', 'Construction phase plan', 'Something else']);
 
 /* ── Applies: technologies and the DNO route ──────────────────────────────── */
 
@@ -57,7 +57,7 @@ const yes = (m) => Object.keys(m).filter((k) => m[k] === null);
 eq(
   'EV only: the covering letter, certificate, Building Regulations, warranty, completion, switching off, manuals, invoice (and the optional extras)',
   yes(applies(['ev'])),
-  ['HX-HO-01', 'HX-HO-04', 'HX-HO-05', 'HX-HO-06', 'HX-HO-08', 'HX-HO-09', 'HX-HO-17', 'HX-HO-18', 'HX-HO-19']
+  ['HX-HO-01', 'HX-HO-04', 'HX-HO-05', 'HX-HO-06', 'HX-HO-08', 'HX-HO-09', 'HX-HO-21', 'HX-HO-17', 'HX-HO-18', 'HX-HO-20', 'HX-HO-19']
 );
 eq('EV only: the rest say why', [applies(['ev'])['HX-PV-02'], applies(['ev'])['HX-HO-02'], applies(['ev'])['HX-BAT-01'], applies(['ev'])['HX-HO-03']], ['No solar panels on this job', 'No solar or battery on this job', 'No battery on this job', 'No MCS certificate for this job’s technologies']);
 eq('heat pump only: MCS certificate and guarantee apply', [applies(['heatpump'])['HX-HO-03'], applies(['heatpump'])['HX-HO-07'], applies(['heatpump'])['HX-HO-02']], [null, null, 'No solar or battery on this job']);
@@ -133,7 +133,7 @@ eq('manuals with no models on the job: Missing, add them', byCode(S.slotStates(c
 
 const h = S.headline(Object.values(part));
 eq('headline: Complete against everything that applies', h.words, `${h.complete} of ${h.total} complete · ${h.waiting} waiting · ${h.missing} missing · ${h.na} not needed`);
-eq('headline counts (21 apply: the 26, less G99, the agreement, PAS 63100 twice and the extras)', [h.complete, h.total, h.na], [9, 21, 4]);
+eq('headline counts (22 apply: the 26 less G99, the agreement, PAS 63100 twice and the extras, plus the construction phase plan)', [h.complete, h.total, h.na], [9, 22, 4]);
 
 // No route chosen: Missing, never silently not needed.
 const noRoute = byCode(S.slotStates(ctx({ dnoRoute: null })));
@@ -173,7 +173,7 @@ eq('Send allowed once the site documents are in; the rest follow', [sc.ok, sc.fo
 // Customer view, pack contents grouping.
 eq('portal: a waiting item is "on its way", a not-needed one hidden', [S.customerState(part['HX-HO-03']), S.customerState(part['HX-HO-16']), S.customerState({ ...part['HX-PV-02'], docs: [doc('HX-PV-02', { visible: true })] })], ['coming', null, 'ready']);
 const groups = S.contentsGroups(Object.values(part).filter((v) => v.state !== 'na' && v.code !== 'HX-HO-01'));
-eq('contents groups in order', groups.map((g) => g.title), ['Certificates', 'Warranties and guarantees', 'Using and looking after your system', 'Design', 'Test and inspection records', 'Grid connection', 'Manufacturer information', 'Invoices']);
+eq('contents groups in order', groups.map((g) => g.title), ['Certificates', 'Warranties and guarantees', 'Using and looking after your system', 'Design', 'Test and inspection records', 'Grid connection', 'Manufacturer information', 'Invoices', 'Other']);
 eq('certificates in pack order', groups[0].items.map((v) => v.code), ['HX-HO-02', 'HX-HO-03', 'HX-HO-04', 'HX-HO-05']);
 eq('model names compared ignoring case, spaces and dashes', S.modelKey('GIV-AIO 13.5') === S.modelKey('giv aio13.5'), true);
 
@@ -236,7 +236,7 @@ const withInterval = I.scheduleInput(
 );
 eq('maintenance schedule interval from the library, with its source', withInterval.input.rows.find((r) => r.item.startsWith('Battery')), { item: 'Battery (GivEnergy 9.5 kWh)', check: 'Check it’s charging and discharging in the app', who: 'You', often: 'Every 12 months', source: 'GivEnergy installation manual 4.2' });
 
-eq('estimate page: never made until MIS 3002’s wording is copied in', [I.shadingInput(facts()).ok, I.shadingInput(facts()).fix], [false, 'upload']);
+eq('estimate page: made with MIS 3002’s wording (copied in from the MCS estimate)', [I.shadingInput(facts()).ok, I.shadingInput(facts()).input?.note.startsWith('The performance of solar PV systems')], [true, true]);
 eq('estimate page: no design figures, Missing (the handover never works one out)', I.shadingInput(facts({ design: designOf({}) })).why, 'Add the estimated generation and the shade factor from the design on Job details.');
 eq('estimate page: with verified wording (fixture), ready', I.shadingInput(facts(), { source: 'MIS 3002', issue: 'test', verified: true, importantNote: 'FIXTURE', shadingNote: 'FIXTURE 2' }).ok, true);
 
@@ -249,7 +249,7 @@ const sig = { name: 'Jane Smith', signed_at: '2026-11-03T17:50:00Z', path: 'sign
 eq('completion sign-off: signed on the phone, ready', I.completionInput(facts({ electrician: { ...facts().electrician, customer: { completion: sig } } })).ok, true);
 
 eq('G98 data sheet: no MPAN, Missing', I.g98Input(facts({ system: { ...facts().system, mpan: null } })).why, 'Add the MPAN on Job details.');
-eq('switching off: no switch locations, Missing and named', I.switchInput(facts()).why, 'Say where the switches are: consumer unit circuit, ac isolator, dc isolator and battery isolator.');
+eq('switching off: no switch locations, made with the standard places', [I.switchInput(facts()).ok, I.switchInput(facts()).input?.steps.some((x) => x.includes(I.SWITCH_DEFAULTS.ac))], [true, true]);
 const sw = I.switchInput(facts({ data: { 'HX-HO-09': { values: { cu: 'Hall, labelled Solar PV', ac: 'Loft, by the inverter', dc: 'Built into the inverter', battery: 'Side of the battery' } } } }));
 eq('switching off: back-up warning on a back-up job', [sw.ok, sw.input.steps.some((s) => s.includes('back-up power'))], [true, true]);
 // The steps the job has, numbered 1…n, and back on from n (a customer's safety instruction).

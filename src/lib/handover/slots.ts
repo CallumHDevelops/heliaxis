@@ -61,6 +61,12 @@ export type SlotCode =
   | 'HX-BAT-02'
   | 'HX-BAT-03'
   | 'HX-BAT-04'
+  | 'HX-HO-20'
+  | 'HX-HO-21'
+  | 'HX-HP-02'
+  | 'HX-HP-03'
+  | 'HX-HP-04'
+  | 'HX-HP-05'
   | 'PACK';
 
 /** What applies() looks at: the job's technologies, its DNO route and two design details. */
@@ -107,6 +113,8 @@ const solar = (c: AppliesCtx) => (has(c, 'solar') ? null : NO_SOLAR);
 const battery = (c: AppliesCtx) => (has(c, 'battery') ? null : NO_BATTERY);
 const pvOrBattery = (c: AppliesCtx) => (has(c, 'solar', 'battery') ? null : NO_PV_OR_BATTERY);
 const any = () => null;
+const heatpump = (c: AppliesCtx) => (has(c, 'heatpump') ? null : 'No heat pump on this job');
+const evOrHeatpump = (c: AppliesCtx) => (has(c, 'ev', 'heatpump') ? null : 'No EV charger or heat pump on this job');
 /** MCS certifies solar, batteries and heat pumps: not an EV charger on its own. */
 const mcs = (c: AppliesCtx) => (has(c, 'solar', 'battery', 'heatpump') ? null : 'No MCS certificate for this job’s technologies');
 const pas = (c: AppliesCtx) => battery(c) ?? (c.pas63100 === true ? null : 'PAS 63100 isn’t ticked for this battery (Job details)');
@@ -201,6 +209,19 @@ export const SLOTS: SlotDef[] = [
     reasons: [EXISTING],
     category: 'certificate',
     pick: 'Building Regulations certificate',
+  },
+  {
+    code: 'HX-HP-04',
+    title: 'Heat pump handover certificate',
+    customer: 'Our certificate that your heat pump was handed over to you, with its settings explained.',
+    group: 'certificates',
+    tech: ['heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 55,
+    applies: heatpump,
+    category: 'certificate',
+    pick: 'Heat pump handover certificate',
   },
   {
     code: 'HX-HO-06',
@@ -317,6 +338,20 @@ export const SLOTS: SlotDef[] = [
     pick: 'Design calculations',
   },
   {
+    code: 'HX-HP-05',
+    title: 'Ground loop design',
+    customer: 'The design of your ground loop (ground source heat pumps only).',
+    group: 'design',
+    tech: ['heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 145,
+    applies: heatpump,
+    optional: true,
+    category: 'design',
+    pick: 'Ground loop design',
+  },
+  {
     code: 'HX-PV-02',
     title: 'Solar PV string test results',
     customer: 'The readings taken on each string of your solar panels before the system was switched on.',
@@ -391,6 +426,33 @@ export const SLOTS: SlotDef[] = [
     pick: 'Battery location check (PAS 63100)',
   },
   {
+    code: 'HX-HP-02',
+    title: 'Heat pump commissioning checklist',
+    customer: 'The checks and readings taken when your heat pump was commissioned.',
+    group: 'tests',
+    tech: ['heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 205,
+    applies: heatpump,
+    category: 'commissioning',
+    pick: 'Heat pump commissioning checklist',
+  },
+  {
+    code: 'HX-HP-03',
+    title: 'Hot water cylinder commissioning',
+    customer: 'The checks made when your hot water cylinder was commissioned.',
+    group: 'tests',
+    tech: ['heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 206,
+    applies: heatpump,
+    reasons: ['No cylinder fitted on this job'],
+    category: 'commissioning',
+    pick: 'Cylinder commissioning checklist',
+  },
+  {
     code: 'HX-HO-15',
     title: 'Grid notice (G98)',
     customer: 'The notice that tells your electricity network (DNO) about your new system.',
@@ -419,6 +481,20 @@ export const SLOTS: SlotDef[] = [
     pick: 'G99 papers',
   },
   {
+    code: 'HX-HO-21',
+    title: 'Grid notice (EV charger or heat pump)',
+    customer: 'The notice that tells your electricity network (DNO) about your new EV charger or heat pump.',
+    group: 'grid',
+    tech: ['ev', 'heatpump'],
+    kind: 'C',
+    maker: 'office',
+    order: 225,
+    applies: evOrHeatpump,
+    reasons: ['Not needed: the DNO’s own rules say no notice for this one'],
+    category: 'dno',
+    pick: 'DNO notice for an EV charger or heat pump',
+  },
+  {
     code: 'HX-HO-17',
     title: 'Product manuals and warranties',
     customer: 'Manuals, datasheets and warranties for the products we fitted.',
@@ -442,6 +518,20 @@ export const SLOTS: SlotDef[] = [
     applies: any,
     category: 'invoice',
     pick: 'Final invoice',
+  },
+  {
+    code: 'HX-HO-20',
+    title: 'Construction phase plan',
+    customer: 'Our plan for working safely at your home, as the Construction (Design and Management) Regulations 2015 ask.',
+    group: 'other',
+    tech: [],
+    kind: 'C',
+    maker: 'office',
+    order: 245,
+    applies: any,
+    reasons: ['Kept on file, not given to the customer'],
+    category: 'handover',
+    pick: 'Construction phase plan',
   },
   {
     code: 'HX-HO-19',
@@ -703,6 +793,14 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
     }
     case 'HX-HO-19':
       return docs.length ? docsState(docs) : { state: 'na', why: 'Optional: nothing extra added.' };
+    case 'HX-HP-05':
+      return docs.length ? docsState(docs) : { state: 'na', why: 'Optional: ground source heat pumps only.' };
+    case 'HX-HO-20':
+    case 'HX-HO-21':
+    case 'HX-HP-02':
+    case 'HX-HP-03':
+    case 'HX-HP-04':
+      return docs.length ? docsState(docs) : { state: 'missing', why: 'Upload it.', fix: 'upload' };
     case 'HX-HO-09':
       // The switching-off page makes it Complete; the manufacturers' procedures from the library go with it.
       return genState('HX-HO-09', docs.filter((x) => x.source !== 'library'), c);
@@ -732,7 +830,7 @@ export function slotStates(c: StateCtx): SlotView[] {
       reasons: d.reasons ?? [],
       category: d.category,
     };
-    if (auto) return { ...base, state: 'na' as const, why: auto, due: null, fix: null, counted: !d.optional, hidden: !techFits(d, c), office: null };
+    if (auto) return { ...base, state: 'na' as const, why: auto, due: null, fix: null, counted: !d.optional, hidden: !techFits(d, c) && !docs.length, office: null };
     if (mark?.na) return { ...base, state: 'na' as const, why: mark.reason || 'Not needed', due: null, fix: null, counted: !d.optional, hidden: false, office: mark };
     const s = stateFor(d, docs, c);
     return { ...base, state: s.state, why: s.why ?? null, due: s.due ?? null, fix: s.fix ?? null, counted: !d.optional, hidden: false, office: null };

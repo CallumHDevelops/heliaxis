@@ -317,7 +317,7 @@ const cur = (key) => docs().find((d) => d.generated_key === key && !d.archived_a
 
 /* ── 1. The pack's own documents, made as their data lands ─────────────────── */
 const r1 = await H.refreshHandover(db, pid, { by: 'staff-1' });
-eq('made from the job: the warranty, completion, switching off, schedule, the G98 data sheet, the receipt, the covering letter', r1.made.sort(), ['HX-HO-18-RECEIPT', 'HX-HO-09', 'HX-HO-01', 'HX-HO-08', 'HX-HO-06', 'HX-HO-15-SHEET', 'HX-HO-11'].sort());
+eq('made from the job: the warranty, completion, switching off, the estimate page, schedule, the G98 data sheet, the receipt, the covering letter', r1.made.sort(), ['HX-HO-18-RECEIPT', 'HX-HO-09', 'HX-HO-01', 'HX-HO-08', 'HX-HO-06', 'HX-HO-15-SHEET', 'HX-HO-11', 'HX-HO-10'].sort());
 eq('the G98 data sheet is an office helper: in no pack item', cur('HX-HO-15-SHEET')?.handover_slot ?? null, null);
 eq('file names carry the title, not the code', [cur('HX-HO-06').name, cur('HX-HO-08').name], ['HX-0042 Heliaxis workmanship warranty.pdf', 'HX-0042 Completion sign-off.pdf']);
 eq('system summary not made yet', !!cur('HX-HO-02'), false);
