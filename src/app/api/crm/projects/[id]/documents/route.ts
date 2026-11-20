@@ -24,6 +24,8 @@ import { isSlot as isInhouseSlot, slotDef as inhouseDef } from '@/lib/inhouse/sl
 import { isSlot as isProposalSlot, slotDef as proposalDef } from '@/lib/proposal/slots';
 import { schemaReady } from '@/lib/schema-ready';
 
+import { notifyCustomer } from '@/lib/crm/portal-notify';
+
 export const dynamic = 'force-dynamic';
 
 const IMAGE = /^image\/(jpeg|png|webp|heic|heif)$/i;
@@ -135,6 +137,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     // A fingerprint of the file, so a signed quote can be matched to exactly what they signed.
     after(() => fingerprintDocument(doc.id as string));
+    // Shown in their portal straight away (not a handover item: those have their own "tell the customer"): they're told.
+    if (doc.visible && !slot && b.notify !== false) after(() => notifyCustomer(db, id, { kind: 'document', name }).then(() => null));
     await logActivity({
       enquiryId: p.enquiry_id,
       projectId: id,

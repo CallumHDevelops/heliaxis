@@ -934,3 +934,136 @@ body:has(#cmsAppRoot) > button[style*='position: fixed'][style*='z-index: 9999']
   cursor: pointer;
   white-space: nowrap;
 }
+
+/* ── Portal tab (PortalInbox.tsx): the customer portal's conversations ── */
+button.hxd-pt-row {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hxd-pt-count {
+  flex: none;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-sizing: border-box;
+}
+.hxd-pt-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.hxd-pt-tags small {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--hxd-muted);
+}
+.hxd-pt-tags .hxd-pt-wait {
+  color: var(--accent-text);
+}
+.hxd-pt-tags .hxd-pt-complaint {
+  color: var(--danger);
+}
+.hxd-pt {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.hxd-pt__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--hxd-line2);
+}
+.hxd-pt__bar div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hxd-pt__bar small {
+  font-size: 12px;
+  color: var(--hxd-muted);
+}
+.hxd-pt__log {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  overflow-y: auto;
+}
+.hxd-pt__msg {
+  max-width: 88%;
+  display: grid;
+  gap: 2px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.hxd-pt__msg span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hxd-pt__msg small {
+  font-size: 11px;
+  color: var(--hxd-muted);
+}
+.hxd-pt__msg.is-in {
+  align-self: flex-start;
+  background: rgb(var(--fg-rgb) / 0.07);
+}
+.hxd-pt__msg.is-out {
+  align-self: flex-end;
+  background: rgb(var(--accent-rgb) / 0.22);
+}
+.hxd-pt__msg.is-complaint {
+  box-shadow: inset 0 0 0 1px var(--danger-line);
+  background: var(--danger-soft);
+}
+.hxd-pt__reply {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--hxd-line2);
+  background: var(--surface);
+}
+.hxd-pt__reply textarea {
+  font: inherit;
+  font-size: 13.5px;
+  resize: vertical;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--field);
+  color: var(--text);
+}
+.hxd-pt__reply .hxd-btn {
+  align-self: flex-end;
+}
+.hxd-pt__reply .hxd-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.hxd-pt__note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ok);
+}

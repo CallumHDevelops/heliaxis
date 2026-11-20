@@ -1759,3 +1759,17 @@ button.pt-foot-link {
     color: var(--accent-text);
   }
 }
+
+/* The sign-in code: big, spaced digits. */
+.pt-login__code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 1.8rem !important;
+  letter-spacing: 0.5em;
+  text-align: center;
+  padding: 14px 12px;
+}
+.pt-linkbtn.pt-inline {
+  display: inline;
+  padding: 0;
+  font-size: inherit;
+}

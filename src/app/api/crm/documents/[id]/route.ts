@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
+import { notifyCustomer } from '@/lib/crm/portal-notify';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, docCategoryOf, DOCS_BUCKET, isUuid, json, logActivity, signedDoc } from '@/lib/crm/server';
 import { SIGNABLE_CATEGORIES } from '@/lib/crm/portal';
@@ -78,6 +79,12 @@ export async function PATCH(req: Request, { params }: Ctx) {
     if (error) return json({ error: error.message }, 500);
     // The handover pack's combined PDF follows what the customer may see.
     if ('visible' in u && d.handover_slot && d.project_id) await refreshHandover(db, String(d.project_id), { by: s.user.id }).catch((e) => console.error('[documents] handover', e));
+    // Newly shown in their portal (not a handover item, not archived): they're told.
+    if (u.visible === true && !d.visible && !d.handover_slot && !d.archived_at && d.project_id && b.notify !== false) {
+      const pid = String(d.project_id);
+      const name = String(u.name ?? d.name);
+      after(() => notifyCustomer(db, pid, { kind: 'document', name }).then(() => null));
+    }
   }
 
   if ('signed_outside' in b) {

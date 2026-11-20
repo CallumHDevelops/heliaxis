@@ -36,7 +36,7 @@ export function PortalMessages({ projectId }: { projectId: string }) {
     setBusy(false);
     if (!r.ok) return setErr(d.error || 'Not sent');
     setText('');
-    setNote(d.emailed ? `Sent. We emailed ${d.emailed} to say there is a reply.` : 'Sent in their portal. (No email went, so tell them on WhatsApp.)');
+    setNote(d.emailed || d.texted ? `Sent. We ${[d.emailed ? `emailed ${d.emailed}` : '', d.texted ? 'texted them' : ''].filter(Boolean).join(' and ')} to say there is a reply.` : 'Sent in their portal. (No email or text went, so tell them on WhatsApp.)');
     await load();
   }
   if (messages === null) return null;

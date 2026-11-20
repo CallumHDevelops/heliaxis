@@ -20,6 +20,7 @@ import {
 } from './dock-shared';
 import { useActiveChats } from './use-active-chats';
 import { ChatList, ThreadBar } from './WhatsAppPanel';
+import { PortalInbox, usePortalThreads } from './PortalInbox';
 import './dock.css';
 
 /**
@@ -31,8 +32,9 @@ import './dock.css';
  * Phones have no dock and make no requests.
  */
 
-type Tab = 'job' | 'chats';
-type Kept = { thread: ActiveChat | null; tab: Tab; path: string };
+/** 'portal': the customer portal's conversations (PortalInbox.tsx), for CRM users. */
+type Tab = 'job' | 'chats' | 'portal';
+type Kept = { thread: ActiveChat | null; tab: Tab; path: string; portal?: string | null };
 const KEEP = 'hx-dock-open';
 /** Set once a record page in this tab has said which job it is (sessionStorage). */
 const SPOKE = 'hx-dock-spoke';
@@ -50,7 +52,7 @@ function readKept(): Kept | null {
   try {
     if (typeof window === 'undefined') return null;
     const k = JSON.parse(sessionStorage.getItem(KEEP) || 'null') as Kept | null;
-    return k && (k.tab === 'job' || k.tab === 'chats') ? k : null;
+    return k && (k.tab === 'job' || k.tab === 'chats' || k.tab === 'portal') ? k : null;
   } catch {
     return null;
   }
@@ -122,6 +124,9 @@ export function WhatsAppDock({
   const { data, error, reload: reloadChats } = useActiveChats(shows && wide760 && (access.inbox || access.crm));
   const rows = data?.rows ?? null;
   const canInbox = data?.canInbox ?? access.inbox;
+  // The customer portal's conversations, beside WhatsApp.
+  const portal = usePortalThreads(shows && wide760 && access.crm);
+  const portalUnread = portal.data?.unread ?? 0;
 
   // What's open, kept for this browser tab so it comes back after a full page load (the CMS).
   const [kept] = useState(readKept);
@@ -142,6 +147,7 @@ export function WhatsAppDock({
   });
   /** A record page in this tab has said which job it is, so it's worth waiting for one (today's record page never does). */
   const spoke = hydrated && spokeState;
+  const [portalOpen, setPortalOpen] = useState<string | null>(kept?.portal ?? null);
   const [focus, setFocus] = useState<{ key: number; thread: string } | null>(null);
   const [scrollTo, setScrollTo] = useState<{ thread: string; message: string } | null>(null);
   /** Just replied in this chat: "Sent ✓ · Next needing reply: …". */
@@ -155,7 +161,7 @@ export function WhatsAppDock({
   const jobHere = job && pageJob === job.projectId ? job : null;
   const waitingForJob = spoke && !!pageJob && !jobHere && gaveUp !== pathname;
   const showJobTab = !!jobHere || waitingForJob;
-  const tab: Tab = showJobTab && (picked?.path !== pathname || picked.tab === 'job') ? 'job' : 'chats';
+  const tab: Tab = picked?.tab === 'portal' && access.crm ? 'portal' : showJobTab && (picked?.path !== pathname || picked.tab === 'job') ? 'job' : 'chats';
   // The live row for the open chat (fresh counts and window), or what was kept.
   const openRow = thread ? (rows?.find((r) => r.threadId === thread.threadId) ?? thread) : null;
   const jobRow = jobHere?.threadId ? (rows?.find((r) => isJobsChat(jobHere, r)) ?? rowFromJob(jobHere, canInbox)) : null;
@@ -172,11 +178,11 @@ export function WhatsAppDock({
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(KEEP, JSON.stringify({ thread: threadState, tab: tabSel?.tab ?? 'chats', path: tabSel?.path ?? '' } satisfies Kept));
+      sessionStorage.setItem(KEEP, JSON.stringify({ thread: threadState, tab: tabSel?.tab ?? 'chats', path: tabSel?.path ?? '', portal: portalOpen } satisfies Kept));
     } catch {
       // Not kept: it opens on the list next time.
     }
-  }, [threadState, tabSel]);
+  }, [threadState, tabSel, portalOpen]);
 
   // Tell the page (the record page's Tasks card, the CRM home) whenever anything here changes, including
   // the Tasks space moving between the tabs (the page puts its card in the new one).
@@ -358,6 +364,9 @@ export function WhatsAppDock({
     if (tab === 'chats' && thread) {
       e.preventDefault();
       backToList();
+    } else if (tab === 'portal' && portalOpen) {
+      e.preventDefault();
+      setPortalOpen(null);
     } else if (overlay) {
       e.preventDefault();
       onCloseOverlay();
@@ -375,6 +384,7 @@ export function WhatsAppDock({
   for (const r of rows ?? []) if (r.unread > 0) addHead({ key: r.threadId, name: r.name, unread: r.unread, needsReply: r.needsReply, row: r });
   for (const r of rows ?? []) if (r.needsReply) addHead({ key: r.threadId, name: r.name, unread: r.unread, needsReply: true, row: r });
   const unreadPeople = data?.counts.unread ?? 0;
+  const unreadAll = unreadPeople + portalUnread;
 
   const wrongCustomer = jobHere && openRow && tab === 'chats' && !isJobsChat(jobHere, openRow);
   const nextUp = sent ? (rows ?? []).find((r) => r.needsReply && r.threadId !== sent) : undefined;
@@ -419,9 +429,9 @@ export function WhatsAppDock({
           })}
         </ul>
         <div className="hxd__foot">
-          {unreadPeople > 0 && (
+          {unreadAll > 0 && (
             <span className="hxd__total">
-              {unreadPeople}
+              {unreadAll}
               <br />
               unread
             </span>
@@ -456,6 +466,11 @@ export function WhatsAppDock({
             <button type="button" role="tab" aria-selected={tab === 'chats'} className={tab === 'chats' ? 'on' : ''} onClick={() => setTab('chats')}>
               Chats{unreadPeople > 0 && <em>{unreadPeople}</em>}
             </button>
+            {access.crm && (
+              <button type="button" role="tab" aria-selected={tab === 'portal'} className={tab === 'portal' ? 'on' : ''} onClick={() => setTab('portal')} title="Messages from customers’ project portals">
+                Portal{portalUnread > 0 && <em>{portalUnread}</em>}
+              </button>
+            )}
           </div>
           <Link href={allChats.href} className="hxd__all">
             {allChats.label}
@@ -484,7 +499,11 @@ export function WhatsAppDock({
           <p className="hxd-banner">WhatsApp isn’t connected yet, so sending is off until the Meta keys are added. The chat history still shows.</p>
         )}
 
-        {tab === 'job' ? (
+        {tab === 'portal' ? (
+          <div className="hxd__body" role="tabpanel">
+            <PortalInbox threads={portal.data?.threads ?? null} reload={portal.reload} open={portalOpen} onOpen={setPortalOpen} />
+          </div>
+        ) : tab === 'job' ? (
           <div className="hxd__body hxd__body--job" role="tabpanel">
             {tasksSlot === 'job' && <div id={SLOT} data-where="job" className="hxd__tasks" />}
             {!jobHere ? (
