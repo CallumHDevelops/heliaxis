@@ -9,6 +9,8 @@ import { pollMailbox } from '@/lib/ms365';
 import { suggestCall } from '@/lib/crm/call-suggest';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
 import { finishMergeFiles } from '@/lib/crm/merge';
+import { flushDocumentNotices } from '@/lib/crm/portal-notify';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -46,7 +48,9 @@ export async function GET(req: Request) {
   }).catch((e) => `error: ${e instanceof Error ? e.message : 'failed'}`);
   // Files from a merge whose move was cut off (src/lib/crm/merge.ts). Never throws.
   const mergeFiles = await finishMergeFiles();
+  // New documents in customers' portals: one summary message per job, 30 quiet minutes after the last (src/lib/crm/portal-notify.ts).
+  const portalDocs = await flushDocumentNotices(createAdminClient()).catch((e) => `error: ${e instanceof Error ? e.message : 'failed'}`);
   // Last, so a long Outlook copy never holds up the customer messages or the mailbox.
   const booking = await runBookingJobs({ until: started + 40_000 }).catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ok: true, ...result, reminded, followUps, tasksDue, tasksSoon, tasksCalendar, booking, crm, emails, mergeFiles });
+  return NextResponse.json({ ok: true, ...result, reminded, followUps, tasksDue, tasksSoon, tasksCalendar, booking, crm, emails, mergeFiles, portalDocs });
 }
