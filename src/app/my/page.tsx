@@ -5,11 +5,11 @@ import './[token]/portal.css';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Your project',
-  description: 'Open your Heliaxis project with your surname and postcode.',
+  description: 'Open your Heliaxis project with your inverter serial number and postcode.',
   robots: { index: false, follow: false },
 };
 
-/** heliaxis.co.uk/my: the customer opens their portal with their surname and postcode (or the link we sent). */
+/** heliaxis.co.uk/my: the customer opens their portal with the last 6 of their inverter serial number and their postcode (or the link we sent). */
 export default function PortalSignIn() {
   return (
     <div className="pt">

@@ -1,16 +1,9 @@
 /**
- * Customers find their portal at /my with their surname and postcode, as well as by the private
- * link we send. Pure matching rules here (the route does the lookups and the rate limit), so
- * tests/portal-login.test.ts reads the same rules.
+ * Customers find their portal at /my with the last 6 characters of their inverter's serial number
+ * and their postcode, as well as by the private link we send. The serial is the one the office typed
+ * on Job details or the one the electrician scanned on site. Pure matching rules here (the route does
+ * the lookups and the rate limit), so tests/portal-login.test.ts reads the same rules.
  */
-
-/** "O'Brien-Smith " → "obriensmith": letters only, any case, accents dropped. */
-export const surnameKey = (s: string | null | undefined) =>
-  String(s ?? '')
-    .normalize('NFKD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z]/g, '');
 
 /** "np19 7az" → "NP197AZ". */
 export const postcodeKey = (s: string | null | undefined) => String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -18,14 +11,22 @@ export const postcodeKey = (s: string | null | undefined) => String(s ?? '').toU
 /** A UK postcode's shape, so nonsense isn't looked up. */
 export const looksLikePostcode = (s: string) => /^[A-Z]{1,2}[0-9][A-Z0-9]?[0-9][A-Z]{2}$/.test(postcodeKey(s));
 
-/** The customer's surname: the last word of the name on the enquiry ("Mrs Jane van Dyke" matches "Dyke" and "van Dyke"). */
-export function surnameMatches(fullName: string | null | undefined, typed: string): boolean {
-  const want = surnameKey(typed);
-  if (want.length < 2) return false;
-  const words = String(fullName ?? '').trim().split(/\s+/).filter(Boolean);
-  if (words.length < 2) return surnameKey(words[0]) === want;
-  // The last word, or the last two together ("van Dyke", "De Souza").
-  return surnameKey(words[words.length - 1]) === want || surnameKey(words.slice(-2).join('')) === want;
+/** A serial with spaces, dashes and case taken out. */
+export const serialKey = (s: string | null | undefined) => String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+/** What the customer types: exactly 6 letters or digits (spaces and dashes ignored). */
+export const looksLikeSerialEnd = (s: string) => serialKey(s).length === 6;
+
+/** Does any of these serials end with what was typed? */
+export const serialEndMatches = (serials: (string | null | undefined)[], typed: string) => {
+  const want = serialKey(typed);
+  return want.length === 6 && serials.some((s) => serialKey(s).length >= 6 && serialKey(s).endsWith(want));
+};
+
+/** The serials a site capture holds ([{ s, unread? }]), or a typed one. */
+export function serialsFrom(v: unknown): string[] {
+  if (typeof v === 'string') return v.trim() ? [v] : [];
+  return Array.isArray(v) ? (v as { s?: unknown; unread?: boolean }[]).filter((x) => x && typeof x.s === 'string' && !x.unread).map((x) => String(x.s)) : [];
 }
 
-export const LOGIN_FAILED = 'We couldn’t find a project with that surname and postcode. Check both, or use the link we sent you. If you’re still stuck, call us on 01633 965205.';
+export const LOGIN_FAILED = 'We couldn’t find a project with that serial number and postcode. Check both, or use the link we sent you. If you’re still stuck, call us on 01633 965205.';

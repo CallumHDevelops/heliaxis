@@ -738,7 +738,7 @@ export async function packPrint(db: Db, ref: StoredRef, printOf: (row: DocRow) =
 export type Via = 'whatsapp' | 'email';
 type Message = { kind: 'pack' | 'added'; what?: string | null };
 
-const packWords = (first: string, link: string) => `Hi ${first || 'there'}, your Heliaxis handover pack is ready. Your certificates, warranties and guides are all in one place here: ${link} (or any time at ${siteUrl()}/my with your surname and postcode). Any questions, just reply here.`;
+const packWords = (first: string, link: string) => `Hi ${first || 'there'}, your Heliaxis handover pack is ready. Your certificates, warranties and guides are all in one place here: ${link} (or any time at ${siteUrl()}/my with the last 6 characters of your inverter serial number and your postcode). Any questions, just reply here.`;
 const addedWords = (first: string, what: string, link: string) => `Hi ${first || 'there'}, we’ve added your ${what} to your Heliaxis handover pack: ${link} Any questions, just reply here.`;
 
 /** The message itself, now: WhatsApp (in the 24-hour window as text, otherwise the approved template) and/or email. */
@@ -766,7 +766,7 @@ async function deliverMessage(db: Db, projectId: string, via: Via[], m: Message)
       const subject = m.kind === 'pack' ? 'Your Heliaxis handover pack' : `We’ve added your ${m.what ?? 'document'} to your handover pack`;
       const body =
         m.kind === 'pack'
-          ? `Hi ${first || 'there'},\n\nYour handover pack is ready. It has your certificates, warranties and guides, all in one place:\n${link}\n\nYou can also open it any time at ${siteUrl()}/my with your surname and postcode.\n\nOne of the team will be in touch to go through it with you.\n\nAny questions, just reply to this email.\n\nThanks,\n${(owner as { full_name?: string } | null)?.full_name || 'The Heliaxis team'}\nHeliaxis`
+          ? `Hi ${first || 'there'},\n\nYour handover pack is ready. It has your certificates, warranties and guides, all in one place:\n${link}\n\nYou can also open it any time at ${siteUrl()}/my with the last 6 characters of your inverter serial number and your postcode.\n\nOne of the team will be in touch to go through it with you.\n\nAny questions, just reply to this email.\n\nThanks,\n${(owner as { full_name?: string } | null)?.full_name || 'The Heliaxis team'}\nHeliaxis`
           : `Hi ${first || 'there'},\n\nWe’ve added your ${m.what ?? 'document'} to your handover pack:\n${link}\n\nThanks,\nThe Heliaxis team`;
       try {
         if (msConfigured()) {

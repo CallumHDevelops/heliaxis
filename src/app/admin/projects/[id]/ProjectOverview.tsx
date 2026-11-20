@@ -673,6 +673,7 @@ const SYSTEM_FIELDS: { key: string; label: string; for: string[]; num?: boolean 
   { key: 'panel_model', label: 'Panel model', for: ['solar'] },
   { key: 'inverter_model', label: 'Inverter', for: ['solar', 'battery'] },
   { key: 'inverter_kw', label: 'Inverter (kW)', for: ['solar', 'battery'], num: true },
+  { key: 'inverter_serial', label: 'Inverter serial number', for: ['solar', 'battery'] },
   { key: 'battery_model', label: 'Battery', for: ['battery'] },
   { key: 'battery_kwh', label: 'Battery usable capacity (kWh)', for: ['battery'], num: true },
   { key: 'heat_pump_model', label: 'Heat pump', for: ['heatpump'] },

@@ -610,9 +610,11 @@ textarea.pt-input { resize: vertical; font: inherit; }
 .pt-preview b { color: #f8bc1e; }
 .pt-preview .pt-btn { padding: 6px 14px; min-height: 0; }
 
-/* /my: open the project with surname and postcode. */
+/* /my: open the project with the inverter serial (last 6) and postcode. */
 .pt-login { display: flex; flex-direction: column; gap: 12px; }
 .pt-login__field { display: flex; flex-direction: column; gap: 6px; font-weight: 600; }
 .pt-login__field .pt-input { width: 100%; font-size: 1.05rem; }
 .pt-login__err { margin: 0; color: var(--danger, #b42318); font-weight: 600; }
 .pt-login__small { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.pt-login__serial { letter-spacing: 0.2em; font-family: "JetBrains Mono", ui-monospace, monospace; }
+.pt-login__field small { font-weight: 400; color: var(--muted); font-size: 0.85rem; }

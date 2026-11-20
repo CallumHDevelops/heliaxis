@@ -478,6 +478,7 @@ const SYSTEM: Record<string, 'number' | 'int' | 'text' | 'design'> = {
   panel_model: 'text',
   inverter_model: 'text',
   inverter_kw: 'number',
+  inverter_serial: 'text',
   battery_model: 'text',
   battery_kwh: 'number',
   heat_pump_model: 'text',
