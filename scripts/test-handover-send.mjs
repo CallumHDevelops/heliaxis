@@ -20,6 +20,8 @@ const SRC = new URL('../src/', import.meta.url).href;
 const mod = (code) => `data:text/javascript,${encodeURIComponent(code)}`;
 const STUBS = {
   'server-only': 'export {}',
+  // Telling the customer (the portal session's src/lib/crm/portal-notify.ts): nothing is sent from a test.
+  '@/lib/crm/portal-notify': 'export const notifyCustomer = async () => ({ emailed: null, texted: false });',
   'next/server': `
     export class NextResponse extends Response {
       static json(body, init = {}) { return new NextResponse(JSON.stringify(body), { status: init.status ?? 200, headers: { 'content-type': 'application/json' } }); }

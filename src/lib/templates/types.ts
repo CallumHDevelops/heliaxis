@@ -57,6 +57,10 @@ export type TemplateField = {
   required?: boolean;
   /** Only asked when an earlier field has this answer. */
   showWhen?: ShowWhen;
+  /** Longer guidance on what to put, behind an (i) on the step-by-step screen. Not printed. */
+  help?: string;
+  /** Worked out for the person filling it in: the product of these earlier numeric answers (they can change it). */
+  calc?: string[];
 };
 
 export type FieldsSection = {

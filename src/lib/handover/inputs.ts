@@ -121,7 +121,7 @@ export type HandoverFacts = {
     installDays: string[];
     commissionedOn: string | null;
     handedOverOn: string | null;
-    dno: { route: string | null; status: string | null; ref: string | null; submittedAt: string | null; notified: boolean };
+    dno: { route: string | null; /** Set when the route was worked out from the inverter size, not chosen: "5 kW inverter". */ routeFrom?: string; status: string | null; ref: string | null; submittedAt: string | null; notified: boolean };
     deposit: { amount: number | null; paidAt: string | null; ref: string | null };
   };
   customer: { name: string; first: string; email: string | null; phone: string | null };

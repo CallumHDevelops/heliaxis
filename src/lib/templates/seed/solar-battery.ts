@@ -5,8 +5,10 @@
  * handover pack item it fills (HX-PV-02…), so a signed form goes straight into the pack. The electrician's
  * own site app records the same things; either fills the item.
  *
- * Provisional until the owner signs off the field lists in the quality system. Nothing here claims that
- * completing a form meets any standard: that is for the people who sign the documents off.
+ * Dates start as the job's switch-on date and equipment as Job details has it ({{commissioned}},
+ * {{panel_model}}…); each question's (i) says what to put. Provisional until the owner signs off the field
+ * lists in the quality system. Nothing here claims that completing a form meets any standard: that is for
+ * the people who sign the documents off.
  */
 import type { DocTemplate, TemplateField } from '../types';
 
@@ -21,6 +23,7 @@ const SIGNERS = [
   { key: 'installer', label: 'Installer or electrician' },
   { key: 'customer', label: 'Customer (optional)' },
 ];
+const ON_SWITCH_ON = '{{commissioned}}';
 
 /* ── HX-PV-02: the PV array test record ───────────────────────────────────── */
 
@@ -35,16 +38,24 @@ function stringSection(n: number): DocTemplate['sections'][number] {
     columns: 3,
     showWhen: { key: 'strings', is: COUNTS.slice(n - 1) },
     fields: [
-      num(k('panels'), `String ${n}: panels on it`, 'panels', { required: true }),
-      num(k('voc_exp'), `String ${n}: expected open-circuit voltage`, 'V', { hint: 'The panel’s Voc × panels, at the temperature on the day if you can.' }),
-      num(k('voc'), `String ${n}: measured open-circuit voltage`, 'V', { required: true }),
-      num(k('isc_exp'), `String ${n}: expected short-circuit current`, 'A', { hint: 'The panel’s Isc, scaled for today’s irradiance if you can.' }),
-      num(k('isc'), `String ${n}: measured short-circuit current`, 'A', { required: true }),
-      yn(k('polarity'), `String ${n}: polarity correct?`, { noNa: true, hint: 'Checked before the isolator was closed or a fuse fitted.' }),
-      num(k('ir_v'), `String ${n}: insulation test voltage`, 'V', { hint: 'Usually 500 V or 1000 V, by the array’s voltage.' }),
-      num(k('ir_pos'), `String ${n}: insulation resistance, positive to earth`, 'MΩ', { required: true }),
-      num(k('ir_neg'), `String ${n}: insulation resistance, negative to earth`, 'MΩ', { required: true }),
-      num(k('earth'), `String ${n}: frame earth continuity`, 'Ω', { hint: 'Leave empty if the frames aren’t earthed.' }),
+      num(k('panels'), `String ${n}: panels on it`, 'panels', { required: true, help: 'Count the panels wired in series on this string (one MPPT input can have more than one string).' }),
+      num(k('voc_exp'), `String ${n}: expected open-circuit voltage`, 'V', {
+        calc: [k('panels'), 'panel_voc'],
+        hint: 'Worked out for you: panels × the panel’s Voc. Change it if you’ve corrected for the temperature.',
+        help: 'Voc at STC × the number of panels. On a cold day the measured Voc will be higher than this, on a hot day lower: up to about 0.3% per °C away from 25 °C for most panels.',
+      }),
+      num(k('voc'), `String ${n}: measured open-circuit voltage`, 'V', { required: true, help: 'Measured at the DC isolator or inverter with the string disconnected from the inverter. Within about 5% of the expected (after temperature) is normal.' }),
+      num(k('isc_exp'), `String ${n}: expected short-circuit current`, 'A', {
+        calc: ['panel_isc'],
+        hint: 'Worked out for you: the panel’s Isc. Change it if you’ve scaled it for today’s irradiance.',
+        help: 'For panels in series this is the panel’s Isc at STC. It scales with irradiance: at 500 W/m² expect roughly half.',
+      }),
+      num(k('isc'), `String ${n}: measured short-circuit current`, 'A', { required: true, help: 'Measured with your PV tester. Only test Isc with the string isolated from the inverter.' }),
+      yn(k('polarity'), `String ${n}: polarity correct?`, { noNa: true, hint: 'Checked before the isolator was closed or a fuse fitted.', help: 'Check + and − with a meter before connecting. A reversed string can damage the inverter.' }),
+      num(k('ir_v'), `String ${n}: insulation test voltage`, 'V', { hint: 'Usually 500 V or 1000 V, by the array’s voltage.', help: 'The test voltage set on your insulation tester for this string (the IET Code of Practice gives the test voltage for the array’s voltage).' }),
+      num(k('ir_pos'), `String ${n}: insulation resistance, positive to earth`, 'MΩ', { required: true, help: 'Positive conductor to earth. If your tester shows >999, type 999.' }),
+      num(k('ir_neg'), `String ${n}: insulation resistance, negative to earth`, 'MΩ', { required: true, help: 'Negative conductor to earth. If your tester shows >999, type 999.' }),
+      num(k('earth'), `String ${n}: frame earth continuity`, 'Ω', { hint: 'Not applicable if the frames aren’t earthed.', help: 'Continuity of the frame (array) earth, if the frames are earthed. Answer Not applicable if they aren’t.' }),
     ],
   };
 }
@@ -54,7 +65,7 @@ export const PV_ARRAY_TEST: DocTemplate = {
   code: 'HX-PV-02',
   title: 'Solar PV array test record',
   purpose: 'The readings taken on each string of panels before the system is switched on.',
-  intro: 'Test each string before the DC isolator is closed or the inverter switched on. Take the readings from your tester; leave expected values empty if you don’t have them.',
+  intro: 'Test each string before the DC isolator is closed or the inverter switched on. Expected values are worked out for you from the panel’s datasheet figures.',
   tech: ['solar'],
   sections: [
     {
@@ -63,30 +74,42 @@ export const PV_ARRAY_TEST: DocTemplate = {
       columns: 2,
       fields: [
         pick('kind', 'New installation or re-test?', ['New installation', 'Re-test of an existing system'], { required: true }),
-        day('tested_on', 'Date of the test', { required: true }),
-        text('tester', 'Tester make and model', { required: true }),
-        day('tester_cal', 'When was the tester last calibrated?'),
-        num('irradiance', 'Irradiance during the test', 'W/m²', { hint: 'From your irradiance meter, if you have one.' }),
-        num('cell_temp', 'Panel temperature during the test', '°C'),
+        day('tested_on', 'Date of the test', { required: true, prefill: ON_SWITCH_ON, help: 'Starts as the job’s switch-on date: change it if you tested on another day.' }),
+        text('tester_make', 'Tester make', { required: true, hint: 'e.g. Megger, Seaward, Fluke' }),
+        text('tester', 'Tester model', { required: true, hint: 'e.g. PV150' }),
+        day('tester_cal', 'When was the tester last calibrated?', { help: 'The date on its calibration certificate or sticker.' }),
+        num('irradiance', 'Irradiance during the test', 'W/m²', { help: 'From your irradiance meter or the PV tester’s probe. Not applicable if you didn’t measure it.' }),
+        num('cell_temp', 'Panel temperature during the test', '°C', { help: 'The back of a panel, from your tester’s probe. Not applicable if you didn’t measure it.' }),
       ],
     },
     {
       type: 'fields',
-      title: 'The equipment',
+      title: 'The panels',
       columns: 2,
       fields: [
-        text('panel', 'Panel make and model', { required: true }),
-        text('inverter', 'Inverter make and model', { required: true }),
-        text('inv_serial', 'Inverter serial number', { required: true, hint: 'From the label on the inverter. The customer signs in to their portal with its last 6 characters.' }),
-        text('cable', 'DC cable type', { hint: 'e.g. H1Z2Z2-K' }),
-        num('cable_mm2', 'DC cable size', 'mm²'),
-        pick('iso_where', 'Where is the DC isolator?', ['Built into the inverter', 'Next to the inverter', 'In the loft', 'Somewhere else']),
-        num('iso_a', 'DC isolator current rating', 'A'),
-        num('iso_v', 'DC isolator voltage rating', 'V'),
-        pick('fuses', 'String fuses or breakers?', ['None', 'Fuses', 'Breakers']),
+        text('panel_make', 'Panel make', { required: true, hint: 'e.g. JA Solar, Aiko, Sungrow' }),
+        text('panel', 'Panel model', { required: true, prefill: '{{panel_model}}', help: 'As on the panel’s label or datasheet, e.g. JAM54D40-440/MB.' }),
+        num('panel_voc', 'Panel open-circuit voltage (Voc)', 'V', { required: true, help: 'From the panel label or datasheet, at STC. Used to work out each string’s expected voltage.' }),
+        num('panel_isc', 'Panel short-circuit current (Isc)', 'A', { required: true, help: 'From the panel label or datasheet, at STC. Used for each string’s expected current.' }),
       ],
     },
-    { type: 'fields', title: 'Strings', fields: [pick('strings', 'How many strings?', COUNTS, { required: true })] },
+    {
+      type: 'fields',
+      title: 'The inverter and DC side',
+      columns: 2,
+      fields: [
+        text('inverter_make', 'Inverter make', { required: true, hint: 'e.g. GoodWe, SolarEdge, Fox ESS' }),
+        text('inverter', 'Inverter model', { required: true, prefill: '{{inverter_model}}' }),
+        text('inv_serial', 'Inverter serial number', { required: true, prefill: '{{inverter_serial}}', help: 'From the label on the inverter, after “SN” or “S/N”. The customer signs in to their portal with its last 6 characters.' }),
+        text('cable', 'DC cable type', { hint: 'e.g. H1Z2Z2-K', help: 'The solar cable used for the DC runs, as printed on its sheath.' }),
+        num('cable_mm2', 'DC cable size', 'mm²', { help: 'Cross-section of the + and − cores: usually 4 or 6 mm².' }),
+        pick('iso_where', 'Where is the DC isolator?', ['Built into the inverter', 'Next to the inverter', 'In the loft', 'Somewhere else']),
+        num('iso_a', 'DC isolator current rating', 'A', { help: 'From the isolator’s label (its DC rating, not AC).' }),
+        num('iso_v', 'DC isolator voltage rating', 'V', { help: 'From the isolator’s label: it must be above the highest string Voc in cold weather.' }),
+        pick('fuses', 'String fuses or breakers?', ['None', 'Fuses', 'Breakers'], { help: 'Usually none with one or two strings per MPPT input. Choose what’s fitted.' }),
+      ],
+    },
+    { type: 'fields', title: 'Strings', fields: [pick('strings', 'How many strings?', COUNTS, { required: true, help: 'Separate strings of panels in series (count every MPPT input in use, and parallel strings on an input).' })] },
     ...COUNTS.map((n) => stringSection(Number(n))),
     {
       type: 'fields',
@@ -115,10 +138,10 @@ export const PV_INSPECTION: DocTemplate = {
       type: 'fields',
       title: 'Design and equipment',
       fields: [
-        day('inspected_on', 'Date of the inspection', { required: true }),
+        day('inspected_on', 'Date of the inspection', { required: true, prefill: ON_SWITCH_ON, help: 'Starts as the job’s switch-on date: change it if you inspected on another day.' }),
         pick('mounting', 'How are the panels mounted?', ['Pitched roof, on the tiles or slates', 'In-roof', 'Flat roof', 'Ground mount', 'Wall or other']),
-        yn('as_designed', 'Installed as designed (panels, layout, inverter and battery as on the design)'),
-        yn('equipment_rated', 'Panels, inverter and DC equipment rated for the array’s maximum voltage and current'),
+        yn('as_designed', 'Installed as designed (panels, layout, inverter and battery as on the design)', { help: 'Compare with the design: panel count and layout, inverter, battery. If anything changed, answer No and say what in the comments.' }),
+        yn('equipment_rated', 'Panels, inverter and DC equipment rated for the array’s maximum voltage and current', { help: 'The highest string Voc in cold weather must be under the inverter’s and isolator’s maximum DC voltage.' }),
         yn('mcs_products', 'Panels and inverter are MCS-certified products'),
       ],
     },
@@ -128,8 +151,8 @@ export const PV_INSPECTION: DocTemplate = {
       fields: [
         yn('dc_cable', 'DC cable is solar cable, suitable for outdoor and UV exposure'),
         yn('dc_protected', 'DC cables protected from damage and supported along their route'),
-        yn('dc_loops', 'Positive and negative cables run together, keeping wiring loops small'),
-        yn('connectors', 'DC connectors are matching make and type, fully mated'),
+        yn('dc_loops', 'Positive and negative cables run together, keeping wiring loops small', { help: 'Run + and − side by side to reduce induced voltages from lightning.' }),
+        yn('connectors', 'DC connectors are matching make and type, fully mated', { help: 'Never mix connector brands (e.g. MC4 with a lookalike): they must be the same make and type.' }),
         yn('dc_entry', 'Roof and wall entries sealed and weatherproof'),
         yn('dc_isolator', 'DC isolator fitted, rated for the array and labelled'),
         yn('string_fuses', 'String fuses or breakers fitted and rated correctly, where needed'),
@@ -141,7 +164,7 @@ export const PV_INSPECTION: DocTemplate = {
       fields: [
         yn('ac_isolator', 'AC isolator fitted next to the inverter, lockable in the off position'),
         yn('ac_protection', 'AC circuit has its own protective device, rated for the inverter'),
-        yn('rcd', 'RCD protection as the inverter maker and the wiring regulations require'),
+        yn('rcd', 'RCD protection as the inverter maker and the wiring regulations require', { help: 'Check the inverter manual for the RCD type it needs (often Type A, sometimes Type B).' }),
         yn('g98_settings', 'Inverter set to the G98 or G99 protection settings for the UK'),
         yn('spd', 'Surge protection fitted where the risk assessment needs it'),
         yn('earthing', 'Earthing and bonding of frames and equipment as the design requires'),
@@ -185,10 +208,10 @@ export const PV_SWITCH_ON: DocTemplate = {
       title: 'Switching on',
       columns: 2,
       fields: [
-        day('switched_on', 'Date switched on', { required: true }),
+        day('switched_on', 'Date switched on', { required: true, prefill: ON_SWITCH_ON }),
         yn('powers_up', 'Inverter starts up with no faults or error codes', { noNa: true }),
         yn('grid_sync', 'Inverter connects to the grid and generates', { noNa: true }),
-        num('ac_output', 'AC output when tested', 'kW'),
+        num('ac_output', 'AC output when tested', 'kW', { help: 'From the inverter display or app at the time of the test. Not applicable if it was too dark to say.' }),
         num('irradiance', 'Irradiance at the time', 'W/m²'),
         yn('export_limit', 'Export limit set as the DNO approval requires', { hint: 'N/A if there is no export limit.' }),
       ],
@@ -197,7 +220,12 @@ export const PV_SWITCH_ON: DocTemplate = {
       type: 'fields',
       title: 'Generation meter',
       columns: 2,
-      fields: [text('gen_meter', 'Generation meter make and model'), text('gen_meter_serial', 'Generation meter serial number'), num('gen_meter_reading', 'Reading at switch-on', 'kWh', { required: true })],
+      fields: [
+        text('gen_meter_make', 'Generation meter make', { hint: 'e.g. EM Ltd, Eastron' }),
+        text('gen_meter', 'Generation meter model'),
+        text('gen_meter_serial', 'Generation meter serial number'),
+        num('gen_meter_reading', 'Reading at switch-on', 'kWh', { required: true, help: 'The total kWh on the generation meter at switch-on. Usually 0 or close to it.' }),
+      ],
     },
     {
       type: 'fields',
@@ -227,9 +255,9 @@ export const BATTERY_INSPECTION: DocTemplate = {
       type: 'fields',
       title: 'Location',
       fields: [
-        day('inspected_on', 'Date of the inspection', { required: true }),
+        day('inspected_on', 'Date of the inspection', { required: true, prefill: ON_SWITCH_ON }),
         pick('location', 'Where is the battery?', ['Garage', 'Utility room', 'Outbuilding', 'Outside', 'Loft', 'Somewhere else'], { required: true }),
-        yn('loc_allowed', 'A location the battery maker allows, within its temperature range'),
+        yn('loc_allowed', 'A location the battery maker allows, within its temperature range', { help: 'Check the manual’s operating temperature range and any places it rules out (lofts and bedrooms often are).' }),
         yn('loc_clearances', 'Clearances and ventilation as the maker requires'),
         yn('loc_escape', 'Not in, or blocking, a way out of the building'),
         yn('loc_protected', 'Protected from damage (vehicles, knocks) and from water'),
@@ -269,25 +297,27 @@ export const BATTERY_COMMISSIONING: DocTemplate = {
       title: 'The battery',
       columns: 2,
       fields: [
-        text('battery', 'Battery make and model', { required: true }),
+        text('battery_make', 'Battery make', { required: true, hint: 'e.g. GivEnergy, Fox ESS, Tesla' }),
+        text('battery', 'Battery model', { required: true, prefill: '{{battery_model}}' }),
         text('battery_serials', 'Battery serial numbers', { required: true, hint: 'One for each module, separated by commas.' }),
-        num('usable_kwh', 'Usable capacity', 'kWh'),
-        text('battery_inverter', 'Battery inverter or gateway make and model', { hint: 'Leave empty if it uses the solar inverter.' }),
-        text('battery_inverter_serial', 'Battery inverter or gateway serial number'),
-        text('firmware', 'Firmware version'),
+        num('usable_kwh', 'Usable capacity', 'kWh', { help: 'The usable (not nominal) capacity from the datasheet, for every module together.' }),
+        text('battery_inverter_make', 'Battery inverter or gateway make', { hint: 'Not applicable if it uses the solar inverter.' }),
+        text('battery_inverter', 'Battery inverter or gateway model', { hint: 'Not applicable if it uses the solar inverter.' }),
+        text('battery_inverter_serial', 'Battery inverter or gateway serial number', { hint: 'Not applicable if it uses the solar inverter.' }),
+        text('firmware', 'Firmware version', { help: 'From the battery or inverter app. Update it first if the maker says to.' }),
       ],
     },
     {
       type: 'fields',
       title: 'Tests',
       fields: [
-        day('commissioned_on', 'Date commissioned', { required: true }),
+        day('commissioned_on', 'Date commissioned', { required: true, prefill: ON_SWITCH_ON }),
         yn('powers_up', 'Battery starts up and talks to the inverter, with no faults', { noNa: true }),
-        yn('charges', 'Charges correctly', { noNa: true }),
+        yn('charges', 'Charges correctly', { noNa: true, help: 'Seen charging, from solar or the grid, in the app or on the display.' }),
         yn('discharges', 'Discharges to the house correctly', { noNa: true }),
         yn('backup_test', 'Back-up power tested by switching off the mains supply', { hint: 'N/A if it gives no back-up power.' }),
         pick('mode', 'Operating mode set', ['Self-consumption', 'Time of use / tariff', 'Back-up reserve', 'Other']),
-        num('reserve', 'Back-up reserve kept', '%'),
+        num('reserve', 'Back-up reserve kept', '%', { help: 'The charge kept back for power cuts. Not applicable if there’s no back-up.' }),
         yn('export_limit', 'Export limit set as the DNO approval requires', { hint: 'N/A if there is no export limit.' }),
       ],
     },

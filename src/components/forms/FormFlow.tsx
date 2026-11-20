@@ -33,6 +33,9 @@ type Screen = { at: 'intro' } | { at: 'q'; i: number } | { at: 'review' } | { at
 
 const fill = (s: string | undefined, merge: Record<string, string>) => (s ?? '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => merge[k] ?? '');
 const blank = (v: unknown) => v === null || v === undefined || String(v).trim() === '';
+const isNa = (v: unknown) => /^n\/?a$/i.test(String(v ?? '').trim());
+/** Questions that can be answered Not applicable (not a yes/no, which has its own N/A, nor a list). */
+const canNa = (q: TemplateField) => !q.required && (q.kind === 'text' || q.kind === 'number' || q.kind === 'date' || q.kind === 'long');
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const YESNO: { v: string; label: string; key: string }[] = [
   { v: 'yes', label: 'Yes', key: 'Y' },
@@ -41,6 +44,7 @@ const YESNO: { v: string; label: string; key: string }[] = [
 ];
 const shown = (q: Q, v: unknown) => {
   if (blank(v)) return '';
+  if (isNa(v)) return 'Not applicable';
   if (q.kind === 'yesno') return YESNO.find((y) => y.v === v)?.label ?? String(v);
   return `${v}${q.kind === 'number' && q.unit ? ` ${q.unit}` : ''}`;
 };
@@ -62,19 +66,24 @@ export function FormFlow({
   who?: string;
 }) {
   const t = view.template;
-  const [answers, setAnswers] = useState<Answers>(() => {
-    // Pre-filled answers from the job ({{customer}}…), only where nothing is answered yet.
-    const a: Answers = { ...view.answers };
-    for (const s of t.sections) if (s.type === 'fields') for (const f of s.fields) if (blank(a[f.key]) && f.prefill) a[f.key] = fill(f.prefill, view.merge);
+  // Pre-filled answers from the job ({{customer}}, {{commissioned}}…), only where nothing is answered yet; saved like any answer.
+  const prefilled = useMemo(() => {
+    const a: Answers = {};
+    for (const s of t.sections) if (s.type === 'fields') for (const f of s.fields) if (blank(view.answers[f.key]) && f.prefill) {
+      const v = fill(f.prefill, view.merge).trim();
+      if (v) a[f.key] = v;
+    }
     return a;
-  });
+  }, [t, view]);
+  const [answers, setAnswers] = useState<Answers>(() => ({ ...view.answers, ...prefilled }));
+  const [help, setHelp] = useState(false);
   const [screen, setScreen] = useState<Screen>(view.status === 'done' || view.submitted ? { at: 'done' } : { at: 'intro' });
   const [dir, setDir] = useState<1 | -1>(1);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState(who ?? '');
   const [image, setImage] = useState<string | null>(null);
-  const dirty = useRef<Answers>({});
+  const dirty = useRef<Answers>({ ...prefilled });
   const input = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
 
   // The questions asked for the answers so far, in order.
@@ -82,7 +91,7 @@ export function FormFlow({
     const vis = visibility(t, answers);
     return t.sections.flatMap((s, si) => (s.type === 'fields' && vis.sections[si] ? s.fields.filter((f) => vis.fields.has(f.key)).map((f) => ({ ...f, section: s.title })) : []));
   }, [t, answers]);
-  const left = questions.filter((q) => q.required && blank(answers[q.key]));
+  const left = questions.filter((q) => blank(answers[q.key]));
   const answered = questions.filter((q) => !blank(answers[q.key])).length;
   const pct = screen.at === 'done' ? 100 : screen.at === 'review' || screen.at === 'sign' ? 100 : screen.at === 'q' ? Math.round((screen.i / Math.max(1, questions.length)) * 100) : 0;
 
@@ -106,7 +115,16 @@ export function FormFlow({
   };
   const go = (s: Screen, d: 1 | -1 = 1) => {
     setErr('');
+    setHelp(false);
     setDir(d);
+    // A worked-out answer (panels × Voc…) is filled in on arrival, when it's still empty and its parts are numbers.
+    if (s.at === 'q') {
+      const q = questions[s.i];
+      if (q?.calc?.length && blank(answers[q.key])) {
+        const parts = q.calc.map((k) => Number(answers[k]));
+        if (parts.every((n) => Number.isFinite(n) && n > 0)) set(q.key, String(Math.round(parts.reduce((a, b) => a * b, 1) * 100) / 100));
+      }
+    }
     setScreen(s);
     void flush();
   };
@@ -115,7 +133,8 @@ export function FormFlow({
     if (screen.at !== 'q') return;
     const q = questions[screen.i];
     if (q?.required && blank(answers[q.key])) return setErr('This one’s needed. Answer it to carry on.');
-    if (q?.kind === 'number' && !blank(answers[q.key]) && !Number.isFinite(Number(answers[q.key]))) return setErr('That needs to be a number.');
+    if (q?.kind === 'number' && !blank(answers[q.key]) && !isNa(answers[q.key]) && !Number.isFinite(Number(answers[q.key]))) return setErr('That needs to be a number, or Not applicable.');
+    if (q && !q.required && blank(answers[q.key])) return setErr('Answer it, or choose Not applicable.');
     go(screen.i + 1 < questions.length ? { at: 'q', i: screen.i + 1 } : { at: 'review' });
   };
   const back = () => {
@@ -238,15 +257,21 @@ export function FormFlow({
             <h2 className="ff-q">
               {q.label}
               {q.required && <span className="ff-req" aria-label="needed"> *</span>}
+              {q.help && (
+                <button type="button" className={`ff-info${help ? ' on' : ''}`} aria-expanded={help} aria-label="What to put here" onClick={() => setHelp((h) => !h)}>
+                  i
+                </button>
+              )}
             </h2>
             {q.hint && <p className="ff-lede">{q.hint}</p>}
+            {q.help && help && <p className="ff-help">{q.help}</p>}
 
             {(q.kind === 'text' || q.kind === 'number' || q.kind === 'date') && (
               <div className="ff-field">
                 <input
                   ref={input}
                   className="ff-input"
-                  type={q.kind === 'date' ? 'date' : 'text'}
+                  type={q.kind === 'date' && !isNa(val) ? 'date' : 'text'}
                   inputMode={q.kind === 'number' ? 'decimal' : undefined}
                   value={val}
                   onChange={(e) => set(q.key, e.target.value)}
@@ -281,11 +306,16 @@ export function FormFlow({
             )}
 
             {err && <p className="ff-err" role="alert">{err}</p>}
-            {(q.kind === 'text' || q.kind === 'number' || q.kind === 'date' || q.kind === 'long' || !q.required) && (
+            {(q.kind === 'text' || q.kind === 'number' || q.kind === 'date' || q.kind === 'long') && (
               <div className="ff-go">
                 <button type="button" className="ff-btn" onClick={next}>
-                  {blank(answers[q.key]) && !q.required ? 'Skip' : 'OK ✓'}
+                  OK ✓
                 </button>
+                {canNa(q) && (
+                  <button type="button" className={`ff-btn ff-btn--ghost${isNa(val) ? ' on' : ''}`} onClick={() => pick(q.key, 'N/A')}>
+                    Not applicable
+                  </button>
+                )}
                 <span className="ff-hint">
                   press <kbd>{q.kind === 'long' ? 'Ctrl + Enter ↵' : 'Enter ↵'}</kbd>
                 </span>
@@ -298,12 +328,13 @@ export function FormFlow({
           <section className="ff-card ff-review">
             <p className="ff-eyebrow">Nearly done</p>
             <h2 className="ff-q">Check your answers</h2>
+            <Left left={left} questions={questions} go={(i) => go({ at: 'q', i }, -1)} />
             <ul>
               {questions.map((x, i) => (
-                <li key={x.key} className={x.required && blank(answers[x.key]) ? 'is-missing' : ''}>
+                <li key={x.key} className={blank(answers[x.key]) ? 'is-missing' : ''}>
                   <button type="button" onClick={() => go({ at: 'q', i }, -1)}>
                     <span>{x.label}</span>
-                    <b>{shown(x, answers[x.key]) || (x.required ? 'Needed' : '–')}</b>
+                    <b>{shown(x, answers[x.key]) || 'Still to answer'}</b>
                   </button>
                 </li>
               ))}
@@ -328,6 +359,7 @@ export function FormFlow({
             <p className="ff-eyebrow">Last step</p>
             <h2 className="ff-q">{view.signLine.label}</h2>
             <p className="ff-lede">Signing confirms the answers are right. It locks the form and puts it in the customer’s handover pack.</p>
+            <Left left={left} questions={questions} go={(i) => go({ at: 'q', i }, -1)} />
             <div className="ff-field">
               <input ref={input} className="ff-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your full name" aria-label="Your full name" autoComplete="name" />
             </div>
@@ -336,7 +368,7 @@ export function FormFlow({
             </div>
             {err && <p className="ff-err" role="alert">{err}</p>}
             <div className="ff-go">
-              <button type="button" className="ff-btn" disabled={busy || !name.trim()} onClick={() => void submit()}>
+              <button type="button" className="ff-btn" disabled={busy || !name.trim() || !!left.length} onClick={() => void submit()}>
                 {busy ? 'Signing…' : 'Sign and send'}
               </button>
             </div>
@@ -375,6 +407,28 @@ export function FormFlow({
           )}
         </nav>
       )}
+    </div>
+  );
+}
+
+/** "3 questions still to answer", each a link to its question. Nothing when all are answered. */
+function Left({ left, questions, go }: { left: Q[]; questions: Q[]; go: (i: number) => void }) {
+  if (!left.length) return null;
+  return (
+    <div className="ff-left" role="alert">
+      <b>
+        {left.length} question{left.length === 1 ? '' : 's'} still to answer
+      </b>
+      <span>Answer each one, or choose Not applicable where it doesn’t apply.</span>
+      <ul>
+        {left.map((q) => (
+          <li key={q.key}>
+            <button type="button" onClick={() => go(questions.indexOf(q))}>
+              {q.label} →
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

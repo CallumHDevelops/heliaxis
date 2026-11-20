@@ -20,7 +20,7 @@ export type PortalDoc = { id: string; name: string; at: string; print: boolean }
 export type PortalHandover = {
   sent: boolean;
   pack: { id: string; size: number | null } | null;
-  groups: { title: string; items: { code: string; title: string; line: string; docs: PortalDoc[]; coming: boolean }[] }[];
+  groups: { title: string; items: { code: string; title: string; line: string; docs: PortalDoc[]; coming: boolean; /** The office's note to the customer about this item. */ note?: string | null }[] }[];
   signs: { kind: 'completion' | 'g98'; title: string; line: string; declaration: string }[];
   next: string[];
   /** Every document shown here, so "Other documents" leaves them out. */
@@ -36,20 +36,22 @@ export async function portalHandover(projectId: string): Promise<PortalHandover 
   const f = l.facts;
   const sent = !!l.pack?.sent_at;
   const doc = (d: { id: string; name: string; at: string; key: string | null; source: string | null }) => ({ id: d.id, name: d.name.replace(/\.pdf$/i, ''), at: d.at, print: d.source === 'generated' && hasPrintVersion(d.key) });
-  const shown = views.filter((v) => customerState(v) === 'ready' || (sent && customerState(v) === 'coming'));
+  const noteOf = (code: string) => (l.slots.get(code)?.note ?? '').trim() || null;
+  const shown = views.filter((v) => customerState(v) === 'ready' || ((sent || !!noteOf(v.code)) && customerState(v) === 'coming'));
   const item = (v: (typeof views)[number]) => ({
     code: v.code,
     title: v.title,
     line: v.customer,
     docs: v.docs.filter((d) => d.visible).sort((a, b) => b.version - a.version).map(doc),
     coming: customerState(v) === 'coming',
+    note: noteOf(v.code),
   });
   const groups = contentsGroups(shown.filter((v) => v.code !== 'HX-HO-01')).map((g) => ({ title: g.title, items: g.items.map(item) }));
   const cover = shown.find((v) => v.code === 'HX-HO-01');
   if (cover) groups.unshift({ title: 'Start here', items: [item(cover)] });
   // Old handover documents (before items existed) still belong here.
   const legacy = l.docs.filter((d) => d.category === 'handover' && !d.handover_slot && d.visible && !d.archived_at);
-  if (legacy.length) groups.push({ title: 'Other', items: legacy.map((d) => ({ code: 'HX-HO-19', title: d.name, line: '', docs: [doc({ id: d.id, name: d.name, at: d.created_at, key: d.generated_key, source: d.source })], coming: false })) });
+  if (legacy.length) groups.push({ title: 'Other', items: legacy.map((d) => ({ code: 'HX-HO-19', title: d.name, line: '', docs: [doc({ id: d.id, name: d.name, at: d.created_at, key: d.generated_key, source: d.source })], coming: false, note: null })) });
   const pack = l.docs.find((d) => d.generated_key === 'PACK' && !d.archived_at && d.visible);
 
   const signs: PortalHandover['signs'] = [];

@@ -38,6 +38,8 @@ export function checkAnswer(f: TemplateField, v: unknown): Checked {
   if (v === null || v === undefined) return { ok: true, value: null };
   if (typeof v === 'string' && v.trim() === '') return { ok: true, value: null };
   const name = `“${f.label}”`;
+  // Not applicable, for a question that isn't required (numbers and dates included).
+  if (!f.required && f.kind !== 'yesno' && f.kind !== 'choice' && typeof v === 'string' && /^n\/?a$/i.test(v.trim())) return { ok: true, value: 'N/A' };
   switch (f.kind) {
     case 'text':
     case 'long': {

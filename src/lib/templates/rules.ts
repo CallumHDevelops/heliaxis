@@ -17,6 +17,11 @@ export const MERGE_FIELDS: { key: string; label: string }[] = [
   { key: 'company_email', label: 'Heliaxis email' },
   { key: 'mcs_number', label: 'Heliaxis MCS certification number' },
   { key: 'mcs_contact', label: 'MCS contact details' },
+  { key: 'commissioned', label: 'The job’s switch-on (commissioning) date' },
+  { key: 'panel_model', label: 'Panel model (Job details)' },
+  { key: 'inverter_model', label: 'Inverter model (Job details)' },
+  { key: 'inverter_serial', label: 'Inverter serial number (Job details)' },
+  { key: 'battery_model', label: 'Battery model (Job details)' },
 ];
 const MERGE_KEYS = new Set(MERGE_FIELDS.map((m) => m.key));
 

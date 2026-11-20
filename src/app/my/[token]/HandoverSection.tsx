@@ -41,11 +41,18 @@ export function HandoverSection({ token, data, signs = true }: { token: string; 
       {signs && data.signs.map((s) => <SignCard key={s.kind} token={token} sign={s} />)}
       {data.groups.map((g) => (
         <DocGroup key={g.title} title={g.title}>
-          {g.items.flatMap((i) =>
-            i.coming
+          {g.items.flatMap((i) => [
+            ...(i.coming
               ? [<ComingRow key={`${i.code}-${i.title}`} title={i.title} line={i.line} />]
-              : i.docs.map((d, k) => <DocRow key={d.id} token={token} doc={d} label={i.docs.length > 1 ? d.name : i.title} line={k === 0 ? i.line : undefined} />)
-          )}
+              : i.docs.map((d, k) => <DocRow key={d.id} token={token} doc={d} label={i.docs.length > 1 ? d.name : i.title} line={k === 0 ? i.line : undefined} />)),
+            ...(i.note
+              ? [
+                  <p key={`${i.code}-note`} className="pt-hv-note">
+                    {i.note}
+                  </p>,
+                ]
+              : []),
+          ])}
         </DocGroup>
       ))}
       <div className="pt-hv-now">

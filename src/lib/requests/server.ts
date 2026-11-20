@@ -1,5 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
+import { ukDay } from '@/lib/bank-holidays';
 import { siteUrl } from '@/lib/crm/server';
 import { saveGenerated } from '@/lib/documents/store';
 import { mergeValues } from '@/lib/documents/templates/render';
@@ -40,21 +41,48 @@ const productsOf = async (db: Db, projectId: string) => {
   return ((data?.products as string[] | null) ?? []).map(String);
 };
 
+/** Job details a form pre-fills: the switch-on date and the equipment ({{commissioned}}, {{panel_model}}…). */
+async function jobMerge(db: Db, projectId: string): Promise<Record<string, string>> {
+  const { data: p } = await db.from('crm_projects').select('commissioned_at, system').eq('id', projectId).maybeSingle();
+  const sys = (p?.system ?? {}) as Record<string, unknown>;
+  const t = (k: string) => (typeof sys[k] === 'string' ? String(sys[k]).trim() : '');
+  return {
+    commissioned: p?.commissioned_at ? ukDay(String(p.commissioned_at)) : '',
+    panel_model: t('panel_model'),
+    inverter_model: t('inverter_model'),
+    inverter_serial: t('inverter_serial'),
+    battery_model: t('battery_model'),
+  };
+}
+
+/**
+ * The summary's details without what the job already says: the overrides that only replace the job's own
+ * details ("leave empty to use…"), and the certificate number once the electrical certificate is in the pack.
+ */
+const OVERRIDES = ['p_loc', 'p_desc', 'e_desc', 'circuits'];
+async function withoutKnown(db: Db, projectId: string, t: Target['template']): Promise<Target['template']> {
+  const { data: eic } = await db.from('crm_documents').select('id').eq('project_id', projectId).eq('handover_slot', 'HX-HO-04').is('archived_at', null).limit(1);
+  const drop = new Set([...OVERRIDES, ...((eic ?? []).length ? ['cert_ref'] : [])]);
+  return { ...t, sections: t.sections.map((s) => (s.type === 'fields' ? { ...s, fields: s.fields.filter((f) => !drop.has(f.key)) } : s)) };
+}
+
 export async function fillView(db: Db, projectId: string, code: string): Promise<FillView | null> {
   const t = targetOf(code, await productsOf(db, projectId));
   const job = await jobHeadFor(db, projectId);
   if (!t || !job) return null;
+  const merge = { ...mergeValues(job), ...(await jobMerge(db, projectId)) };
   const head = { ref: job.ref, address: job.address.join(', '), customer: job.customer };
+  if (code === 'HX-HO-02') t.template = await withoutKnown(db, projectId, t.template);
   if (t.kind === 'form') {
     const row = await supabaseStore(db).live(projectId, t.code);
     const v = formView(t.template, row);
     const first = t.template.sections.flatMap((s) => (s.type === 'sign' ? s.signers : []))[0] ?? null;
-    return { code, kind: 'form', title: t.title, template: t.template, answers: v.answers, merge: mergeValues(job), status: v.status === 'signed' ? 'done' : 'open', job: head, signLine: first };
+    return { code, kind: 'form', title: t.title, template: t.template, answers: v.answers, merge, status: v.status === 'signed' ? 'done' : 'open', job: head, signLine: first };
   }
   const { data } = await db.from('handover_slots').select('data').eq('project_id', projectId).eq('slot', code).maybeSingle();
   const values = ((data?.data as { values?: Record<string, string> } | null)?.values ?? {}) as Record<string, string>;
   const answers: Answers = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, valueLabelOf(code, k, v)]));
-  return { code, kind: 'values', title: t.title, template: t.template, answers, merge: mergeValues(job), status: 'open', job: head, signLine: null };
+  return { code, kind: 'values', title: t.title, template: t.template, answers, merge, status: 'open', job: head, signLine: null };
 }
 
 /** Save some answers. */

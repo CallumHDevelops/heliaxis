@@ -373,6 +373,8 @@ export type HandoverView = {
   products: string[];
   /** Items an installer can be asked to fill in by link, or the office can answer one question at a time (src/lib/requests). */
   requestable: string[];
+  /** The office's notes to the customer, by item: shown under it in their portal. */
+  notes: Record<string, string>;
   /** Something can be made, attached, released or rebuilt now: the tab asks for a refresh. */
   dirty: boolean;
   /** "Tell the customer" ticked by default on uploads (CRM settings). */
@@ -484,6 +486,7 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
     stage: f.job.stage,
     products: f.job.products,
     requestable: requestableCodes(f.job.products),
+    notes: Object.fromEntries([...l.slots].filter(([, s]) => (s.note ?? '').trim()).map(([k, s]) => [k, String(s.note)])),
     dirty: isDirty(l, views, made),
     tellDefault: f.settings.tellOnUpload,
   };

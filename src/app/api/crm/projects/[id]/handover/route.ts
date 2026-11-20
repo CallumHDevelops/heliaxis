@@ -101,6 +101,18 @@ export async function POST(req: Request, { params }: Ctx) {
         else notes.push('Nothing to make: it’s up to date, or it still needs something (see the row).');
         break;
       }
+      case 'note': {
+        if (!slot) return json({ error: 'Which item?' }, 400);
+        // A note the customer sees under this item in their portal ("We're waiting for this from the insurer…").
+        const note = String(b.note ?? '').trim().slice(0, 600);
+        const { data: cur } = await db.from('handover_slots').select('*').eq('project_id', id).eq('slot', slot).maybeSingle();
+        await db.from('handover_slots').upsert(
+          { project_id: id, slot, na: cur?.na ?? false, na_reason: cur?.na_reason ?? null, data: cur?.data ?? {}, note: note || null, updated_by: by, updated_at: new Date().toISOString() },
+          { onConflict: 'project_id,slot' }
+        );
+        await log(note ? `Handover pack: note for the customer on ${slotDef(slot)?.title}` : `Handover pack: note removed from ${slotDef(slot)?.title}`);
+        break;
+      }
       case 'na':
       case 'restore': {
         if (!slot) return json({ error: 'Which item?' }, 400);

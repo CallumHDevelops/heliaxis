@@ -543,3 +543,14 @@
 .rq-person small { color: var(--muted); }
 .rq-person:hover { background: var(--border-soft); }
 .rq-person.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+
+/* A complete item, folded to one line. */
+.hv-row--compact { display: flex; align-items: center; gap: 8px; padding-top: 8px; padding-bottom: 8px; }
+.hv-row__fold { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; padding: 0; }
+.hv-row__fold b { white-space: nowrap; }
+.hv-row__fold code { font-size: 0.78rem; color: var(--muted); }
+.hv-row__fold small { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.hv-row__less { float: right; margin-top: -4px; }
+
+/* The office's note to the customer on an item. */
+.hv-note { margin: 2px 0 6px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 8px 8px 0; font-size: 0.9rem; }

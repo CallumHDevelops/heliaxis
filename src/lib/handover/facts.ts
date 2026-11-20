@@ -165,6 +165,16 @@ async function electricianOf(db: Db, projectId: string): Promise<{ facts: Electr
   };
 }
 
+/** G98 covers inverters up to 16 A per phase: 3.68 kW on a single-phase supply. Above that it's G99. */
+export const G98_MAX_KW = 3.68;
+/** The installed inverter rating in kW: Job details', else the OpenSolar design's rating × how many. */
+export function inverterKw(jobKw: number | null, os: Record<string, unknown> | null): number | null {
+  if (jobKw && jobKw > 0) return jobKw;
+  const each = Number(os?.inverterKw);
+  const count = Number(os?.inverterCount) || 1;
+  return each > 0 ? Math.round(each * count * 100) / 100 : null;
+}
+
 /** The OpenSolar proposal's figures on the job's quote (sent or accepted first): the option the customer chose. */
 async function quoteOpenSolar(db: Db, projectId: string): Promise<Record<string, unknown> | null> {
   const { data } = await db.from('crm_quotes').select('status, content, created_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(10);
@@ -275,6 +285,12 @@ export async function loadHandover(db: Db, projectId: string): Promise<Loaded | 
     const kwh = Number(facts.opensolar.annualGenerationKwh);
     const shade = Number(facts.opensolar.shadeFactor);
     facts.design = { ...facts.design, est_kwh_year: facts.design.est_kwh_year ?? (kwh > 0 ? kwh : null), shade_factor: facts.design.shade_factor ?? (shade > 0 && shade <= 1 ? shade : null) };
+  }
+  // No DNO route chosen on Paperwork: from the inverter size (the owner's rule): 3.68 kW or less in all is
+  // G98, more is G99. Job details' inverter rating first, else the OpenSolar design's (rating × count).
+  if (!facts.job.dno.route && (products.includes('solar') || products.includes('battery'))) {
+    const kw = inverterKw(facts.system.inverter_kw, facts.opensolar);
+    if (kw) facts.job.dno = { ...facts.job.dno, route: kw <= G98_MAX_KW ? 'g98' : 'g99', routeFrom: `${kw} kW inverter` };
   }
   // The library matched to the job's models.
   facts.library = libraryFor(libraryAll, modelsOf(facts), products);

@@ -346,3 +346,87 @@
 .ff-nav button:hover {
   background: var(--accent-hover);
 }
+
+/* (i): what to put here. */
+.ff-info {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 10px;
+  vertical-align: middle;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent-line);
+  background: var(--surface);
+  color: var(--accent-text);
+  font: italic 700 1rem Georgia, 'Times New Roman', serif;
+  cursor: pointer;
+}
+.ff-info.on,
+.ff-info:hover {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.ff-help {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  line-height: 1.5;
+}
+.ff-btn--ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1.5px solid var(--border-strong);
+  box-shadow: none;
+  font-weight: 700;
+}
+.ff-btn--ghost:hover:not(:disabled) {
+  background: var(--border-soft);
+}
+.ff-btn--ghost.on {
+  border-color: var(--accent-hover);
+  background: var(--accent-soft);
+}
+/* What's still to answer, at the top of the review and the signature. */
+.ff-left {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-line);
+}
+.ff-left b {
+  display: block;
+  color: var(--danger);
+  font-size: 1.05rem;
+}
+.ff-left span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin: 2px 0 8px;
+}
+.ff-left ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ff-left li button {
+  border: 1px solid var(--danger-line);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.ff-left li button:hover {
+  background: var(--danger-soft);
+}

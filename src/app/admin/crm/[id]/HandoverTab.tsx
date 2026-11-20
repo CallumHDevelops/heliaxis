@@ -42,6 +42,7 @@ type Sheet =
   | { kind: 'library'; model: string }
   | { kind: 'quick'; what: 'commissioned' | 'estimate' }
   | { kind: 'opensolar' }
+  | { kind: 'note'; code: SlotCode; title: string }
   | { kind: 'request'; code: SlotCode; title: string }
   | { kind: 'fill'; code: SlotCode };
 
@@ -155,6 +156,9 @@ export function HandoverTab({
   }, [projectId]);
   const { reload } = useLiveRefresh(load, 30_000);
   const req = useRequests(projectId);
+  // Complete items fold to one line (less scrolling); opened ones stay open until folded again.
+  const [opened, setOpened] = useState<Set<string>>(() => new Set());
+  const toggle = (code: string) => setOpened((o) => { const n = new Set(o); if (n.has(code)) n.delete(code); else n.add(code); return n; });
 
   const done = (v: HandoverView & { notes?: string[] }, msg?: string) => {
     setView(v);
@@ -245,6 +249,7 @@ export function HandoverTab({
     const sheetId = s.code === 'HX-HO-15' ? v.helpers.g98Sheet : s.code === 'HX-HO-16' ? v.helpers.g99Sheet : null;
     if (sheetId && s.state !== 'na') helpers.push({ label: s.code === 'HX-HO-15' ? 'G98 data sheet' : 'G99 data sheet', run: () => void window.open(`/api/crm/documents/${sheetId}`, '_blank', 'noopener') });
     if ((s.code === 'HX-HO-10' || s.code === 'HX-HO-14') && s.state !== 'na') helpers.push({ label: s.state === 'complete' ? 'Use a different OpenSolar proposal' : 'Upload the OpenSolar proposal', run: () => setSheet({ kind: 'opensolar' }), fix: 'opensolar' });
+    helpers.push({ label: v.notes[s.code] ? 'Edit the customer note' : 'Note for the customer', run: () => setSheet({ kind: 'note', code: s.code, title: s.title }) });
     if (s.code === 'HX-HO-18') helpers.push({ label: 'Final invoice and payments', run: () => setSheet({ kind: 'invoice' }), fix: 'invoice' });
     // Ours, or the electrician's (HX-PV-02…: made again from their sign-off, after a correction once the customer
     // has it), and any made document that's Out of date (their EV or heat pump record, their certificate).
@@ -295,6 +300,11 @@ export function HandoverTab({
             </span>
           </div>
         ))}
+        {v.notes[s.code] && (
+          <p className="hv-note">
+            <b>Note for the customer:</b> {v.notes[s.code]}
+          </p>
+        )}
         {requestWords(req.data?.requests.find((r) => r.target === s.code && !r.cancelled_at)) && (
           <p className="hv-asked">{requestWords(req.data?.requests.find((r) => r.target === s.code && !r.cancelled_at))}</p>
         )}
@@ -389,9 +399,33 @@ export function HandoverTab({
           </button>
         </li>
       );
+    if (s.state === 'complete' && !opened.has(s.code))
+      return (
+        <li key={s.code} className={`hv-row hv-row--${s.state} hv-row--compact`}>
+          <button type="button" className="hv-row__fold" onClick={() => toggle(s.code)} aria-expanded={false}>
+            <Mark state="complete" />
+            <b>{s.title}</b>
+            <code>{s.code}</code>
+            <small>{said}</small>
+          </button>
+          {latest && (
+            <a className="crm-chipbtn" href={`/api/crm/documents/${latest.id}`} target="_blank" rel="noreferrer">
+              View
+            </a>
+          )}
+          <button type="button" className="crm-chipbtn" onClick={() => toggle(s.code)}>
+            More ▾
+          </button>
+        </li>
+      );
     return (
       <li key={s.code} className={`hv-row hv-row--${s.state}`}>
         <div className="hv-row__head">{head}</div>
+        {s.state === 'complete' && (
+          <button type="button" className="crm-chipbtn hv-row__less" onClick={() => toggle(s.code)}>
+            Less ▴
+          </button>
+        )}
         {actions(s)}
       </li>
     );
@@ -563,6 +597,15 @@ export function HandoverTab({
             onChanged();
             void reload();
           }}
+        />
+      )}
+      {sheet?.kind === 'note' && (
+        <NoteSheet
+          title={sheet.title}
+          first={v.customer.first}
+          note={v.notes[sheet.code] ?? ''}
+          onClose={() => setSheet(null)}
+          onSave={(note) => post({ action: 'note', slot: sheet.code, note }, note ? 'Note saved: it shows in their portal.' : 'Note removed.')}
         />
       )}
       {sheet?.kind === 'opensolar' && (
@@ -831,6 +874,59 @@ function QuickSheet({ projectId, what, today, onClose, onSaved, onOpenSolar }: {
         <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={() => void save()}>
           {busy ? 'Saving…' : 'Save'}
         </button>
+        <button type="button" className="crm-btn crm-btn--ghost" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </PlainSheet>
+  );
+}
+
+/** A note the customer sees under the item in their portal: what's happening with it. */
+function NoteSheet({ title, first, note, onClose, onSave }: { title: string; first: string; note: string; onClose: () => void; onSave: (note: string) => Promise<void> }) {
+  const [text, setText] = useState(note);
+  const [busy, setBusy] = useState(false);
+  return (
+    <PlainSheet label="Note for the customer" onClose={onClose}>
+      <h2>Note for the customer</h2>
+      <p className="crm-muted crm-small">
+        Shown under <b>{title}</b> in {first || 'the customer'}’s portal, so they know what’s happening with it.
+      </p>
+      <textarea
+        className="crm-input"
+        rows={4}
+        maxLength={600}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={`Hi ${first || 'there'}, we’re still waiting for this document from the insurance provider and will upload it as soon as it arrives.`}
+      />
+      <div className="crm-actions">
+        <button
+          type="button"
+          className="crm-btn crm-btn--solar"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            await onSave(text.trim());
+            setBusy(false);
+          }}
+        >
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+        {note && (
+          <button
+            type="button"
+            className="crm-btn crm-btn--ghost"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              await onSave('');
+              setBusy(false);
+            }}
+          >
+            Remove it
+          </button>
+        )}
         <button type="button" className="crm-btn crm-btn--ghost" onClick={onClose}>
           Cancel
         </button>

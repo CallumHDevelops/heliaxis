@@ -44,6 +44,13 @@ export function mergeValues(job: JobHead): Record<string, string> {
     company_email: c.email,
     mcs_number: c.mcsNumber,
     mcs_contact: MCS_CONTACT,
+    // Job details a form pre-fills (src/lib/requests/server.ts jobMerge): the step-by-step screen saves
+    // them as answers, so the printed form has them from its answers.
+    commissioned: '',
+    panel_model: '',
+    inverter_model: '',
+    inverter_serial: '',
+    battery_model: '',
   };
 }
 
