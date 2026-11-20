@@ -188,9 +188,10 @@ export async function saveElectricianDocs(db: Db, assignmentId: string, opts: { 
         inputs: docInputs(d.key, inputs),
         category: 'commissioning',
         slot: d.slot,
-        release: 'with_pack',
-        visible: false,
-        force: !!opts.force?.includes(d.slot),
+        // Into the customer's portal straight away (the owner, 20 Nov 2026), made again when corrected.
+        release: 'now',
+        visible: true,
+        force: true,
         by: opts.by ?? null,
       })
     );
@@ -216,9 +217,9 @@ export async function saveElectricianDocs(db: Db, assignmentId: string, opts: { 
           inputs: { photos: photos.map((x) => x.id), no },
           category: 'certificate',
           slot: 'HX-HO-04',
-          release: 'with_pack',
-          visible: false,
-          force: !!opts.force?.includes('HX-HO-04'),
+          release: 'now',
+          visible: true,
+          force: true,
           by: opts.by ?? null,
         })
       );

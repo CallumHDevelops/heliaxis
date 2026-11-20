@@ -165,6 +165,16 @@ async function electricianOf(db: Db, projectId: string): Promise<{ facts: Electr
   };
 }
 
+/** The OpenSolar proposal's figures on the job's quote (sent or accepted first): the option the customer chose. */
+async function quoteOpenSolar(db: Db, projectId: string): Promise<Record<string, unknown> | null> {
+  const { data } = await db.from('crm_quotes').select('status, content, created_at').eq('project_id', projectId).order('created_at', { ascending: false }).limit(10);
+  const rows = (data ?? []) as { status: string; content: { proposal?: { options?: Record<string, unknown>[]; chosen?: number } } | null }[];
+  const q = rows.find((r) => (r.status === 'accepted' || r.status === 'sent') && r.content?.proposal?.options?.length) ?? rows.find((r) => r.content?.proposal?.options?.length);
+  const p = q?.content?.proposal;
+  if (!p?.options?.length) return null;
+  return p.options[Math.min(Math.max(0, Number(p.chosen) || 0), p.options.length - 1)] ?? null;
+}
+
 export async function loadHandover(db: Db, projectId: string): Promise<Loaded | null> {
   const { data: raw } = await db.from('crm_projects').select('*').eq('id', projectId).maybeSingle();
   if (!raw) return null;
@@ -249,6 +259,7 @@ export async function loadHandover(db: Db, projectId: string): Promise<Loaded | 
       method: r.method as Payment['method'],
       reference: str(r.reference),
     })),
+    opensolar: null,
     survey: { shading, sunPath: str((sun as { storage_path?: string } | null)?.storage_path) },
     made: [...new Set(current.map((d) => String(d.handover_slot)))],
     settings,
@@ -256,6 +267,14 @@ export async function loadHandover(db: Db, projectId: string): Promise<Loaded | 
   for (const plugin of PLUGINS) {
     const more = await plugin(db, projectId, facts).catch(() => null);
     if (more && facts.electrician) facts.electrician = { ...facts.electrician, ...more, values: { ...facts.electrician.values, ...(more.values ?? {}) } };
+  }
+  // The OpenSolar design: a proposal uploaded on the Handover tab, else the one read into the job's quote.
+  facts.opensolar = (slots.get('HX-HO-14')?.data as SlotData | undefined)?.opensolar ?? (await quoteOpenSolar(db, projectId).catch(() => null));
+  // The estimate figures, when Job details hasn't got them: as the design software printed them.
+  if (facts.opensolar) {
+    const kwh = Number(facts.opensolar.annualGenerationKwh);
+    const shade = Number(facts.opensolar.shadeFactor);
+    facts.design = { ...facts.design, est_kwh_year: facts.design.est_kwh_year ?? (kwh > 0 ? kwh : null), shade_factor: facts.design.shade_factor ?? (shade > 0 && shade <= 1 ? shade : null) };
   }
   // The library matched to the job's models.
   facts.library = libraryFor(libraryAll, modelsOf(facts), products);

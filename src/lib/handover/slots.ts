@@ -329,8 +329,8 @@ export const SLOTS: SlotDef[] = [
     customer: 'The calculations behind your system’s design.',
     group: 'design',
     tech: ['solar', 'battery'],
-    kind: 'C',
-    maker: 'office',
+    kind: 'G',
+    maker: 'pack',
     order: 140,
     applies: pvOrBattery,
     reasons: ['No structural or other calculations needed for this design'],
@@ -625,7 +625,9 @@ export type Fix =
   /** Only the switch-on (commissioning) date is missing: a date box on the row. */
   | 'commissioned'
   /** Only the design's estimate figures (kWh a year, shade factor) are missing. */
-  | 'estimate';
+  | 'estimate'
+  /** Needs the OpenSolar proposal: upload it and its figures are read. */
+  | 'opensolar';
 
 /** One of this unit's generated documents: made from these inputs now, or what it still needs. */
 export type GenNeed = { ready: true; hash: string } | { ready: false; state: 'missing' | 'waiting'; why: string; fix?: Fix; due?: string | null };
@@ -766,8 +768,8 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       if (docs.length) return docsState(docs);
       return { state: 'missing', why: c.designDoc ? 'Upload the wiring diagram, or use the design document on the job.' : 'Upload the wiring diagram.', fix: 'upload' };
     case 'HX-HO-14':
-      if (docs.length) return docsState(docs);
-      return { state: 'missing', why: c.designDoc ? 'Upload the design calculations (or use the design document), or mark them not needed.' : 'Upload the design calculations, or mark them not needed.', fix: 'upload' };
+      // Made from the OpenSolar design's performance table (HX-HO-14 generator), or the office's own upload.
+      return genState('HX-HO-14', docs, c);
     case 'HX-HO-17':
       if (!c.models.length) return { state: 'missing', why: 'Add the product models on Job details.', fix: 'job' };
       if (c.libraryGaps.length)

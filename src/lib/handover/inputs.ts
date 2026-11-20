@@ -10,6 +10,8 @@
  * from the database.
  */
 import type { Design } from '../site/design';
+import { MCS_NOTE, mcsTable, type McsSection } from '../quotes/mcs';
+import type { ProposalOption } from '../quotes/types';
 import { signedStatement, summaryStandards, SUMMARY_DECLARATIONS } from '../site/declaration';
 import { MIS3002_NOTES } from '../site/fixed/mis3002';
 import { approved, DRAFTS, warrantyReady, type HandoverSettings, type ScheduleRow } from './settings-shared';
@@ -54,6 +56,8 @@ export type SlotData = {
   outstanding?: { text: string; by: string | null }[];
   /** HX-HO-16: which G99 paper each document is. */
   parts?: Record<string, string>;
+  /** HX-HO-14: the OpenSolar proposal's chosen option, read from a proposal uploaded on the Handover tab. */
+  opensolar?: Record<string, unknown>;
   /** Set by the document store: newer inputs than the version the customer has. */
   stale?: { key: string; hash: string; at: string };
 };
@@ -131,6 +135,8 @@ export type HandoverFacts = {
   /** The job's library items (matched by model, plus the ones in every pack). */
   library: LibraryItem[];
   payments: Payment[];
+  /** The OpenSolar design's figures (ProposalOption): uploaded on the Handover tab, else from the job's quote. Null: none. */
+  opensolar: Record<string, unknown> | null;
   /** From the solar survey: what shades the roof, and the sun-path photo. */
   survey: { shading: string[]; sunPath: string | null };
   /** Pack items with a current document (HX-PV-02, HX-BAT-01…): for the system summary's records. */
@@ -421,6 +427,22 @@ export function shadingInput(f: HandoverFacts, notes = MIS3002_NOTES): Made<Shad
       source: `${notes.source} ${notes.issue}`,
     },
   };
+}
+
+/** HX-HO-14: the system design calculations: the OpenSolar design's MCS performance table, in our layout. */
+export type CalcsInput = JobHead & { option: string | null; sections: McsSection[]; note: string; equipment: [string, string][] };
+export function calcsInput(f: HandoverFacts): Made<CalcsInput> {
+  const o = f.opensolar;
+  if (!o) return missing('Upload the OpenSolar proposal: the calculations are made from its performance table. Or upload your own calculations.', 'opensolar');
+  const sections = mcsTable(o as ProposalOption);
+  if (!sections.length) return missing('The OpenSolar proposal had no performance table in it. Upload one that has, or your own calculations.', 'opensolar');
+  const s = (k: string) => (typeof o[k] === 'string' && (o[k] as string).trim() ? (o[k] as string).trim() : null);
+  const n = (k: string) => (typeof o[k] === 'number' ? (o[k] as number) : null);
+  const equipment: [string, string][] = [];
+  if (n('panelCount') || s('panelModel')) equipment.push(['Panels', [n('panelCount') ? `${n('panelCount')} ×` : null, s('panelBrand'), s('panelModel'), n('panelWatts') ? `(${n('panelWatts')} W)` : null].filter(Boolean).join(' ')]);
+  if (s('inverterModel')) equipment.push(['Inverter', [n('inverterCount') && n('inverterCount')! > 1 ? `${n('inverterCount')} ×` : null, s('inverterBrand'), s('inverterModel'), n('inverterKw') ? `(${n('inverterKw')} kW)` : null].filter(Boolean).join(' ')]);
+  if (s('batteryModel')) equipment.push(['Battery', [s('batteryBrand'), s('batteryModel'), n('batteryUsableKwh') ? `(${n('batteryUsableKwh')} kWh usable)` : null].filter(Boolean).join(' ')]);
+  return { ok: true, input: { ...head(f), option: s('name'), sections, note: MCS_NOTE, equipment } };
 }
 
 /** HX-HO-11: the maintenance schedule. Every interval from somewhere real, or "as the maker's manual says". */

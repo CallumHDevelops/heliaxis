@@ -11,6 +11,7 @@ import { useMedia } from '../use-stored';
 import { CopySheet, InvoiceSheet, LibrarySheet, NotNeededSheet, OutstandingSheet, SendSheet, SignDesignSheet, UploadSheet, ValuesSheet } from './HandoverSheets';
 import { Mark } from './PackPanel';
 import { PlainSheet } from './RecordSheets';
+import { OpenSolarSheet } from './OpenSolarSheet';
 import { OfficeFill, RequestSheet, requestWords, useRequests } from './RequestInstaller';
 import { docNumber } from '@/lib/docs/packs';
 import { send, type Tab } from './record-shared';
@@ -40,6 +41,7 @@ type Sheet =
   | { kind: 'invoice' }
   | { kind: 'library'; model: string }
   | { kind: 'quick'; what: 'commissioned' | 'estimate' }
+  | { kind: 'opensolar' }
   | { kind: 'request'; code: SlotCode; title: string }
   | { kind: 'fill'; code: SlotCode };
 
@@ -73,6 +75,7 @@ const FIX_LABEL: Record<Fix, string> = {
   'dno-sent': 'Mark it sent to the DNO',
   commissioned: 'Add switch-on date',
   estimate: 'Add the estimate figures',
+  opensolar: 'Upload the OpenSolar proposal',
 };
 /** The electrician's own records (their step-by-step site app): asking for them means putting them on the job. */
 const SITE_ITEMS = ['HX-HO-04'];
@@ -206,6 +209,8 @@ export function HandoverTab({
         return setSheet({ kind: 'mid' });
       case 'invoice':
         return setSheet({ kind: 'invoice' });
+      case 'opensolar':
+        return setSheet({ kind: 'opensolar' });
       case 'commissioned':
       case 'estimate':
         return setSheet({ kind: 'quick', what: f });
@@ -239,6 +244,7 @@ export function HandoverTab({
     // The office's data sheets for filling in the DNO's forms (never in the pack).
     const sheetId = s.code === 'HX-HO-15' ? v.helpers.g98Sheet : s.code === 'HX-HO-16' ? v.helpers.g99Sheet : null;
     if (sheetId && s.state !== 'na') helpers.push({ label: s.code === 'HX-HO-15' ? 'G98 data sheet' : 'G99 data sheet', run: () => void window.open(`/api/crm/documents/${sheetId}`, '_blank', 'noopener') });
+    if ((s.code === 'HX-HO-10' || s.code === 'HX-HO-14') && s.state !== 'na') helpers.push({ label: s.state === 'complete' ? 'Use a different OpenSolar proposal' : 'Upload the OpenSolar proposal', run: () => setSheet({ kind: 'opensolar' }), fix: 'opensolar' });
     if (s.code === 'HX-HO-18') helpers.push({ label: 'Final invoice and payments', run: () => setSheet({ kind: 'invoice' }), fix: 'invoice' });
     // Ours, or the electrician's (HX-PV-02…: made again from their sign-off, after a correction once the customer
     // has it), and any made document that's Out of date (their EV or heat pump record, their certificate).
@@ -559,12 +565,25 @@ export function HandoverTab({
           }}
         />
       )}
+      {sheet?.kind === 'opensolar' && (
+        <OpenSolarSheet
+          projectId={projectId}
+          onClose={() => setSheet(null)}
+          onDone={() => {
+            setSheet(null);
+            setNotice('OpenSolar figures in: the design calculations and the solar estimate page are made from them.');
+            onChanged();
+            void reload();
+          }}
+        />
+      )}
       {sheet?.kind === 'quick' && (
         <QuickSheet
           projectId={projectId}
           what={sheet.what}
           today={today}
           onClose={() => setSheet(null)}
+          onOpenSolar={() => setSheet({ kind: 'opensolar' })}
           onSaved={(msg) => {
             setSheet(null);
             setNotice(msg);
@@ -752,7 +771,7 @@ function TechPicker({ projectId, onSaved }: { projectId: string; onSaved: () => 
  * When all an item lacks is one detail (the switch-on date; the design's estimate figures), it's typed
  * here on the row instead of a trip to Job details. Saved on the job, so everything else that waits for it moves too.
  */
-function QuickSheet({ projectId, what, today, onClose, onSaved }: { projectId: string; what: 'commissioned' | 'estimate'; today: string; onClose: () => void; onSaved: (msg: string) => void }) {
+function QuickSheet({ projectId, what, today, onClose, onSaved, onOpenSolar }: { projectId: string; what: 'commissioned' | 'estimate'; today: string; onClose: () => void; onSaved: (msg: string) => void; onOpenSolar: () => void }) {
   const [day, setDay] = useState(today);
   const [kwh, setKwh] = useState('');
   const [shade, setShade] = useState('1');
@@ -794,6 +813,9 @@ function QuickSheet({ projectId, what, today, onClose, onSaved }: { projectId: s
       ) : (
         <>
           <p className="crm-muted crm-small">From the MCS performance estimate in the design. The handover never works these out itself.</p>
+          <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={onOpenSolar}>
+            Read them from the OpenSolar proposal instead
+          </button>
           <label className="crm-label" htmlFor="hv-q-kwh">
             Estimated generation (kWh a year)
           </label>

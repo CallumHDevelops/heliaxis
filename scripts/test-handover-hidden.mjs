@@ -20,6 +20,7 @@ const db = kit.setup({
     export async function logActivity(a) { globalThis.__rec.activity.push(a.body); }
     export async function ensurePortalToken() { return 'portal-token-0123456789'; }
     export const portalUrl = (t) => 'https://heliaxis.test/my/' + t;
+    export const siteUrl = () => 'https://heliaxis.test';
     export async function signedDoc(p) { return 'https://storage.test/' + p; }
     export const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
     export async function crmSession() { return { user: { id: 'staff-1' }, profile: { full_name: 'Sarah Office', role: 'admin' } }; }`,

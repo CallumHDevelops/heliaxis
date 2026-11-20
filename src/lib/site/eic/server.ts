@@ -246,8 +246,8 @@ export async function saveCertificate(
         inputs: m.inputs,
         category: 'certificate',
         slot: m.final && IET_MEIWC.verified ? 'HX-HO-04' : null,
-        release: m.final && IET_MEIWC.verified ? 'with_pack' : 'now',
-        visible: false,
+        release: 'now',
+        visible: !!(m.final && IET_MEIWC.verified),
         force: opt.force,
         by,
       });
@@ -264,8 +264,8 @@ export async function saveCertificate(
     inputs: m.inputs,
     category: 'certificate',
     slot: m.final ? 'HX-HO-04' : null,
-    release: m.final ? 'with_pack' : 'now',
-    visible: false,
+    release: 'now',
+    visible: !!m.final,
     force: opt.force,
     by,
   });

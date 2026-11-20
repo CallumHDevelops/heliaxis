@@ -36,6 +36,7 @@ const STUBS = {
     export async function logActivity(a) { globalThis.__rec.activity.push(a.body); }
     export async function ensurePortalToken() { return 'portal-token-0123456789'; }
     export const portalUrl = (t) => 'https://heliaxis.test/my/' + t;
+    export const siteUrl = () => 'https://heliaxis.test';
     export const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
     export async function crmSession() { return { user: { id: 'staff-1' }, profile: { full_name: 'Sarah Office', role: globalThis.__role ?? 'admin' } }; }`,
   '@/lib/crm/portal': `export const SIGNABLE_CATEGORIES = ['quote', 'contract'];`,
@@ -339,7 +340,7 @@ eq('…and the tab offers it only to an admin', /\(isAdmin \|\| !SITE_SLOTS\.inc
 eq('the manual attached from the library into Product manuals and warranties, the procedure into Switching off', docs().filter((d) => d.source === 'library').map((d) => d.handover_slot), ['HX-HO-17', 'HX-HO-09']);
 const switching = (await H.handoverView(db, pid)).slots.find((s) => s.code === 'HX-HO-09');
 eq('switching off lists the procedure beside its own page (Complete from the page)', [switching.state, switching.docs.map((d) => d.source).sort()], ['complete', ['generated', 'library']]);
-eq('all held until the pack goes (with_pack, not visible)', docs().filter((d) => d.source === 'generated' && d.handover_slot).every((d) => d.release === 'with_pack' && !d.visible), true);
+eq('each one in the customer’s portal straight away (the owner, 20 Nov 2026)', docs().filter((d) => d.source === 'generated' && d.handover_slot && /^HX-HO-/.test(String(d.generated_key))).every((d) => d.release === 'now' && d.visible), true);
 const r1b = await H.refreshHandover(db, pid, { by: 'staff-1' });
 eq('nothing new the second time (same inputs)', r1b.made, []);
 // The office signs the design part: the system summary follows.
@@ -362,7 +363,7 @@ const mcs = await upload('MCS certificate', await signedDoc.save(), { handover_s
 eq('MCS certificate in the pack, in their portal at once, its number offered', [mcs.document.handover_slot, mcs.document.visible, mcs.document.release, mcs.read?.mcs_cert_no], ['HX-HO-03', true, 'now', 'MCS-00998877']);
 let portal = await P.portalHandover(pid);
 const shownIds = portal.groups.flatMap((g) => g.items.flatMap((i) => i.docs.map((d) => d.id)));
-eq('the portal shows it straight away, and nothing that’s held', [shownIds.includes(mcs.document.id), shownIds.length], [true, 1]);
+eq('the portal shows it straight away, beside the pack’s own documents', [shownIds.includes(mcs.document.id), shownIds.length > 1], [true, true]);
 // The certificate is in, so the warranty insurance is next: its 7 days start the day it's uploaded (no registered date on the job).
 const insurance = (await H.handoverView(db, pid)).slots.find((s) => s.code === 'HX-HO-07');
 eq('the MCS certificate uploaded: registered today, the warranty insurance Missing with its 7-day deadline and task', [db.rows('crm_projects')[0].paperwork.mcs_registered_on, insurance.state, insurance.fix, insurance.due, globalThis.__rec.deadlines.includes(pid)], ['2026-11-03', 'missing', 'upload', '2026-11-10', true]);
@@ -397,7 +398,7 @@ eq('Needed after all: made again as the next version', [back.body.slots.find((s)
 /* ── 3. Build ──────────────────────────────────────────────────────────────── */
 const b1 = await post({ action: 'build' });
 const pack1 = cur('PACK');
-eq('one PDF, stored as the pack (v1, held until sent)', [b1.status, b1.body.built.version, pack1.storage_path, pack1.release, pack1.visible], [200, 1, `projects/${pid}/handover/pack-v1.pdf`, 'with_pack', false]);
+eq('one PDF, stored as the pack (v1, in their portal straight away)', [b1.status, b1.body.built.version, pack1.storage_path, pack1.release, pack1.visible], [200, 1, `projects/${pid}/handover/pack-v1.pdf`, 'now', true]);
 const packRow = db.rows('handover_packs').find((x) => x.project_id === pid);
 const sep = Object.fromEntries(packRow.contents.filter((c) => c.separate).map((c) => [c.slot, c.separate]));
 eq('the signed certificate and the 30 MB manual left as separate files', sep, { 'HX-HO-03': 'signed', 'HX-HO-17': 'size' });

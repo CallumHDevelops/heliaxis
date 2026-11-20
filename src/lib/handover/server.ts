@@ -6,6 +6,7 @@ import { addDays, shortDay } from '@/lib/projects/deadlines';
 import { docFileName } from '@/lib/documents/pdf-kit';
 import { inputsHash, saveGenerated, type Reprint, type StoredRef } from '@/lib/documents/store';
 import type { Loader } from '@/lib/documents/handover/common';
+import { CALCS_TITLE, makeCalcs } from '@/lib/documents/handover/calcs';
 import { COMPLETION_TITLE, makeCompletion } from '@/lib/documents/handover/completion';
 import { COVER_TITLE, makeCoverLetter } from '@/lib/documents/handover/cover-letter';
 import { ESTIMATE_TITLE, makeShading } from '@/lib/documents/handover/estimate';
@@ -33,6 +34,7 @@ import {
   AGREEMENT_FIELDS,
   agreementInput,
   buildingControlFields,
+  calcsInput,
   completionInput,
   coverInput,
   g98Input,
@@ -95,6 +97,7 @@ const GENS: Gen[] = [
   { key: 'HX-HO-08', slot: 'HX-HO-08', code: 'HX-HO-08', title: COMPLETION_TITLE, category: 'handover', input: (f) => completionInput(f), make: makeCompletion as Gen['make'] },
   { key: 'HX-HO-09', slot: 'HX-HO-09', code: 'HX-HO-09', title: SWITCH_OFF_TITLE, category: 'handover', input: (f) => switchInput(f), make: makeSwitchOff as Gen['make'] },
   { key: 'HX-HO-10', slot: 'HX-HO-10', code: 'HX-HO-10', title: ESTIMATE_TITLE, category: 'handover', input: (f) => shadingInput(f), make: makeShading as Gen['make'] },
+  { key: 'HX-HO-14', slot: 'HX-HO-14', code: 'HX-HO-14', title: CALCS_TITLE, category: 'design', input: (f) => calcsInput(f), make: makeCalcs as Gen['make'] },
   { key: 'HX-HO-11', slot: 'HX-HO-11', code: 'HX-HO-11', title: SCHEDULE_TITLE, category: 'handover', input: (f) => scheduleInput(f), make: makeSchedule as Gen['make'] },
   { key: 'HX-HO-12', slot: 'HX-HO-12', code: 'HX-HO-12', title: PLAN_TITLE, category: 'handover', input: (f) => agreementInput(f), make: makeAgreement as Gen['make'] },
   // The G98 and G99 data sheets: office helpers beside HX-HO-15 and HX-HO-16, never in the pack.
@@ -214,13 +217,14 @@ async function attachLibrary(db: Db, l: Loaded, by: string | null): Promise<numb
       storage_path: to,
       mime: item.mime,
       size: item.size,
-      visible: sent,
+      // Into the customer's portal straight away (the owner, 20 Nov 2026), not held for Send.
+      visible: true,
       uploaded_by: by,
       source: 'library',
       generated_key: key,
       version: 1,
       handover_slot: slot,
-      release: sent ? 'now' : 'with_pack',
+      release: 'now',
     });
     if (!error) n++;
   }
@@ -254,8 +258,8 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
     const m = made.get(g.key);
     const cur = currentOf(at, g.key);
     const applies = genApplies(g, at, views);
-    if (g.slot && cur && !cur.visible && !applies) {
-      // It stopped applying before the customer had it: out of the pack (kept, archived). Needed after all: made again.
+    if (g.slot && cur && !applies) {
+      // It stopped applying (marked Not needed, the DNO route changed): out of the pack and the portal (kept, archived). Needed after all: made again.
       await db.from('crm_documents').update({ archived_at: new Date().toISOString(), archived_by: opts.by ?? null }).eq('id', cur.id);
       out.archived++;
       return;
@@ -263,11 +267,7 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
     if (!m?.ok || !applies) return;
     const hash = hashOf(g, m.input);
     if (cur?.inputs_hash === hash) return;
-    const force = !!opts.force?.includes(g.key) || !!(g.slot && opts.force?.includes(g.slot)) || !!g.live;
-    if (cur?.visible && !force) {
-      out.stale.push(g.key);
-      return;
-    }
+    // The customer sees each document as soon as it's made, so each one follows its data: made again whenever that changes.
     const bytes = await g.make(m.input as never, load);
     const r = await saveGenerated(db, projectId, {
       key: g.key,
@@ -276,9 +276,9 @@ export async function refreshHandover(db: Db, projectId: string, opts: { by?: st
       inputs: hashed(g, m.input),
       category: g.category,
       slot: g.slot,
-      release: g.slot ? 'with_pack' : 'now',
-      visible: sent && !!g.slot,
-      force,
+      release: 'now',
+      visible: !!g.slot,
+      force: true,
       by: opts.by ?? null,
     });
     if (r.status === 'saved') out.made.push(g.key);
@@ -614,14 +614,14 @@ export async function buildHandover(db: Db, projectId: string, opts: { by: strin
       storage_path: path,
       mime: 'application/pdf',
       size: built.bytes.length,
-      visible: sent,
+      visible: true,
       uploaded_by: opts.by,
       source: 'generated',
       generated_key: 'PACK',
       version,
       inputs_hash: packKey(l),
       handover_slot: 'PACK',
-      release: sent ? 'now' : 'with_pack',
+      release: 'now',
     })
     .select('id')
     .single();

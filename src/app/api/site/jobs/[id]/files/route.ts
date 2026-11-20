@@ -71,10 +71,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         storage_path: path,
         mime,
         size,
-        visible: false,
+        // A pack item's file goes into the customer's portal straight away (the owner, 20 Nov 2026).
+        visible: !!kind.handover,
         source: 'site',
         handover_slot: kind.handover,
-        release: 'with_pack',
+        release: 'now',
       });
       if (error && error.code !== '23505') return siteJson({ error: 'busy', message: 'That file didn’t save. It will try again.' }, 503);
     }

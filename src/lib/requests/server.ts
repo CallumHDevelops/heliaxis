@@ -112,8 +112,8 @@ async function fileForm(db: Db, projectId: string, t: Target, by: string | null)
     inputs: { form: t.code, at: new Date().toISOString() },
     category: 'commissioning',
     slot: t.slot,
-    release: 'with_pack',
-    visible: false,
+    release: 'now',
+    visible: true,
     force: true,
     by,
   });
