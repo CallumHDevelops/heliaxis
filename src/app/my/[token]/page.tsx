@@ -7,10 +7,17 @@ import { themeContext } from '@/lib/theme/server';
 import { PortalView } from './PortalView';
 
 export const dynamic = 'force-dynamic';
-export const metadata: Metadata = {
-  title: 'Your project',
-  robots: { index: false, follow: false },
-};
+/** Its own home-screen app: the project's manifest (installed from here, the icon opens this project) and iPhone's settings. */
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    title: 'Your project',
+    robots: { index: false, follow: false },
+    manifest: `/my/${encodeURIComponent(token)}/manifest.webmanifest`,
+    appleWebApp: { capable: true, title: 'My Heliaxis', statusBarStyle: 'black-translucent' },
+    icons: { apple: [{ url: '/my/apple-touch-icon.png', sizes: '180x180' }] },
+  };
+}
 
 /**
  * The customer's private link: a quote-only page while the quote waits to be signed (Quote sent),
@@ -43,7 +50,7 @@ export default async function CustomerPortal({
           </a>
         </div>
       )}
-      <PortalView data={data} paid={paid !== undefined} justAccepted={accepted !== undefined} openAccept={accept !== undefined} themePref={pref} />
+      <PortalView data={data} paid={paid !== undefined} justAccepted={accepted !== undefined} openAccept={accept !== undefined} themePref={pref} preview={preview} />
     </>
   );
 }

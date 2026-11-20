@@ -1,13 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { forgetProject, registerPortalWorker, rememberedProject } from './InstallApp';
 
 /** The last 6 of the inverter's serial number, and the postcode → their portal. */
-export function PortalLogin() {
+export function PortalLogin({ forget = false }: { forget?: boolean }) {
   const [serial, setSerial] = useState('');
   const [postcode, setPostcode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+
+  // "Forget it on this device", or a project this phone remembers (the home-screen app on an iPhone keeps its own storage).
+  useEffect(() => {
+    registerPortalWorker();
+    if (forget) return forgetProject();
+    const t = rememberedProject();
+    if (!t || !/^[A-Za-z0-9_-]{16,64}$/.test(t)) return;
+    // Only if that project still opens (a closed one would land on "not found" every time).
+    void fetch(`/my/${t}`, { method: 'HEAD', cache: 'no-store' })
+      .then((r) => (r.ok ? window.location.replace(`/my/${t}`) : forgetProject()))
+      .catch(() => null);
+  }, [forget]);
 
   async function go(e: React.FormEvent) {
     e.preventDefault();
@@ -28,7 +41,7 @@ export function PortalLogin() {
   }
 
   return (
-    <form className="pt-card pt-login" onSubmit={go}>
+    <form className="pt-card pt-login pt-action" onSubmit={go}>
       <h2>Open your project</h2>
       <p>Enter the last 6 characters of your inverter’s serial number, and your postcode.</p>
       <label className="pt-login__field">

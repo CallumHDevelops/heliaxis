@@ -27,10 +27,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
     db.from('crm_documents').select('*').eq('id', id).eq('project_id', p.id).maybeSingle(),
     signable.order('created_at', { ascending: false }).limit(1),
   ]);
-  if (!d) return new NextResponse('Not found', { status: 404 });
+  const q0 = new URL(req.url).searchParams;
+  if (!d) {
+    // The proposal pack's universal documents (MCS Customer Commitment, Consumer Code leaflet, complaints procedure…)
+    // live once in the library (proposal-library.sql), the same on every job: any portal can open them.
+    const { data: lib } = await db.from('crm_library').select('*').eq('id', id).not('proposal_slot', 'is', null).is('archived_at', null).maybeSingle().then((r) => r, () => ({ data: null }));
+    if (!lib?.storage_path) return new NextResponse('Not found', { status: 404 });
+    const libUrl = await signedDoc(lib.storage_path, 300, q0.has('download') ? lib.name : undefined);
+    return libUrl ? NextResponse.redirect(libUrl) : new NextResponse('Not found', { status: 404 });
+  }
   const isQuote = id === p.accepted_document_id || (!p.accepted_at && toSign?.[0]?.id === id);
   // Only the quote-only page serves a document that isn't marked visible (and the signed one stays viewable).
-  if (!(p.mode === 'quote' ? isQuote : d.visible || id === p.accepted_document_id)) return new NextResponse('Not found', { status: 404 });
+  // The quote-only page also opens the proposal pack's documents once they're marked visible (covering letter, contract…).
+  if (!(p.mode === 'quote' ? isQuote || (d.visible && !!d.proposal_slot && !d.archived_at) : d.visible || id === p.accepted_document_id)) return new NextResponse('Not found', { status: 404 });
   const q = new URL(req.url).searchParams;
   // A customer looking at the quote they were sent: noted on the job (once), not the signed copy afterwards.
   if (isQuote && !p.accepted_at) after(() => recordQuoteEvent({ id: p.id, enquiry_id: p.enquiry_id, owner_id: p.owner_id as string | null, title: p.title }, 'viewed_pdf').then(() => null, () => null));

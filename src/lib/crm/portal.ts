@@ -9,6 +9,7 @@ import { stripeConfigured } from '@/lib/stripe';
 import { portalHandover } from '@/lib/handover/portal';
 import { mergedInto } from './aliases';
 import { hasPrintVersion } from '@/lib/documents/print-shared';
+import { portalExtras } from './portal-extra';
 
 const TOKEN = /^[A-Za-z0-9_-]{16,64}$/;
 
@@ -89,7 +90,10 @@ export async function loadPortal(token: string) {
   // Once handover.sql has run, the handover pack is its own section, grouped and in pack order
   // (src/lib/handover/portal.ts); the documents in it aren't listed again below.
   const handover = full ? await portalHandover(p.id).catch(() => null) : null;
-  const inPack = new Set(handover?.ids ?? []);
+  // The proposal pack, money, dated history, equipment and warranties (portal-extra.ts). Best-effort.
+  const sw = await proposalSwitch().catch(() => ({ on: false, ready: false }));
+  const extras = await portalExtras(db, p, docs, { full, proposalReady: sw.ready }).catch(() => null);
+  const inPack = new Set([...(handover?.ids ?? []), ...(extras?.proposal?.ids ?? [])]);
   const ordered = handover
     ? visible.filter((d) => !inPack.has(d.id) && !(d as { handover_slot?: string | null }).handover_slot && d.category !== 'handover')
     : [...visible.filter((d) => d.category === 'handover'), ...visible.filter((d) => d.category !== 'handover')];
@@ -97,7 +101,6 @@ export async function loadPortal(token: string) {
   const hasSigned = isSigned(p, docs);
   // The proposal pack's accept check (src/lib/proposal): off unless PROPOSAL_PACK is "on" and proposal-pack.sql has run.
   // `held`: they pressed Accept while the contract was still being finished (they have not signed).
-  const sw = await proposalSwitch().catch(() => ({ on: false, ready: false }));
   const pack = { on: sw.on && sw.ready, held: sw.on && sw.ready && !!p.accepted_pending_at && !p.accepted_at };
   return {
     token,
@@ -139,6 +142,9 @@ export async function loadPortal(token: string) {
     /** The quote has a design proposal: the interactive page at /my/<token>/proposal is there to explore. */
     pack,
     hasProposal: !!(quoteRows?.[0]?.content as { proposal?: { options?: unknown[] } } | undefined)?.proposal?.options?.length,
+    extras,
+    hestia: !!process.env.ANTHROPIC_API_KEY,
+    phone: process.env.NEXT_PUBLIC_PHONE_NUMBER || '01633 965205',
     whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || null,
     email: process.env.MS_MAILBOX || 'hello@heliaxis.co.uk',
   };

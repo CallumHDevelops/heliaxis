@@ -33,18 +33,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const p = await projectByToken(token);
   if (!p) return reply({ error: 'Not found' }, 404);
   const b = await req.json().catch(() => ({}));
-  const text = String(b.body || '').trim().slice(0, MAX_MESSAGE);
-  if (!text) return reply({ error: 'Write your message first.' }, 400);
+  // "Log a complaint" in the portal: the same conversation, marked as a complaint so it's dealt with under the complaints procedure.
+  const complaint = b.kind === 'complaint';
+  const typed = String(b.body || '').trim().slice(0, MAX_MESSAGE);
+  if (!typed) return reply({ error: 'Write your message first.' }, 400);
+  const text = complaint ? `Complaint: ${typed}` : typed;
   if ((await recentFromCustomer(p.id)) >= HOURLY_LIMIT) return reply({ error: 'You have sent a lot of messages in a short time. Please wait a little, or call us.' }, 429);
   const db = createAdminClient();
   const { error } = await db.from('portal_messages').insert({ project_id: p.id, enquiry_id: p.enquiry_id, direction: 'in', body: text });
   if (error) return reply({ error: 'Couldn’t send your message just now. Please try again, or message us on WhatsApp.' }, 500);
-  await logActivity({ enquiryId: p.enquiry_id, projectId: p.id, kind: 'note', body: `💬 Message from the customer (portal): ${text.length > 400 ? `${text.slice(0, 400)}…` : text}` });
+  await logActivity({ enquiryId: p.enquiry_id, projectId: p.id, kind: 'note', body: `${complaint ? '⚠️ COMPLAINT from the customer (portal)' : '💬 Message from the customer (portal)'}: ${text.length > 400 ? `${text.slice(0, 400)}…` : text}` });
   await db.from('crm_projects').update({ sequence_stopped_at: new Date().toISOString() }).eq('id', p.id).is('sequence_stopped_at', null).then(() => null, () => null);
   after(async () => {
     const { data: people } = await db.from('profiles').select('*').eq('status', 'approved');
     const team = (people ?? []).filter((x) => canAccess(x, 'crm')).map((x) => x.id as string);
-    await Promise.all(team.map((userId) => notify({ userId, kind: 'crm_portal_message', title: `💬 Message from ${p.title}`, body: text.slice(0, 140), href: `/admin/crm/${p.id}`, tag: `crm-msg-${p.id}` })));
+    await Promise.all(team.map((userId) => notify({ userId, kind: 'crm_portal_message', title: complaint ? `⚠️ Complaint from ${p.title}` : `💬 Message from ${p.title}`, body: text.slice(0, 140), href: `/admin/crm/${p.id}`, tag: `crm-msg-${p.id}` })));
   });
   return reply({ ok: true });
 }

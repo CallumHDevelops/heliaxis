@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import type { PortalHandover } from '@/lib/handover/portal';
 import { PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
+import { ComingRow, DocGroup, DocRow, Icon } from './parts';
 
 /**
  * "Your handover pack" in the customer's portal (screens C1, C2): Download everything first once it's
@@ -13,64 +14,39 @@ import { PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-share
  */
 
 const size = (n: number | null) => (n ? (n >= 1024 * 1024 ? `${Math.round(n / 1024 / 1024)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`) : '');
-// Month names spelt here: Node and the browser disagree on "Sep" and "Sept", which breaks hydration.
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const ukParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', day: 'numeric', month: 'numeric', year: 'numeric' });
-const day = (iso: string) => {
-  const p = Object.fromEntries(ukParts.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
-  return `${p.day} ${MONTHS[Number(p.month) - 1]} ${p.year}`;
-};
 
-export function HandoverSection({ token, data }: { token: string; data: PortalHandover }) {
+/** `signs`: false when the signature cards are shown on the Home tab instead (as the next thing to do). */
+export function HandoverSection({ token, data, signs = true }: { token: string; data: PortalHandover; signs?: boolean }) {
+  const href = data.pack ? `/api/my/${token}/doc/${data.pack.id}` : '';
   return (
-    <section className="pt-card pt-handover" aria-label="Your handover pack">
-      <h2>Your handover pack</h2>
-      <p className="pt-muted">Your certificates, warranties and guides, all in one place.</p>
+    <section className="pt-card pt-handover" aria-label="Your handover pack" id="pt-handover">
+      <div className="pt-card-head">
+        <span className="pt-badge ok">{data.sent ? 'Ready' : 'Being prepared'}</span>
+        <h2>Your handover pack</h2>
+        <p className="pt-muted">Your certificates, warranties and guides. Keep them safe: you’ll need them if you sell your home.</p>
+      </div>
       {data.pack && (
-        <a className="pt-btn pt-hv-all" href={`/api/my/${token}/doc/${data.pack.id}`} target="_blank" rel="noreferrer">
-          Download everything (PDF{data.pack.size ? `, ${size(data.pack.size)}` : ''})
-        </a>
-      )}
-      {data.pack && (
-        <a className="pt-hv-print pt-hv-print--all" href={printHref(`/api/my/${token}/doc/${data.pack.id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
-          {PRINT_LABEL}: everything, without the colour, to save ink
-        </a>
-      )}
-      {data.signs.map((s) => (
-        <SignCard key={s.kind} token={token} sign={s} />
-      ))}
-      {data.groups.map((g) => (
-        <div key={g.title} className="pt-hv-group">
-          <h3>{g.title}</h3>
-          <ul className="pt-hv-items">
-            {g.items.map((i) => (
-              <li key={`${i.code}-${i.title}`} className={i.coming ? 'is-coming' : i.docs.length > 1 ? 'is-multi' : ''}>
-                <div className="pt-hv-item">
-                  <b>{i.title}</b>
-                  {i.line && <small>{i.line}</small>}
-                </div>
-                {i.coming ? (
-                  <span className="pt-hv-coming">On its way</span>
-                ) : (
-                  <span className="pt-hv-docs">
-                    {i.docs.map((d) => (
-                      <span key={d.id} className="pt-hv-doc">
-                        <a href={`/api/my/${token}/doc/${d.id}`} target="_blank" rel="noreferrer" title={`${d.name} · ${day(d.at)}`}>
-                          {i.docs.length > 1 ? d.name : 'View'}
-                        </a>
-                        {d.print && (
-                          <a className="pt-hv-print" href={printHref(`/api/my/${token}/doc/${d.id}`)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
-                            {PRINT_LABEL}
-                          </a>
-                        )}
-                      </span>
-                    ))}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
+        <div className="pt-all">
+          <a className="pt-btn" href={href} target="_blank" rel="noreferrer">
+            <Icon name="view" size={18} /> View the whole pack
+          </a>
+          <a className="pt-btn ghost" href={`${href}?download=1`}>
+            <Icon name="download" size={18} /> Download (PDF{data.pack.size ? `, ${size(data.pack.size)}` : ''})
+          </a>
+          <a className="pt-doc-print pt-all-print" href={printHref(href)} target="_blank" rel="noreferrer" title={PRINT_TITLE}>
+            {PRINT_LABEL}: the whole pack without the colour, to save ink
+          </a>
         </div>
+      )}
+      {signs && data.signs.map((s) => <SignCard key={s.kind} token={token} sign={s} />)}
+      {data.groups.map((g) => (
+        <DocGroup key={g.title} title={g.title}>
+          {g.items.flatMap((i) =>
+            i.coming
+              ? [<ComingRow key={`${i.code}-${i.title}`} title={i.title} line={i.line} />]
+              : i.docs.map((d, k) => <DocRow key={d.id} token={token} doc={d} label={i.docs.length > 1 ? d.name : i.title} line={k === 0 ? i.line : undefined} />)
+          )}
+        </DocGroup>
       ))}
       <div className="pt-hv-now">
         <h3>What to do now</h3>
@@ -85,7 +61,7 @@ export function HandoverSection({ token, data }: { token: string; data: PortalHa
 }
 
 /** C2: their own signature for one document, with what they're confirming above it. */
-function SignCard({ token, sign }: { token: string; sign: PortalHandover['signs'][number] }) {
+export function SignCard({ token, sign }: { token: string; sign: PortalHandover['signs'][number] }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [sig, setSig] = useState<string | null>(null);
