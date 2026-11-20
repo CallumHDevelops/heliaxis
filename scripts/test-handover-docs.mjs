@@ -170,7 +170,7 @@ const docs = {};
 docs['HX-HO-01'] = await D.cover.makeCoverLetter(must(I.coverInput(f, views)));
 await check('HX-HO-01', docs['HX-HO-01'], ['Covering letter', 'HX-HO-01 · PROJECT HX-0042', 'Dear Jane,', '12 × JA Solar JAM54S30 440 solar panels (5.28 kWp)', 'MCS-00123456', 'HIES · HIES-998877', 'Smart Export Guarantee', 'Callum Hughes', 'Enclosed']);
 docs['HX-HO-06'] = await D.warranty.makeWarranty(must(I.warrantyInput(f)));
-await check('HX-HO-06', docs['HX-HO-06'], ['Heliaxis workmanship warranty', 'HX-HO-06 · Issue 1', '10 years from 3 November 2026', 'FIXTURE WORDING', 'HIES, policy HIES-998877', 'Your statutory rights are not affected.']);
+await check('HX-HO-06', docs['HX-HO-06'], ['Heliaxis workmanship warranty', 'HX-HO-06 · Issue 1', '10 years from 3 November 2026', 'FIXTURE WORDING', 'HIES insurance-backed guarantee, policy HIES-998877', 'Your statutory rights are not affected.']);
 docs['HX-HO-08'] = await D.completion.makeCompletion(must(I.completionInput(f)), load);
 await check('HX-HO-08', docs['HX-HO-08'], ['Completion sign-off', 'HX-HO-08 · Issue 1', '2 and 3 November 2026', 'One cracked ridge tile to replace', '12 November 2026', 'Signed on the Heliaxis app', 'Dave Price, Price Electrical']);
 docs['HX-HO-15-SHEET'] = await D.g98.makeG98Sheet(must(I.g98Input(f)), load);

@@ -45,7 +45,7 @@ eq(
   [...S.PACK_ITEMS].sort((a, b) => a.order - b.order).map((s) => s.code),
   ['HX-HO-01', 'HX-HO-02', 'HX-HO-03', 'HX-HO-04', 'HX-BAT-04', 'HX-HO-05', 'HX-HP-04', 'HX-HO-06', 'HX-HO-07', 'HX-HO-08', 'HX-HO-09', 'HX-HO-10', 'HX-HO-11', 'HX-HO-12', 'HX-HO-13', 'HX-HO-14', 'HX-HP-05', 'HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-BAT-03', 'HX-HP-02', 'HX-HP-03', 'HX-HO-15', 'HX-HO-16', 'HX-HO-21', 'HX-HO-17', 'HX-HO-18', 'HX-HO-20', 'HX-HO-19']
 );
-eq('"Which is it?" ends with Something else; the office’s uploads (the G98 notice, the estimate page, the PAS 63100 papers) are offered', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Battery location statement (PAS 63100)', 'Building Regulations certificate', 'Heat pump handover certificate', 'Warranty insurance policy', 'Solar estimate, shading and care', 'Wiring diagram (schematic)', 'Design calculations', 'Ground loop design', 'Battery location check (PAS 63100)', 'Heat pump commissioning checklist', 'Cylinder commissioning checklist', 'G98 notice as sent', 'G99 papers', 'DNO notice for an EV charger or heat pump', 'Final invoice', 'Construction phase plan', 'Something else']);
+eq('"Which is it?" ends with Something else; the office’s uploads (the G98 notice, the estimate page, the PAS 63100 papers) are offered', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Battery location statement (PAS 63100)', 'Building Regulations certificate', 'Heat pump handover certificate', 'QualityMark guarantee certificate', 'Solar estimate, shading and care', 'Wiring diagram (schematic)', 'Design calculations', 'Ground loop design', 'Battery location check (PAS 63100)', 'Heat pump commissioning checklist', 'Cylinder commissioning checklist', 'G98 notice as sent', 'G99 papers', 'DNO notice for an EV charger or heat pump', 'Final invoice', 'Construction phase plan', 'Something else']);
 
 /* ── Applies: technologies and the DNO route ──────────────────────────────── */
 
@@ -109,7 +109,7 @@ eq('the EIC made in the app, signed off but its design part not signed: Missing,
 eq('MCS certificate: Waiting, due in 10 working days', [part['HX-HO-03'].state, part['HX-HO-03'].why, part['HX-HO-03'].due], ['waiting', 'Due Tue 17 Nov (10 working days)', '2026-11-17']);
 eq('warranty insurance: Waiting until the MCS certificate', [part['HX-HO-07'].state, part['HX-HO-07'].why], ['waiting', 'After the MCS certificate.']);
 eq('warranty insurance: Missing once the MCS certificate’s number is saved, or the certificate is uploaded', [byCode(S.slotStates(ctx({ paperwork: { mcs_cert_no: 'MCS-123' } })))['HX-HO-07'].state, byCode(S.slotStates(ctx({ docs: [doc('HX-HO-03', { source: 'upload', key: null })] })))['HX-HO-07'].fix], ['missing', 'upload']);
-eq('…with its 7 days once they start', byCode(S.slotStates(ctx({ paperwork: { mcs_cert_no: 'MCS-123', mcs_registered_on: '2026-11-12' }, due: { ...ctx().due, cc16: '2026-11-19' } })))['HX-HO-07'].why, 'Buy the warranty insurance and upload the policy. Due Thu 19 Nov (7 days).');
+eq('…with its 7 days once they start', byCode(S.slotStates(ctx({ paperwork: { mcs_cert_no: 'MCS-123', mcs_registered_on: '2026-11-12' }, due: { ...ctx().due, cc16: '2026-11-19' } })))['HX-HO-07'].why, 'Register the QualityMark guarantee and upload its certificate. Due Thu 19 Nov (7 days).');
 eq('Building Control: Missing (Heliaxis notifies), due in 30 days', [part['HX-HO-05'].state, part['HX-HO-05'].fix], ['missing', 'notify-bc']);
 eq('Building Control by the electrician’s scheme: Waiting for them', byCode(S.slotStates(ctx({ partPBy: 'self' })))['HX-HO-05'].why, 'Waiting for Dave to notify their scheme and send the reference.');
 eq('system summary: Missing until the design part is signed', [part['HX-HO-02'].state, part['HX-HO-02'].fix], ['missing', 'sign-design']);
@@ -242,7 +242,7 @@ eq('estimate page: with verified wording (fixture), ready', I.shadingInput(facts
 
 eq('workmanship warranty: no term set, Missing, upload your own', [I.warrantyInput(facts()).ok, I.warrantyInput(facts()).fix], [false, 'settings']);
 const w = I.warrantyInput(facts({ settings: { ...settings, warrantyYears: 10, warrantyStart: 'commissioning', warrantyText: 'Our wording.' } }));
-eq('workmanship warranty: term, start and wording set, dated from switching on; policy to follow', [w.ok, w.input.start, w.input.backedBy], [true, '2026-11-03', null]);
+eq('workmanship warranty: term, start and wording set, dated from switching on; policy to follow', [w.ok, w.input.start, w.input.backedBy], [true, '2026-11-03', 'QualityMark insurance-backed guarantee (policy number to follow)']);
 
 eq('completion sign-off: Waiting for the customer to sign', I.completionInput(facts()).why, 'Waiting for Jane to sign (on the electrician’s phone or in their portal).');
 const sig = { name: 'Jane Smith', signed_at: '2026-11-03T17:50:00Z', path: 'signatures/p1/site-s1-cust-completion.png', via: 'phone' };

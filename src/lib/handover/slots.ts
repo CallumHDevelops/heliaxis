@@ -238,7 +238,7 @@ export const SLOTS: SlotDef[] = [
   {
     code: 'HX-HO-07',
     title: 'Warranty insurance',
-    customer: 'The insurance that backs our warranty if we ever stopped trading.',
+    customer: 'Your QualityMark insurance-backed guarantee: it backs our warranty if we ever stopped trading.',
     group: 'warranties',
     tech: ['solar', 'battery', 'heatpump'],
     kind: 'C',
@@ -246,7 +246,7 @@ export const SLOTS: SlotDef[] = [
     order: 70,
     applies: mcs,
     category: 'warranty',
-    pick: 'Warranty insurance policy',
+    pick: 'QualityMark guarantee certificate',
   },
   {
     code: 'HX-HO-08',
@@ -750,7 +750,7 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       if (docs.length) return docsState(docs);
       // Once the MCS certificate is in (registered, its number saved or the certificate uploaded).
       if (p.mcs_registered_on || p.mcs_cert_no || c.docs.some((x) => x.slot === 'HX-HO-03'))
-        return { state: 'missing', why: `Buy the warranty insurance and upload the policy.${c.due.cc16 ? ` ${dueWords(c.due.cc16, '7 days')}.` : ''}`, due: c.due.cc16 ?? null, fix: 'upload' };
+        return { state: 'missing', why: `Register the QualityMark guarantee and upload its certificate.${c.due.cc16 ? ` ${dueWords(c.due.cc16, '7 days')}.` : ''}`, due: c.due.cc16 ?? null, fix: 'upload' };
       return { state: 'waiting', why: 'After the MCS certificate.' };
     case 'HX-HO-05':
       if (docs.length) return docsState(docs);

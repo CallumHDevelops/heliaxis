@@ -8,7 +8,7 @@
  * Bump TERMS_VERSION whenever any wording here changes: it goes into each document's inputs, so
  * contracts not yet signed are made again with the new words (signed ones are never touched).
  */
-export const TERMS_VERSION = 'terms-1 (20 Nov 2026)';
+export const TERMS_VERSION = 'terms-2 (20 Nov 2026)';
 
 /** Facts about the company and its schemes that the contract names. Check them when anything changes. */
 export const TERMS_FACTS = {
@@ -16,6 +16,8 @@ export const TERMS_FACTS = {
   quoteValidDays: 30,
   /** The insurer that protects deposits and advance payments (RECC). */
   depositInsurer: 'Peacock Insurance',
+  /** Who provides the insurance-backed guarantee (IBG) on our workmanship warranty. */
+  ibgProvider: 'QualityMark',
   /** Who insures Heliaxis for damage to people and property. */
   liabilityInsurer: 'Open Underwriting',
   /** MCS certification body (Heliaxis's MCS number is NAP-…: NAPIT). */
@@ -157,7 +159,7 @@ export function contractClauses(o: { warrantyYears: number | null; solar: boolea
       paras: [
         [
           o.warrantyYears ? `We guarantee our workmanship for ${o.warrantyYears} years from the day the system is switched on.` : 'We guarantee our workmanship, as our written warranty sets out.',
-          'The equipment also carries its manufacturers’ warranties, and our workmanship warranty is backed by an insurance policy in case we stop trading. We will give you all of these in writing in your handover pack and go through them with you.',
+          `The equipment also carries its manufacturers’ warranties, and our workmanship warranty is backed by an insurance-backed guarantee from ${TERMS_FACTS.ibgProvider} in case we stop trading. We will give you all of these in writing in your handover pack and go through them with you.`,
         ].join(' '),
       ],
     },

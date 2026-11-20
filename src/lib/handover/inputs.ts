@@ -255,7 +255,7 @@ export function coverInput(f: HandoverFacts, views: SlotView[]): Made<CoverInput
   if (cert) refs.push(['Electrical certificate', cert]);
   if (f.job.dno.ref) refs.push(['DNO reference', f.job.dno.ref]);
   if (p.building_regs_ref) refs.push(['Building Control', p.building_regs_ref]);
-  if (p.ibg_ref || p.ibg_provider) refs.push(['Guarantee', [p.ibg_provider, p.ibg_ref].filter(Boolean).join(' · ')]);
+  if (p.ibg_ref) refs.push(['Guarantee', [p.ibg_provider || IBG_PROVIDER, p.ibg_ref].join(' · ')]);
   const next: string[] = [];
   if (has(f, 'solar'))
     next.push('Apply for the Smart Export Guarantee (SEG) with an energy supplier, so you’re paid for the electricity you export. They’ll ask for your MCS certificate and your export MPAN (your supplier can tell you this).');
@@ -295,7 +295,7 @@ export function warrantyInput(f: HandoverFacts): Made<WarrantyInput> {
       start,
       startRule: s.warrantyStart,
       text: s.warrantyText,
-      backedBy: p.ibg_ref || p.ibg_provider ? [p.ibg_provider, p.ibg_ref ? `policy ${p.ibg_ref}` : null].filter(Boolean).join(', ') : null,
+      backedBy: `${p.ibg_provider || IBG_PROVIDER} insurance-backed guarantee${p.ibg_ref ? `, policy ${p.ibg_ref}` : ' (policy number to follow)'}`,
       installed: installedLines(f),
     },
   };
@@ -612,6 +612,9 @@ export function summaryInput(f: HandoverFacts): Made<SummaryInput> {
     },
   };
 }
+
+/** Heliaxis's insurance-backed guarantee provider, unless a job's Paperwork names another. */
+export const IBG_PROVIDER = 'QualityMark';
 
 /** HX-HO-09's own page: how to switch this house's system off, from where the switches are. */
 export const SWITCH_FIELDS: { key: 'cu' | 'ac' | 'dc' | 'battery'; label: string; hint: string; for?: Tech }[] = [
