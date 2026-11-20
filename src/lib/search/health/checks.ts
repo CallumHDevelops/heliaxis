@@ -5,6 +5,8 @@
  * Check keys, as stored in seo_health.check_key: index | sitemap | orphan | canonical | schema | lighthouse | crawlers | llms.
  */
 
+import { isTrackableAnalyticsPath } from '@/lib/analytics-paths';
+
 export const HEALTH_CHECKS = ['index', 'sitemap', 'orphan', 'canonical', 'schema', 'lighthouse', 'crawlers', 'llms'] as const;
 export type HealthCheck = (typeof HEALTH_CHECKS)[number];
 
@@ -64,6 +66,8 @@ export function keyPages(o: { gsc?: { page: string; impressions: number }[]; pin
   const out: string[] = [];
   for (const p of ['/', ...ranked, ...(o.pinned ?? []).map((x) => toPath(x, o.host)).filter((x): x is string => !!x), ...(o.sitemap ?? [])]) {
     if (out.length >= n) break;
+    // Sign-in, admin and personal links are never meant to be indexed (the same list the analytics use).
+    if (!isTrackableAnalyticsPath(p)) continue;
     if (!out.includes(p)) out.push(p);
   }
   return out;

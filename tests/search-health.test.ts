@@ -61,6 +61,11 @@ describe('paths and the sitemap', () => {
     expect(sitemapStatus([{ path: `${BASE}/sitemap.xml`, errors: '2' }], `${BASE}/sitemap.xml`)).toMatchObject({ ok: false, errors: 2 });
   });
 
+  it('never picks sign-in, admin or personal pages as key pages', () => {
+    const pages = keyPages({ host: HOST, gsc: [{ page: `${BASE}/login`, impressions: 99 }, { page: `${BASE}/admin/search`, impressions: 50 }, { page: `${BASE}/solar-panels`, impressions: 5 }], sitemap: [] }, 50);
+    expect(pages).toEqual(['/', '/solar-panels']);
+  });
+
   it('picks key pages: home, Search Console impressions, pinned, then the sitemap', () => {
     const pages = keyPages(
       {
