@@ -1,5 +1,5 @@
 /**
- * The customer portal's service worker (scope /my), so phones offer to install it as an app. It keeps
+ * The customer portal's service worker (scope /my, or / on portal.heliaxis.co.uk, where it's /sw.js), so phones offer to install it as an app. It keeps
  * nothing private: pages and /api always come from the network; only when there's no signal does a page
  * fall back to the site's offline page. Served from a route so each deploy is a new version.
  */
@@ -23,5 +23,5 @@ self.addEventListener('fetch', (e) => {
 `;
 
 export function GET() {
-  return new Response(script, { headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/my' } });
+  return new Response(script, { headers: { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/' } });
 }

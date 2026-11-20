@@ -1,4 +1,5 @@
 import 'server-only';
+import { customerPortalOrigin } from './portal-url';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePortal } from '@/lib/auth';
 import { clearLeadNotifications } from '@/lib/notify';
@@ -265,7 +266,10 @@ export async function fingerprintDocument(docId: string): Promise<string | null>
 /* ── Customer portal ─────────────────────────────────────────────────────────── */
 
 export const siteUrl = () => (process.env.NEXT_PUBLIC_SITE_URL || 'https://heliaxis.co.uk').replace(/\/$/, '');
-export const portalUrl = (token: string) => `${siteUrl()}/my/${token}`;
+/** The customer's portal link (portal.heliaxis.co.uk/<token> on the live site; src/lib/crm/portal-url.ts). */
+export const portalUrl = (token: string) => `${customerPortalOrigin(siteUrl())}/${token}`;
+/** Where a customer opens their portal with their inverter serial and postcode. */
+export const portalSignInUrl = () => customerPortalOrigin(siteUrl());
 
 /**
  * The opportunity's private customer link (created on first use). It opens as a quote-only page

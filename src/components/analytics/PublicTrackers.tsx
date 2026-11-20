@@ -37,9 +37,9 @@ if (typeof window !== 'undefined') rememberFirstTouch();
  * Google Analytics only once the visitor has accepted cookies.
  * /admin, /login, /register, /pending, /preview and the personal /my/ and /book/ links never get trackers.
  */
-export function PublicTrackers() {
+export function PublicTrackers({ off = false }: { /** The customer portal's own address: nothing at all. */ off?: boolean }) {
   const pathname = usePathname();
-  const isPublic = isTrackableAnalyticsPath(pathname || '');
+  const isPublic = !off && isTrackableAnalyticsPath(pathname || '');
   const consent = useConsent();
 
   // GA already loaded earlier in this visit stays quiet after a Reject, and on any personal link

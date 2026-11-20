@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { syncThemeMetas } from '@/lib/theme/client';
 import { themeRouteFor } from '@/lib/theme/routes';
+import { isCustomerHost } from '@/lib/crm/portal-url';
 
 declare global {
   interface Window {
@@ -31,7 +32,9 @@ export function ThemeSync() {
   }, []);
   useEffect(() => {
     const d = document.documentElement;
-    const route = themeRouteFor(pathname ?? location.pathname);
+    const path = pathname ?? location.pathname;
+    // portal.heliaxis.co.uk shows the /my pages at its own paths (the middleware rewrites them).
+    const route = themeRouteFor(isCustomerHost(location.host) && !/^\/my(\/|$)/.test(path) ? `/my${path === '/' ? '' : path}` : path);
     if ((route?.scope ?? null) !== (d.getAttribute('data-theme-scope') || null)) {
       location.reload();
       return;

@@ -4,6 +4,7 @@ import { updateSession } from '@/lib/supabase/middleware';
 import { canAccess, HUB_PATH, portalForPath } from '@/lib/portals';
 import { ATTR_COOKIE, attrCookieOptions, attributionFromUrl, CONSENT_COOKIE, hasConsent, isTagged } from '@/lib/attribution';
 import { encodeThemeRoute, themeRouteFor } from '@/lib/theme/routes';
+import { isCustomerHost, isMainHost, CUSTOMER_ORIGIN, onCustomerHost } from '@/lib/crm/portal-url';
 import { profileThemeToAdopt, THEME_AT_COOKIE, THEME_COOKIE, themeCookieOptions, THEME_ROUTE_HEADER } from '@/lib/theme/shared';
 
 const AUTH_PATHS = ['/login', '/register', '/pending'];
@@ -16,6 +17,29 @@ export async function middleware(request: NextRequest) {
   // bar colours (src/lib/theme/routes.ts). Set on the request in place, so every
   // NextResponse.next({ request }) below passes it on (and a value sent by the browser never is).
   request.headers.set(THEME_ROUTE_HEADER, encodeThemeRoute(themeRouteFor(pathname)));
+
+  // --- Customer portal (portal.heliaxis.co.uk): its own address over the /my pages (src/lib/crm/portal-url.ts) ---
+  // "/" is the sign-in page and "/<token>" a project; /my/... typed here loses the /my. Files (other than the
+  // portal's own manifest and service worker) pass through untouched.
+  if (isCustomerHost(hostname)) {
+    if (pathname === '/my' || pathname.startsWith('/my/')) {
+      const url = request.nextUrl.clone();
+      url.pathname = onCustomerHost(pathname);
+      return NextResponse.redirect(url, 308);
+    }
+    const last = pathname.split('/').pop() ?? '';
+    if (last.includes('.') && last !== 'manifest.webmanifest' && last !== 'sw.js') return NextResponse.next({ request });
+    const url = request.nextUrl.clone();
+    url.pathname = pathname === '/' ? '/my' : `/my${pathname}`;
+    request.headers.set(THEME_ROUTE_HEADER, encodeThemeRoute(themeRouteFor(url.pathname)));
+    return NextResponse.rewrite(url, { request });
+  }
+  // Old heliaxis.co.uk/my links (already sent to customers) go to the portal's own address. Not while a member
+  // of staff is using "View as customer" (hx_portal_preview, src/lib/crm/portal-preview.ts): that stays here,
+  // where their sign-in is.
+  if (isMainHost(hostname) && (pathname === '/my' || pathname.startsWith('/my/')) && !request.cookies.get('hx_portal_preview')) {
+    return NextResponse.redirect(`${CUSTOMER_ORIGIN}${onCustomerHost(pathname)}${request.nextUrl.search}`, 308);
+  }
 
   // --- Subcontractor portal subdomain (subcontractor.heliaxis.co.uk) ---
   // Serves only the token-gated /portal app; anything else lands on the portal home.

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { isCustomerHost } from '@/lib/crm/portal-url';
 import { Icon } from './[token]/parts';
 
 type BIP = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> };
@@ -178,5 +179,6 @@ export const rememberedProject = () => get('hx_my_token');
 /** The portal's own service worker (scope /my): what lets Chrome offer "Install app". Production only. */
 export function registerPortalWorker() {
   if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('/my/sw.js', { scope: '/my' }).catch(() => null);
+  const here = isCustomerHost(location.host);
+  navigator.serviceWorker.register(here ? '/sw.js' : '/my/sw.js', { scope: here ? '/' : '/my' }).catch(() => null);
 }

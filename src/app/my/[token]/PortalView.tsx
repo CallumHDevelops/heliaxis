@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { SignaturePad } from '@/components/subcontractors/SignaturePad';
 import { BrandLogo } from '@/components/theme/BrandLogo';
 import { ThemeChoice } from '@/components/theme/ThemeChoice';
@@ -46,17 +46,41 @@ const fmtDate = (iso: string, withTime = false) => whenText(iso, withTime);
  * what's paid, the balance) and Help (Hestia, messages, call / WhatsApp / email, log a complaint).
  * `themePref`: their Light / Dark / Match phone as the server rendered it. `preview`: staff looking.
  */
-export function PortalView({ data, paid = false, justAccepted = false, openAccept = false, themePref = 'system', preview = false }: { data: PortalData; paid?: boolean; justAccepted?: boolean; /** Came from the quote's Accept button: the sign box opens straight away. */ openAccept?: boolean; themePref?: ThemePref; preview?: boolean }) {
+export function PortalView({
+  data,
+  paid = false,
+  justAccepted = false,
+  openAccept = false,
+  themePref = 'system',
+  preview = false,
+  base = '/my',
+}: {
+  data: PortalData;
+  /** '/my', or '' on portal.heliaxis.co.uk. */ base?: string;
+  paid?: boolean;
+  justAccepted?: boolean;
+  /** Came from the quote's Accept button: the sign box opens straight away. */ openAccept?: boolean;
+  themePref?: ThemePref;
+  preview?: boolean;
+}) {
   // This phone remembers their project, so /my and the home-screen icon open it again (never for staff previewing).
   useEffect(() => {
     if (!preview) rememberProject(data.token);
     registerPortalWorker();
   }, [data.token, preview]);
-  return data.mode === 'quote' ? <QuotePage data={data} openAccept={openAccept} themePref={themePref} /> : <FullPortal data={data} paid={paid} justAccepted={justAccepted} openAccept={openAccept} themePref={themePref} />;
+  return (
+    <BaseContext.Provider value={base}>
+      {data.mode === 'quote' ? <QuotePage data={data} openAccept={openAccept} themePref={themePref} /> : <FullPortal data={data} paid={paid} justAccepted={justAccepted} openAccept={openAccept} themePref={themePref} />}
+    </BaseContext.Provider>
+  );
 }
+
+/** Where the portal's pages are: '/my', or '' on portal.heliaxis.co.uk. */
+const BaseContext = createContext('/my');
 
 function Shell({ data, themePref, nav, children }: { data: PortalData; themePref: ThemePref; nav?: ReactNode; children: ReactNode }) {
   const ref = data.extras?.ref;
+  const base = useContext(BaseContext);
   return (
     <div className={`pt${nav ? ' has-nav' : ''}`}>
       <header className="pt-head">
@@ -79,7 +103,7 @@ function Shell({ data, themePref, nav, children }: { data: PortalData; themePref
             className="pt-foot-link"
             onClick={() => {
               forgetProject();
-              window.location.assign('/my?signout=1');
+              window.location.assign(base ? `${base}?signout=1` : '/?signout=1');
             }}
           >
             Not your project? Forget it on this device
@@ -174,7 +198,11 @@ function ComplaintSheet({ token, procedure, onClose, onSent }: { token: string; 
   async function send() {
     setBusy(true);
     setErr('');
-    const r = await fetch(`/api/my/${token}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text, kind: 'complaint' }) }).catch(() => null);
+    const r = await fetch(`/api/my/${token}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: text, kind: 'complaint' }),
+    }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     setBusy(false);
     if (!r?.ok) return setErr(d.error || 'Something went wrong. Please try again, or call us.');
@@ -223,7 +251,12 @@ function ComplaintSheet({ token, procedure, onClose, onSent }: { token: string; 
 /** Tell Heliaxis a step was reached (opened the link, started to accept, ...). Quiet, and never in the customer's way. */
 function track(token: string, type: 'opened' | 'sign_started' | 'decline_started' | 'dates_started') {
   try {
-    void fetch(`/api/my/${token}/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type }), keepalive: true }).catch(() => null);
+    void fetch(`/api/my/${token}/event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type }),
+      keepalive: true,
+    }).catch(() => null);
   } catch {
     // Tracking must never get in the way.
   }
@@ -256,7 +289,9 @@ function useAcceptIntent(data: PortalData, open: () => void) {
   async function accept() {
     if (!data.pack.on) return open();
     setBusy(true);
-    const r = await fetch(`/api/my/${data.token}/accept-intent`, { method: 'POST' }).catch(() => null);
+    const r = await fetch(`/api/my/${data.token}/accept-intent`, {
+      method: 'POST',
+    }).catch(() => null);
     const d = r?.ok ? await r.json().catch(() => ({})) : {};
     setBusy(false);
     if (d.path === 'hold') return setHeld(true);
@@ -317,6 +352,7 @@ function useQuoteFlow(data: PortalData, openAccept: boolean) {
 
 function QuoteCard({ data, flow, onQuery }: { data: PortalData; flow: ReturnType<typeof useQuoteFlow>; onQuery: () => void }) {
   const q = flow.q!;
+  const base = useContext(BaseContext);
   const href = `/api/my/${data.token}/doc/${q.id}`;
   if (flow.held)
     return (
@@ -343,7 +379,7 @@ function QuoteCard({ data, flow, onQuery }: { data: PortalData; flow: ReturnType
         </button>
       </div>
       {data.hasProposal && (
-        <a className="pt-btn ghost pt-wide" href={`/my/${data.token}/proposal`}>
+        <a className="pt-btn ghost pt-wide" href={`${base}/${data.token}/proposal`}>
           <Icon name="spark" size={18} /> Explore your design and savings
         </a>
       )}
@@ -404,33 +440,48 @@ function QuotePage({ data, openAccept, themePref }: { data: PortalData; openAcce
     <Shell data={data} themePref={themePref}>
       <Hero data={data} kicker={`Hi ${data.first}`} headline={data.accepted ? 'Thank you! Your quote is accepted' : q ? `Your ${quoteWord(q)} is ready` : 'Your quote is on its way'} />
 
-      {data.accepted ? (
-        <section className="pt-card pt-action">
-          <p className="pt-banner ok">
-            ✓ Accepted by {data.accepted.name} on {fmtDate(data.accepted.at)}.
-          </p>
-          {data.accepted.document && (
-            <ul className="pt-docs">
-              <DocRow token={data.token} doc={{ id: data.accepted.document.id, name: data.accepted.document.name }} label="What you signed" line={data.accepted.document.name} />
-            </ul>
-          )}
-          {data.deposit && !data.deposit.paidAt && <Deposit token={data.token} deposit={data.deposit} />}
-          <InstallDates token={data.token} pref={data.installPref} />
-        </section>
-      ) : q ? (
-        <QuoteCard data={data} flow={flow} onQuery={() => ask('I have a question about my quote: ')} />
-      ) : (
-        <section className="pt-card">
-          <h2>Your quote</h2>
-          <p className="pt-muted">We’re just finishing your quote and will send it over shortly.</p>
-        </section>
-      )}
+      <Split
+        side={
+          <>
+            {data.hestia && <Hestia token={data.token} suggestions={['What happens after I sign?', 'Can I cancel if I change my mind?', 'How does the deposit work?']} onHandoff={ask} />}
+            <ContactCard data={data} onMessage={() => ask('')} onComplaint={() => setComplaint(true)} />
+            <InstallApp compact />
+          </>
+        }
+      >
+        {data.accepted ? (
+          <section className="pt-card pt-action">
+            <p className="pt-banner ok">
+              ✓ Accepted by {data.accepted.name} on {fmtDate(data.accepted.at)}.
+            </p>
+            {data.accepted.document && (
+              <ul className="pt-docs">
+                <DocRow
+                  token={data.token}
+                  doc={{
+                    id: data.accepted.document.id,
+                    name: data.accepted.document.name,
+                  }}
+                  label="What you signed"
+                  line={data.accepted.document.name}
+                />
+              </ul>
+            )}
+            {data.deposit && !data.deposit.paidAt && <Deposit token={data.token} deposit={data.deposit} />}
+            <InstallDates token={data.token} pref={data.installPref} />
+          </section>
+        ) : q ? (
+          <QuoteCard data={data} flow={flow} onQuery={() => ask('I have a question about my quote: ')} />
+        ) : (
+          <section className="pt-card">
+            <h2>Your quote</h2>
+            <p className="pt-muted">We’re just finishing your quote and will send it over shortly.</p>
+          </section>
+        )}
 
-      <ProposalPack data={data} />
-      <InstallApp compact />
-      {data.hestia && <Hestia token={data.token} suggestions={['What happens after I sign?', 'Can I cancel if I change my mind?', 'How does the deposit work?']} onHandoff={ask} />}
-      <PortalMessages token={data.token} first={data.first} focus={query} prefill={prefill || 'I have a question about my quote: '} />
-      <ContactCard data={data} onMessage={() => ask('')} onComplaint={() => setComplaint(true)} />
+        <ProposalPack data={data} />
+        <PortalMessages token={data.token} first={data.first} focus={query} prefill={prefill || 'I have a question about my quote: '} />
+      </Split>
       {complaint && <ComplaintSheet token={data.token} procedure={complaintsDoc(data)} onClose={() => setComplaint(false)} onSent={() => setQuery((n) => n)} />}
       {flow.sheets}
     </Shell>
@@ -508,7 +559,11 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
       if (!iso) continue;
       const n = daysUntil(iso, now);
       if (n < 0) continue;
-      return { big: n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : `${n} days`, text: n <= 1 ? `Your ${what}` : `until your ${what}`, sub: fmtDate(iso, true) };
+      return {
+        big: n === 0 ? 'Today' : n === 1 ? 'Tomorrow' : `${n} days`,
+        text: n <= 1 ? `Your ${what}` : `until your ${what}`,
+        sub: fmtDate(iso, true),
+      };
     }
     return null;
   }, [now, data.installAt, data.surveyAt]);
@@ -529,7 +584,7 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
         <span className="pt-badge">Your next step</span>
         <h2>Pay your deposit</h2>
         <Deposit token={data.token} deposit={data.deposit} />
-      </section>
+      </section>,
     );
   if (accepted && !data.installAt)
     todo.push(
@@ -537,14 +592,14 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
         <span className="pt-badge">{todo.length ? 'Then' : 'Your next step'}</span>
         <h2>Choose your installation date</h2>
         <InstallDates token={data.token} pref={data.installPref} />
-      </section>
+      </section>,
     );
   for (const s of pack?.signs ?? [])
     todo.push(
       <section key={`sign-${s.kind}`} className="pt-card pt-action">
         <span className="pt-badge">Your next step</span>
         <SignCard token={data.token} sign={s} />
-      </section>
+      </section>,
     );
   if (pack?.pack)
     todo.push(
@@ -555,7 +610,7 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
         <button type="button" className="pt-btn" onClick={() => setTab('docs')}>
           <Icon name="docs" size={18} /> Open your documents
         </button>
-      </section>
+      </section>,
     );
   if (balanceDue && x?.money?.balance)
     todo.push(
@@ -566,7 +621,7 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
         <button type="button" className="pt-btn ghost" onClick={() => setTab('money')}>
           <Icon name="money" size={18} /> See payments and invoices
         </button>
-      </section>
+      </section>,
     );
 
   const nav = (
@@ -577,6 +632,17 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
           <span>{t.label}</span>
         </button>
       ))}
+      {data.phone && (
+        <div className="pt-nav-foot">
+          <small>Questions?</small>
+          <a href={`tel:${data.phone.replace(/\s/g, '')}`}>
+            <Icon name="phone" size={16} /> {data.phone}
+          </a>
+          <button type="button" onClick={() => ask('')}>
+            <Icon name="help" size={16} /> Message the team
+          </button>
+        </div>
+      )}
     </nav>
   );
 
@@ -585,95 +651,115 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
       {tab === 'home' && (
         <>
           <Hero data={data} kicker={`Hi ${data.first}`} headline={HEADLINE[data.stage] ?? 'Your project'} step={step} count={count} />
-          {paid && <p className="pt-banner ok">Thank you, your deposit has been paid. {accepted && !data.installAt ? 'Last step: choose your installation date below.' : ''}</p>}
-          {justAccepted && !paid && <p className="pt-banner ok">Thank you, your quote is accepted.</p>}
-          {accepted && !justAccepted && data.stage === 'won' && (
-            <p className="pt-banner ok">
-              ✓ Accepted by {accepted.name} on {fmtDate(accepted.at)}.
-            </p>
-          )}
-          {todo.length ? (
-            todo
-          ) : (
-            <section className="pt-card pt-calm">
-              <span className="pt-calm-ic" aria-hidden="true">
-                <Icon name="check" size={22} />
-              </span>
-              <div>
-                <h2>Nothing for you to do right now</h2>
-                <p className="pt-muted">{DOING[data.stage] ?? 'We’ll be in touch about the next step.'}</p>
-              </div>
-            </section>
-          )}
+          <Split
+            side={
+              <>
+                <QuickLinks data={data} setTab={setTab} />
+                <InstallApp compact />
+              </>
+            }
+          >
+            {paid && <p className="pt-banner ok">Thank you, your deposit has been paid. {accepted && !data.installAt ? 'Last step: choose your installation date below.' : ''}</p>}
+            {justAccepted && !paid && <p className="pt-banner ok">Thank you, your quote is accepted.</p>}
+            {accepted && !justAccepted && data.stage === 'won' && (
+              <p className="pt-banner ok">
+                ✓ Accepted by {accepted.name} on {fmtDate(accepted.at)}.
+              </p>
+            )}
+            {todo.length ? (
+              todo
+            ) : (
+              <section className="pt-card pt-calm">
+                <span className="pt-calm-ic" aria-hidden="true">
+                  <Icon name="check" size={22} />
+                </span>
+                <div>
+                  <h2>Nothing for you to do right now</h2>
+                  <p className="pt-muted">{DOING[data.stage] ?? 'We’ll be in touch about the next step.'}</p>
+                </div>
+              </section>
+            )}
 
-          {steps.length > 0 && (
-            <section className="pt-card">
-              <h2>Your journey</h2>
-              <ol className="pt-track">
-                {steps.map((s) => (
-                  <li key={s.key} className={s.state}>
-                    <span className="pt-dot" aria-hidden="true">
-                      {s.state === 'done' ? <Icon name="check" size={13} /> : ''}
-                    </span>
-                    <div>
-                      <b>{s.label}</b>
-                      {(s.date || s.note) && <small>{[s.date ? fmtDate(s.date, s.key === 'survey' || s.key === 'install') : '', s.note].filter(Boolean).join(' · ')}</small>}
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
+            {steps.length > 0 && (
+              <section className="pt-card">
+                <h2>Your journey</h2>
+                <ol className="pt-track">
+                  {steps.map((s) => (
+                    <li key={s.key} className={s.state}>
+                      <span className="pt-dot" aria-hidden="true">
+                        {s.state === 'done' ? <Icon name="check" size={13} /> : ''}
+                      </span>
+                      <div>
+                        <b>{s.label}</b>
+                        {(s.date || s.note) && <small>{[s.date ? fmtDate(s.date, s.key === 'survey' || s.key === 'install') : '', s.note].filter(Boolean).join(' · ')}</small>}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
 
-          {data.photos.length > 0 && (
-            <section className="pt-card">
-              <h2>Photos</h2>
-              <div className="pt-photos">
-                {data.photos.map((p) =>
-                  p.thumb ? (
-                    <button key={p.id} type="button" onClick={() => setPhoto(p.url)} aria-label={p.caption || 'Photo'}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.thumb} alt={p.caption || 'Installation photo'} loading="lazy" />
-                    </button>
-                  ) : null
-                )}
-              </div>
-            </section>
-          )}
-
-          <QuickLinks data={data} setTab={setTab} />
-          <InstallApp compact />
+            {data.photos.length > 0 && (
+              <section className="pt-card">
+                <h2>Photos</h2>
+                <div className="pt-photos">
+                  {data.photos.map((p) =>
+                    p.thumb ? (
+                      <button key={p.id} type="button" onClick={() => setPhoto(p.url)} aria-label={p.caption || 'Photo'}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.thumb} alt={p.caption || 'Installation photo'} loading="lazy" />
+                      </button>
+                    ) : null,
+                  )}
+                </div>
+              </section>
+            )}
+          </Split>
         </>
       )}
 
       {tab === 'docs' && (
         <>
           <TabTitle title="Documents" sub="Everything we’ve given you, in one place. View any document, or download it to keep." />
-          {late && pack && <HandoverSection token={data.token} data={pack} signs={false} />}
-          <ProposalPack data={data} signedNote={accepted ? `What you agreed to${accepted ? ` on ${dayText(accepted.at)}` : ''}, and the information that came with it.` : undefined} />
-          {!data.extras?.proposal && accepted?.document && (
+          <div className="pt-narrow">
+            {late && pack && <HandoverSection token={data.token} data={pack} signs={false} />}
+            <ProposalPack data={data} signedNote={accepted ? `What you agreed to${accepted ? ` on ${dayText(accepted.at)}` : ''}, and the information that came with it.` : undefined} />
+            {!data.extras?.proposal && accepted?.document && (
+              <section className="pt-card">
+                <h2>What you signed</h2>
+                <ul className="pt-docs">
+                  <DocRow
+                    token={data.token}
+                    doc={{
+                      id: accepted.document.id,
+                      name: accepted.document.name,
+                      at: accepted.at,
+                    }}
+                    line={`Signed by ${accepted.name}`}
+                  />
+                </ul>
+              </section>
+            )}
+            {!late && pack && <HandoverSection token={data.token} data={pack} signs={false} />}
+            {(x?.money?.invoices.length ?? 0) > 0 && (
+              <section className="pt-card">
+                <DocGroup title="Invoices and receipts">
+                  {x!.money!.invoices.map((d) => (
+                    <DocRow key={d.id} token={data.token} doc={d} />
+                  ))}
+                </DocGroup>
+              </section>
+            )}
             <section className="pt-card">
-              <h2>What you signed</h2>
-              <ul className="pt-docs">
-                <DocRow token={data.token} doc={{ id: accepted.document.id, name: accepted.document.name, at: accepted.at }} line={`Signed by ${accepted.name}`} />
-              </ul>
-            </section>
-          )}
-          {!late && pack && <HandoverSection token={data.token} data={pack} signs={false} />}
-          {(x?.money?.invoices.length ?? 0) > 0 && (
-            <section className="pt-card">
-              <DocGroup title="Invoices and receipts">
-                {x!.money!.invoices.map((d) => (
-                  <DocRow key={d.id} token={data.token} doc={d} />
-                ))}
+              <DocGroup title={pack || x?.proposal ? 'Other documents' : 'Your documents'}>
+                {others.length ? (
+                  others.map((d) => <DocRow key={d.id} token={data.token} doc={{ id: d.id, name: d.name, at: d.at, print: d.print }} line={DOC_LABEL[d.category]} />)
+                ) : (
+                  <li className="pt-empty">Your grid connection (DNO) letters, certificates and other documents will appear here.</li>
+                )}
               </DocGroup>
             </section>
-          )}
-          <section className="pt-card">
-            <DocGroup title={pack || x?.proposal ? 'Other documents' : 'Your documents'}>
-              {others.length ? others.map((d) => <DocRow key={d.id} token={data.token} doc={{ id: d.id, name: d.name, at: d.at, print: d.print }} line={DOC_LABEL[d.category]} />) : <li className="pt-empty">Your grid connection (DNO) letters, certificates and other documents will appear here.</li>}
-            </DocGroup>
-          </section>
+          </div>
         </>
       )}
 
@@ -689,10 +775,17 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
       {tab === 'help' && (
         <>
           <TabTitle title="Help" sub="Ask Hestia for a quick answer, or talk to the team." />
-          {data.hestia && <Hestia token={data.token} suggestions={helpSuggestions(data)} onHandoff={ask} />}
-          <PortalMessages token={data.token} first={data.first} focus={query} prefill={prefill} />
-          <ContactCard data={data} onMessage={() => ask('')} onComplaint={() => setComplaint(true)} />
-          <InstallApp />
+          <Split
+            side={
+              <>
+                <ContactCard data={data} onMessage={() => ask('')} onComplaint={() => setComplaint(true)} />
+                <InstallApp />
+              </>
+            }
+          >
+            {data.hestia && <Hestia token={data.token} suggestions={helpSuggestions(data)} onHandoff={ask} />}
+            <PortalMessages token={data.token} first={data.first} focus={query} prefill={prefill} />
+          </Split>
         </>
       )}
 
@@ -728,6 +821,16 @@ function helpSuggestions(data: PortalData): string[] {
   return ['What happens next?', 'When will I get a date?', 'What is a DNO application?'];
 }
 
+/** Phone: one column (main, then side). Desktop: the main column with a narrower one beside it. */
+function Split({ children, side }: { children: ReactNode; side: ReactNode }) {
+  return (
+    <div className="pt-split">
+      <div className="pt-split-main">{children}</div>
+      <aside className="pt-split-side">{side}</aside>
+    </div>
+  );
+}
+
 function TabTitle({ title, sub }: { title: string; sub: string }) {
   return (
     <div className="pt-tabtitle">
@@ -743,10 +846,30 @@ function QuickLinks({ data, setTab }: { data: PortalData; setTab: (t: Tab) => vo
   const docs = data.documents.length + (x?.proposal?.ids.length ?? 0) + (data.handover?.ids.length ?? 0);
   const next = x?.events.find((e) => e.planned);
   const items: { tab: Tab; icon: string; title: string; line: string }[] = [
-    { tab: 'docs', icon: 'docs', title: 'Documents', line: docs ? `${docs} to view or download` : 'Your packs and certificates' },
-    { tab: 'system', icon: 'system', title: 'My system', line: x?.equipment.length ? `${x.equipment.length} items, serials and warranties` : 'Equipment and warranties' },
-    { tab: 'money', icon: 'money', title: 'Payments', line: x?.money?.total ? (x.money.balance ? `${money(x.money.balance)} left to pay` : 'Paid in full') : 'Price, payments and invoices' },
-    { tab: 'help', icon: 'help', title: 'Help', line: data.hestia ? 'Ask Hestia or message the team' : 'Message, call or email us' },
+    {
+      tab: 'docs',
+      icon: 'docs',
+      title: 'Documents',
+      line: docs ? `${docs} to view or download` : 'Your packs and certificates',
+    },
+    {
+      tab: 'system',
+      icon: 'system',
+      title: 'My system',
+      line: x?.equipment.length ? `${x.equipment.length} items, serials and warranties` : 'Equipment and warranties',
+    },
+    {
+      tab: 'money',
+      icon: 'money',
+      title: 'Payments',
+      line: x?.money?.total ? (x.money.balance ? `${money(x.money.balance)} left to pay` : 'Paid in full') : 'Price, payments and invoices',
+    },
+    {
+      tab: 'help',
+      icon: 'help',
+      title: 'Help',
+      line: data.hestia ? 'Ask Hestia or message the team' : 'Message, call or email us',
+    },
   ];
   return (
     <>
@@ -800,82 +923,88 @@ function SystemTab({ data }: { data: PortalData }) {
   return (
     <>
       <TabTitle title="My system" sub="What we installed, its serial numbers and warranties, and every date on your project." />
-      <section className="pt-card">
-        <h2>Your equipment</h2>
-        {eq.length ? (
-          <ul className="pt-equip">
-            {eq.map((e) => (
-              <li key={e.what}>
-                <div className="pt-equip-top">
-                  <b>{e.what}</b>
-                  {(e.rating || e.count) && <span className="pt-pill">{[e.count ? `${e.count} ×` : '', e.rating].filter(Boolean).join(' ')}</span>}
-                </div>
-                {e.model && <span className="pt-equip-model">{e.model}</span>}
-                {e.serials.length > 0 && (
-                  <div className="pt-serials">
-                    <small>Serial number{e.serials.length > 1 ? 's' : ''}</small>
-                    {e.serials.map((s) => (
-                      <span key={s} className="pt-serial">
-                        <code>{s}</code>
-                        <CopyButton text={s} />
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="pt-muted">Your equipment and its serial numbers appear here once your system is designed and installed.</p>
-        )}
-      </section>
-
-      <section className="pt-card">
-        <h2>Your warranties</h2>
-        {x?.warranties.length ? (
-          <ul className="pt-warr">
-            {x.warranties.map((w) => (
-              <li key={w.title}>
-                <Icon name="shield" />
-                <div>
-                  <b>{w.title}</b>
-                  <span>{w.term}</span>
-                  <small>{w.detail}</small>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="pt-muted">Your warranty details appear here once your system is installed. The documents themselves are in your handover pack.</p>
-        )}
-      </section>
-
-      <section className="pt-card">
-        <h2>Every date on your project</h2>
-        {events.length ? (
+      <Split
+        side={
           <>
-            <ol className="pt-timeline">
-              {(all ? events : events.slice(-8)).map((e, i) => (
-                <li key={`${e.key}-${i}`} className={e.planned ? 'planned' : ''}>
-                  <time>{dayText(e.at)}</time>
-                  <b>
-                    {e.label}
-                    {e.planned && <em> planned</em>}
-                  </b>
-                  {e.detail && <small>{e.detail}</small>}
+            <section className="pt-card">
+              <h2>Every date on your project</h2>
+              {events.length ? (
+                <>
+                  <ol className="pt-timeline">
+                    {(all ? events : events.slice(-8)).map((e, i) => (
+                      <li key={`${e.key}-${i}`} className={e.planned ? 'planned' : ''}>
+                        <time>{dayText(e.at)}</time>
+                        <b>
+                          {e.label}
+                          {e.planned && <em> planned</em>}
+                        </b>
+                        {e.detail && <small>{e.detail}</small>}
+                      </li>
+                    ))}
+                  </ol>
+                  {events.length > 8 && !all && (
+                    <button type="button" className="pt-linkbtn" onClick={() => setAll(true)}>
+                      Show all {events.length} dates
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="pt-muted">Dates appear here as your project goes along.</p>
+              )}
+            </section>
+          </>
+        }
+      >
+        <section className="pt-card">
+          <h2>Your equipment</h2>
+          {eq.length ? (
+            <ul className="pt-equip">
+              {eq.map((e) => (
+                <li key={e.what}>
+                  <div className="pt-equip-top">
+                    <b>{e.what}</b>
+                    {(e.rating || e.count) && <span className="pt-pill">{[e.count ? `${e.count} ×` : '', e.rating].filter(Boolean).join(' ')}</span>}
+                  </div>
+                  {e.model && <span className="pt-equip-model">{e.model}</span>}
+                  {e.serials.length > 0 && (
+                    <div className="pt-serials">
+                      <small>Serial number{e.serials.length > 1 ? 's' : ''}</small>
+                      {e.serials.map((s) => (
+                        <span key={s} className="pt-serial">
+                          <code>{s}</code>
+                          <CopyButton text={s} />
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </li>
               ))}
-            </ol>
-            {events.length > 8 && !all && (
-              <button type="button" className="pt-linkbtn" onClick={() => setAll(true)}>
-                Show all {events.length} dates
-              </button>
-            )}
-          </>
-        ) : (
-          <p className="pt-muted">Dates appear here as your project goes along.</p>
-        )}
-      </section>
+            </ul>
+          ) : (
+            <p className="pt-muted">Your equipment and its serial numbers appear here once your system is designed and installed.</p>
+          )}
+        </section>
+
+        <section className="pt-card">
+          <h2>Your warranties</h2>
+          {x?.warranties.length ? (
+            <ul className="pt-warr">
+              {x.warranties.map((w) => (
+                <li key={w.title}>
+                  <Icon name="shield" />
+                  <div>
+                    <b>{w.title}</b>
+                    <span>{w.term}</span>
+                    <small>{w.detail}</small>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="pt-muted">Your warranty details appear here once your system is installed. The documents themselves are in your handover pack.</p>
+          )}
+        </section>
+      </Split>
     </>
   );
 }
@@ -885,63 +1014,70 @@ function MoneyTab({ data, depositDue }: { data: PortalData; depositDue: boolean 
   const pct = m?.total ? Math.min(100, Math.round((m.paid / m.total) * 100)) : 0;
   return (
     <>
-      <section className="pt-card pt-moneycard">
-        {m?.total ? (
+      <Split
+        side={
           <>
-            <div className="pt-money-row">
-              <span>Agreed price (inc. VAT)</span>
-              <b>{money(m.total)}</b>
-            </div>
-            <div className="pt-money-bar" role="img" aria-label={`${pct}% paid`}>
-              <i style={{ width: `${pct}%` }} />
-            </div>
-            <div className="pt-money-split">
-              <div>
-                <small>Paid</small>
-                <b>{money(m.paid)}</b>
-              </div>
-              <div>
-                <small>Left to pay</small>
-                <b className={m.balance ? 'due' : 'ok'}>{m.balance ? money(m.balance) : 'Nothing'}</b>
-              </div>
-            </div>
+            <section className="pt-card">
+              <DocGroup title="Invoices and receipts">{m?.invoices.length ? m.invoices.map((d) => <DocRow key={d.id} token={data.token} doc={d} />) : <li className="pt-empty">Your invoices and receipts will appear here.</li>}</DocGroup>
+            </section>
+            <p className="pt-muted pt-center">A question about a payment? Ask in Help, or call us.</p>
           </>
-        ) : (
-          <p className="pt-muted">Your agreed price will show here once it’s on your account. Your payments and invoices are below.</p>
-        )}
-      </section>
-      {depositDue && data.deposit && (
-        <section className="pt-card pt-action">
-          <span className="pt-badge">To pay now</span>
-          <h2>Your deposit</h2>
-          <Deposit token={data.token} deposit={data.deposit} />
+        }
+      >
+        <section className="pt-card pt-moneycard">
+          {m?.total ? (
+            <>
+              <div className="pt-money-row">
+                <span>Agreed price (inc. VAT)</span>
+                <b>{money(m.total)}</b>
+              </div>
+              <div className="pt-money-bar" role="img" aria-label={`${pct}% paid`}>
+                <i style={{ width: `${pct}%` }} />
+              </div>
+              <div className="pt-money-split">
+                <div>
+                  <small>Paid</small>
+                  <b>{money(m.paid)}</b>
+                </div>
+                <div>
+                  <small>Left to pay</small>
+                  <b className={m.balance ? 'due' : 'ok'}>{m.balance ? money(m.balance) : 'Nothing'}</b>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="pt-muted">Your agreed price will show here once it’s on your account. Your payments and invoices are below.</p>
+          )}
         </section>
-      )}
-      <section className="pt-card">
-        <h2>Payments received</h2>
-        {m?.payments.length ? (
-          <ul className="pt-pays">
-            {m.payments.map((p, i) => (
-              <li key={i}>
-                <span>
-                  <b>{p.label}</b>
-                  <small>
-                    {dayText(p.on)}
-                    {p.reference ? ` · ${p.reference}` : ''}
-                  </small>
-                </span>
-                <b>{money(p.amount)}</b>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="pt-muted">No payments recorded yet.</p>
+        {depositDue && data.deposit && (
+          <section className="pt-card pt-action">
+            <span className="pt-badge">To pay now</span>
+            <h2>Your deposit</h2>
+            <Deposit token={data.token} deposit={data.deposit} />
+          </section>
         )}
-      </section>
-      <section className="pt-card">
-        <DocGroup title="Invoices and receipts">{m?.invoices.length ? m.invoices.map((d) => <DocRow key={d.id} token={data.token} doc={d} />) : <li className="pt-empty">Your invoices and receipts will appear here.</li>}</DocGroup>
-      </section>
-      <p className="pt-muted pt-center">A question about a payment? Ask in Help, or call us.</p>
+        <section className="pt-card">
+          <h2>Payments received</h2>
+          {m?.payments.length ? (
+            <ul className="pt-pays">
+              {m.payments.map((p, i) => (
+                <li key={i}>
+                  <span>
+                    <b>{p.label}</b>
+                    <small>
+                      {dayText(p.on)}
+                      {p.reference ? ` · ${p.reference}` : ''}
+                    </small>
+                  </span>
+                  <b>{money(p.amount)}</b>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="pt-muted">No payments recorded yet.</p>
+          )}
+        </section>
+      </Split>
     </>
   );
 }
@@ -1000,7 +1136,13 @@ function SignForm({ token, quote, onDone, onCancel }: { token: string; quote: Qu
     const r = await fetch(`/api/my/${token}/accept`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documentId: quote.id, name, agree, signature: sig, startEarly }),
+      body: JSON.stringify({
+        documentId: quote.id,
+        name,
+        agree,
+        signature: sig,
+        startEarly,
+      }),
     }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     // 409: it's already been signed (another tap or another phone), so show the signed page.
@@ -1022,12 +1164,10 @@ function SignForm({ token, quote, onDone, onCancel }: { token: string; quote: Qu
       </div>
       <p className="pt-cancel">{CANCEL_NOTE}</p>
       <label className="pt-check">
-        <input type="checkbox" checked={startEarly} onChange={(e) => setStartEarly(e.target.checked)} /> Please start work within the 14 days. I
-        understand I may have to pay for work already done if I then cancel.
+        <input type="checkbox" checked={startEarly} onChange={(e) => setStartEarly(e.target.checked)} /> Please start work within the 14 days. I understand I may have to pay for work already done if I then cancel.
       </label>
       <label className="pt-check">
-        <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> I accept this {what} and Heliaxis’s terms and
-        conditions.
+        <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} /> I accept this {what} and Heliaxis’s terms and conditions.
       </label>
       {err && <p className="pt-err">{err}</p>}
       <div className="pt-row">
@@ -1053,7 +1193,11 @@ function DeclineSheet({ token, word, onClose }: { token: string; word: string; o
   async function send() {
     setBusy(true);
     setErr('');
-    const r = await fetch(`/api/my/${token}/decline`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) }).catch(() => null);
+    const r = await fetch(`/api/my/${token}/decline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     setBusy(false);
     if (!r?.ok) return setErr(d.error || 'Something went wrong. Please try again.');
@@ -1093,7 +1237,13 @@ function DeclineSheet({ token, word, onClose }: { token: string; word: string; o
   );
 }
 
-const wordsOf = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+const wordsOf = (d: string) =>
+  new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  });
 const shortOf = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDate();
 
 /**
@@ -1101,7 +1251,12 @@ const shortOf = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDate();
  * for them and the office confirms it. Weekends and bank holidays are greyed, as are days with no room.
  */
 function InstallDates({ token, pref }: { token: string; pref: PortalData['installPref'] }) {
-  const [cal, setCal] = useState<{ days: CalendarDay[]; from: string; prev: string | null; next: string | null } | null>(null);
+  const [cal, setCal] = useState<{
+    days: CalendarDay[];
+    from: string;
+    prev: string | null;
+    next: string | null;
+  } | null>(null);
   const [from, setFrom] = useState<string | null>(null);
   const [pick, setPick] = useState(pref?.dates?.[0] ?? '');
   const [flexible, setFlexible] = useState(pref?.flexible ?? false);
@@ -1127,14 +1282,28 @@ function InstallDates({ token, pref }: { token: string; pref: PortalData['instal
   function choose(d: string) {
     if (!started.current) {
       started.current = true;
-      void fetch(`/api/my/${token}/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'dates_started' }), keepalive: true }).catch(() => null);
+      void fetch(`/api/my/${token}/event`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'dates_started' }),
+        keepalive: true,
+      }).catch(() => null);
     }
     setPick(d);
   }
   async function save() {
     setBusy(true);
     setErr('');
-    const r = await fetch(`/api/my/${token}/install-dates`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dates: [pick], flexible, notes, provisional: true }) }).catch(() => null);
+    const r = await fetch(`/api/my/${token}/install-dates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dates: [pick],
+        flexible,
+        notes,
+        provisional: true,
+      }),
+    }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     setBusy(false);
     if (!r?.ok) {
@@ -1178,7 +1347,15 @@ function InstallDates({ token, pref }: { token: string; pref: PortalData['instal
                 {wk.map((d) => {
                   const off = d.state === 'closed' || d.state === 'full';
                   return (
-                    <button key={d.day} type="button" disabled={off} aria-pressed={pick === d.day} aria-label={`${wordsOf(d.day)}${d.state === 'full' ? ', fully booked' : d.state === 'closed' ? ', not available' : d.state === 'few' ? ', last place' : ''}`} className={`pt-cal-day is-${d.state}${pick === d.day ? ' on' : ''}`} onClick={() => choose(d.day)}>
+                    <button
+                      key={d.day}
+                      type="button"
+                      disabled={off}
+                      aria-pressed={pick === d.day}
+                      aria-label={`${wordsOf(d.day)}${d.state === 'full' ? ', fully booked' : d.state === 'closed' ? ', not available' : d.state === 'few' ? ', last place' : ''}`}
+                      className={`pt-cal-day is-${d.state}${pick === d.day ? ' on' : ''}`}
+                      onClick={() => choose(d.day)}
+                    >
                       <small>{new Date(`${d.day}T12:00:00Z`).toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' })}</small>
                       <b>{shortOf(d.day)}</b>
                       {d.state === 'few' && <i>last place</i>}
@@ -1221,7 +1398,13 @@ function InstallDates({ token, pref }: { token: string; pref: PortalData['instal
   );
 }
 
-type Msg = { id: string; direction: 'in' | 'out'; body: string; created_at: string; by: string | null };
+type Msg = {
+  id: string;
+  direction: 'in' | 'out';
+  body: string;
+  created_at: string;
+  by: string | null;
+};
 
 /**
  * The customer's conversation with Heliaxis: what they send comes straight to the team and is logged against
@@ -1256,7 +1439,11 @@ function PortalMessages({ token, first, focus, prefill }: { token: string; first
     setBusy(true);
     setErr('');
     setSent(false);
-    const r = await fetch(`/api/my/${token}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text }) }).catch(() => null);
+    const r = await fetch(`/api/my/${token}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body: text }),
+    }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     setBusy(false);
     if (!r?.ok) return setErr(d.error || 'Something went wrong. Please try again.');
@@ -1264,7 +1451,13 @@ function PortalMessages({ token, first, focus, prefill }: { token: string; first
     setSent(true);
     await load();
   }
-  const when = (iso: string) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const when = (iso: string) =>
+    new Date(iso).toLocaleString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   return (
     <section className="pt-card pt-msgs" id="pt-messages" ref={card} data-track="messages">
       <h2>Messages</h2>

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
+import { headers } from "next/headers";
 import { PublicTrackers } from "@/components/analytics/PublicTrackers";
+import { isCustomerHost } from "@/lib/crm/portal-url";
 import { ThemeSync } from "@/components/theme/ThemeSync";
 import { SELF_ROUTE_SCRIPT } from "@/lib/theme/routes";
 import { themeContext, themeViewport } from "@/lib/theme/server";
@@ -125,7 +127,8 @@ export default async function RootLayout({
       </head>
       <body className={`${outfit.variable} font-sans antialiased`}>
         {boot && <ThemeSync />}
-        <PublicTrackers />
+        {/* Never on the customer portal's own address (portal.heliaxis.co.uk): every page there is personal. */}
+        <PublicTrackers off={isCustomerHost((await headers()).get('host'))} />
 
         {children}
       </body>

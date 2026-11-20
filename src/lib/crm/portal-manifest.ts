@@ -4,15 +4,16 @@
  * opens it straight away (whatever the phone kept); from /my it is the sign-in page, which reopens the
  * project this phone remembers.
  */
-export function portalManifest(token?: string) {
-  const start = token ? `/my/${token}?app=1` : '/my?app=1';
+/** `base`: '/my', or '' on portal.heliaxis.co.uk, where the portal is the whole site. */
+export function portalManifest(token?: string, base = '/my') {
+  const start = token ? `${base}/${token}?app=1` : base ? `${base}?app=1` : '/?app=1';
   return {
-    id: token ? `/my/${token}` : '/my',
+    id: token ? `${base}/${token}` : base || '/',
     name: 'My Heliaxis project',
     short_name: 'My Heliaxis',
     description: 'Your Heliaxis project: next steps, dates, documents, payments and help.',
     start_url: start,
-    scope: '/my',
+    scope: base || '/',
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#211f18',

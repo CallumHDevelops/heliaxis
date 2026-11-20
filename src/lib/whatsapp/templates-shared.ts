@@ -57,7 +57,7 @@ export const FIELDS: Record<FieldKey, { label: string; example: string; help: st
     help: 'From the products on their opportunity, e.g. “solar panels and battery storage”',
     token: 'asked_about',
   },
-  quote_link: { label: 'Quote / portal link', example: 'https://heliaxis.co.uk/my/Xk2pQ7', help: 'Their customer portal link', token: 'quote_link' },
+  quote_link: { label: 'Quote / portal link', example: 'https://portal.heliaxis.co.uk/Xk2pQ7', help: 'Their customer portal link', token: 'quote_link' },
   when_words: { label: 'When (“tomorrow”, “in 3 days”)', example: 'tomorrow', help: 'Filled in by the reminder' },
   date_words: { label: 'The day (“Tuesday 3 November”)', example: 'Tuesday 3 November', help: 'Filled in when an appointment is booked', auto: true },
   time_words: { label: 'The time (“10:45”)', example: '10:45', help: 'Filled in when an appointment is booked', auto: true },
@@ -72,7 +72,7 @@ export const FIELDS: Record<FieldKey, { label: string; example: string; help: st
   po_number: { label: 'PO number', example: 'PO-0123', help: 'Filled in when a trade signs off', auto: true },
   fix_what: { label: 'What needs putting right', example: 'two tiles left lifted above the left of the array', help: 'Filled in by the office’s Return to site', auto: true },
   fix_by: { label: 'Put right by', example: 'Thursday 12 November', help: 'Filled in by the office’s Return to site', auto: true },
-  portal_link: { label: 'Customer portal link', example: 'https://heliaxis.co.uk/my/Xk2pQ7', help: 'Their customer portal link', auto: true },
+  portal_link: { label: 'Customer portal link', example: 'https://portal.heliaxis.co.uk/Xk2pQ7', help: 'Their customer portal link', auto: true },
 };
 
 /** The fields the "New template" form offers as insert chips, typed into the message as {token}. */
@@ -304,7 +304,7 @@ export const READY_MADE: ReadyTemplate[] = [
     body: 'Hi {{1}}, your Heliaxis handover pack is ready. Your certificates, warranties and guides are all in one place here: {{2}} Any questions, just reply here.',
     fields: ['first_name', 'portal_link'],
     buttons: [],
-    examples: ['Sarah', 'https://heliaxis.co.uk/my/Xk2pQ7'],
+    examples: ['Sarah', 'https://portal.heliaxis.co.uk/Xk2pQ7'],
   },
 ];
 

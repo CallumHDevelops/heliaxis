@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
+import { isCustomerHost } from '@/lib/crm/portal-url';
 import { notFound } from 'next/navigation';
 import { requirePortal } from '@/lib/auth';
 import { loadPortal } from '@/lib/crm/portal';
@@ -13,7 +15,7 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   return {
     title: 'Your project',
     robots: { index: false, follow: false },
-    manifest: `/my/${encodeURIComponent(token)}/manifest.webmanifest`,
+    manifest: `${(await onPortalHost()) ? '' : '/my'}/${encodeURIComponent(token)}/manifest.webmanifest`,
     appleWebApp: { capable: true, title: 'My Heliaxis', statusBarStyle: 'black-translucent' },
     icons: { apple: [{ url: '/my/apple-touch-icon.png', sizes: '180x180' }] },
   };
@@ -50,7 +52,10 @@ export default async function CustomerPortal({
           </a>
         </div>
       )}
-      <PortalView data={data} paid={paid !== undefined} justAccepted={accepted !== undefined} openAccept={accept !== undefined} themePref={pref} preview={preview} />
+      <PortalView data={data} paid={paid !== undefined} justAccepted={accepted !== undefined} openAccept={accept !== undefined} themePref={pref} preview={preview} base={(await onPortalHost()) ? '' : '/my'} />
     </>
   );
 }
+
+/** On portal.heliaxis.co.uk the portal's own links drop the /my (src/lib/crm/portal-url.ts). */
+const onPortalHost = async () => isCustomerHost((await headers()).get('host'));

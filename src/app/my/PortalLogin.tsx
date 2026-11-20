@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { portalPathHere } from '@/lib/crm/portal-url';
 import { forgetProject, registerPortalWorker, rememberedProject } from './InstallApp';
 
 /** Their project number, surname or inverter serial (last 6), and the postcode → their portal. */
@@ -17,8 +18,9 @@ export function PortalLogin({ forget = false }: { forget?: boolean }) {
     const t = rememberedProject();
     if (!t || !/^[A-Za-z0-9_-]{16,64}$/.test(t)) return;
     // Only if that project still opens (a closed one would land on "not found" every time).
-    void fetch(`/my/${t}`, { method: 'HEAD', cache: 'no-store' })
-      .then((r) => (r.ok ? window.location.replace(`/my/${t}`) : forgetProject()))
+    const at = portalPathHere(`/my/${t}`);
+    void fetch(at, { method: 'HEAD', cache: 'no-store' })
+      .then((r) => (r.ok ? window.location.replace(at) : forgetProject()))
       .catch(() => null);
   }, [forget]);
 
@@ -30,7 +32,7 @@ export function PortalLogin({ forget = false }: { forget?: boolean }) {
       const r = await fetch('/api/my/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: serial, postcode }) });
       const d = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
       if (r.ok && d.url) {
-        window.location.assign(d.url);
+        window.location.assign(portalPathHere(d.url));
         return;
       }
       setErr(d.error || 'That didn’t work. Try again.');
