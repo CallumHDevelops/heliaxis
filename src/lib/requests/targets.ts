@@ -1,4 +1,5 @@
 import { SUMMARY_FIELDS, SWITCH_FIELDS } from '../handover/inputs';
+import { isSlot } from '../handover/slots';
 import { templateByCode, templatesForProducts } from '../templates/registry';
 import type { DocTemplate } from '../templates/types';
 
@@ -60,8 +61,8 @@ export function targetOf(code: string, products: string[]): Target | null {
   const v = VALUES[code];
   if (v) return { code, kind: 'values', title: v.title, slot: code, template: { schema: 1, code, title: v.title, intro: v.intro, tech: [], sections: [v.fields(products)] } };
   const t = templateByCode(code);
-  // The form templates whose codes are handover items (HX-HP-02 commissioning, -03 cylinder, -04 handover) are printed into them.
-  return t ? { code, kind: 'form', title: t.title, template: t, slot: /^HX-HP-0[234]$/.test(code) ? code : null } : null;
+  // A form whose code is a handover item (HX-PV-02 array test, HX-HP-02 commissioning…) is printed into it.
+  return t ? { code, kind: 'form', title: t.title, template: t, slot: isSlot(code) ? code : null } : null;
 }
 
 /** Everything that can be requested on a job with these technologies. */
@@ -76,4 +77,4 @@ export function targetsFor(products: string[]): Target[] {
 export const isRequestable = (code: string, products: string[]) => targetsFor(products).some((t) => t.code === code);
 
 /** The electrician's own records, made by their step-by-step site app: asking for them means putting the electrician on the job (the Site tab). */
-export const SITE_ITEMS = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-HO-04'];
+export const SITE_ITEMS = ['HX-HO-04'];

@@ -82,11 +82,23 @@ export async function fillFinish(db: Db, projectId: string, code: string, sign: 
       const r = await signLine(supabaseStore(db), t.template, projectId, line.key, sign, who, source, new Date().toISOString());
       if (!r.ok) return { ok: false, why: r.why };
     }
+    if (t.code === 'HX-PV-02') await keepInverterSerial(db, projectId);
     if (t.slot) await fileForm(db, projectId, t, who.id);
   } else {
     await refreshHandover(db, projectId, { by: who.id, force: [code] }).catch((e) => console.error('[requests] refresh', e));
   }
   return { ok: true };
+}
+
+/** The PV array test's inverter serial onto Job details, unless one is typed there already (the portal sign-in uses its last 6). */
+async function keepInverterSerial(db: Db, projectId: string) {
+  const row = await supabaseStore(db).live(projectId, 'HX-PV-02');
+  const serial = String(row?.answers?.inv_serial ?? '').trim();
+  if (!serial) return;
+  const { data: p } = await db.from('crm_projects').select('system').eq('id', projectId).maybeSingle();
+  const sys = (p?.system ?? {}) as Record<string, unknown>;
+  if (String(sys.inverter_serial ?? '').trim()) return;
+  await db.from('crm_projects').update({ system: { ...sys, inverter_serial: serial.slice(0, 60) } }).eq('id', projectId);
 }
 
 /** A signed form, printed and filed in its handover pack item (held to go with the pack, like the pack's own documents). */

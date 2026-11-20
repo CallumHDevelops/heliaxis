@@ -39,10 +39,10 @@ describe('the registry', () => {
     expect(templateByCode('HX-HP-02')?.title).toBe('Heat pump commissioning record');
     expect(templateByCode('F26A')).toBeNull();
   });
-  it('puts the heat pump forms on a heat pump job, and none on a solar one', () => {
+  it('puts the heat pump forms on a heat pump job, and the solar and battery ones on theirs', () => {
     expect(templatesForProducts(['heatpump']).map((t) => t.code)).toEqual(['HX-HP-02', 'HX-HP-03', 'HX-HP-04']);
-    expect(templatesForProducts(['solar', 'battery'])).toEqual([]);
-    expect(templatesForProducts(['solar', 'heatpump']).length).toBe(3);
+    expect(templatesForProducts(['solar', 'battery']).map((t) => t.code)).toEqual(['HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02']);
+    expect(templatesForProducts(['solar', 'heatpump']).length).toBe(6);
   });
 });
 
