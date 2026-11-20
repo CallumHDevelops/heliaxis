@@ -55,7 +55,12 @@ describe('states on a job', () => {
 
   it('is Missing for a document we make that nothing has made yet', () => {
     expect(by(complete({ docs: [] }), 'HX-PP-02').state).toBe('missing');
-    expect(by(complete({ gen: {} }), 'HX-PP-02').state).toBe('missing');
+    expect(by(complete({ gen: {} }), 'HX-PP-04').state).toBe('complete');
+    expect(by(complete({ docs: [], gen: {} }), 'HX-PP-04').state).toBe('missing');
+  });
+
+  it('counts a filed document in an item the app does not make (the quotation the office sent)', () => {
+    expect(by(complete({ gen: {} }), 'HX-PP-02').state).toBe('complete');
   });
 
   it('is Out of date when the job changed after a document was made', () => {

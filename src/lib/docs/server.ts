@@ -5,6 +5,7 @@ import { handoverSummary, handoverView } from '@/lib/handover/server';
 import { inhouseView } from '@/lib/inhouse/server';
 import { GROUPS as INHOUSE_GROUPS } from '@/lib/inhouse/slots';
 import { loadViews as proposalViews } from '@/lib/proposal/server';
+import { refreshProposal } from '@/lib/proposal/generate';
 import { GROUPS as PROPOSAL_GROUPS } from '@/lib/proposal/slots';
 import { schemaReady } from '@/lib/schema-ready';
 import type { Db } from '@/lib/site/server';
@@ -40,6 +41,8 @@ export async function packsView(db: Db, projectId: string): Promise<PacksView | 
   const stage = String(p.stage ?? '');
   const products = ((p.products as string[] | null) ?? []).map(String);
   const schema = await schemaReady();
+  // The proposal pack's own documents are made (again) when the job or its quote has changed. Best-effort.
+  if (schema.proposal) await refreshProposal(db, projectId).catch((e) => console.error('[docs] proposal', e));
 
   const [ih, forms, proposal, handover, general] = await Promise.all([
     inhouseView(db, projectId),

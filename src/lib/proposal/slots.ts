@@ -262,6 +262,8 @@ export type StateCtx = AppliesCtx & {
   gen: Partial<Record<ProposalCode, GenNeed>>;
   /** Product models on the job with no data sheet in the library. */
   libraryGaps: string[];
+  /** Items another document already covers (the performance estimate inside the quotation), with where. */
+  covered?: Partial<Record<ProposalCode, string>>;
 };
 
 export type ProposalView = {
@@ -294,9 +296,11 @@ type Result = { state: State; why?: string | null; fix?: Fix | null };
 const newest = (docs: ProposalDoc[]) => [...docs].sort((a, b) => b.version - a.version || b.at.localeCompare(a.at))[0];
 
 function stateFor(d: ProposalDef, docs: ProposalDoc[], c: StateCtx): Result {
+  if (c.covered?.[d.code] && !docs.length) return { state: 'complete', why: c.covered[d.code] };
   if (d.kind === 'G') {
     const need = c.gen[d.code];
-    if (!need) return { state: 'missing', why: d.missing, fix: 'job' };
+    // Not one the app makes (the quotation): the office's own, or the sent quote's PDF, filed in it.
+    if (!need) return docs.length ? { state: 'complete' } : { state: 'missing', why: d.missing, fix: d.code === 'HX-PP-02' ? 'opensolar' : 'job' };
     if (!need.ready) return { state: 'missing', why: need.why, fix: need.fix ?? 'job' };
     const cur = newest(docs);
     if (!cur) return { state: 'missing', why: d.missing, fix: 'job' };

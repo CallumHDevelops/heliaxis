@@ -34,6 +34,10 @@ export const ISSUE: Record<string, string> = {
   'HX-HP-02': 'Issue 1',
   'HX-HP-03': 'Issue 1',
   'HX-HP-04': 'Issue 1',
+  // The proposal pack's own documents (src/lib/proposal/terms.ts).
+  'HX-PP-01': 'Issue 1',
+  'HX-PP-04': 'Issue 1',
+  'HX-PP-08': 'Issue 1',
   PACK: 'Issue 1',
 };
 export const issueOf = (code: string) => ISSUE[code] ?? 'Issue 1';
