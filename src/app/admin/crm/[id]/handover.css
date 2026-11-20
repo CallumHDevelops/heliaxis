@@ -535,3 +535,11 @@
 .hv-docno {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
+
+/* Requests for installer information (RequestInstaller.tsx). */
+.hv-asked { margin: 2px 0 6px; font-size: 0.85rem; color: var(--accent-text); font-weight: 600; }
+.rq-people { list-style: none; margin: 8px 0 12px; padding: 0; max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
+.rq-person { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border-soft); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.rq-person small { color: var(--muted); }
+.rq-person:hover { background: var(--border-soft); }
+.rq-person.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }

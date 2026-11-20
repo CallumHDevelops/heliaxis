@@ -1,0 +1,348 @@
+/* One question at a time (FormFlow): big type, generous space, phone first. Theme tokens from src/app/theme.css. */
+.ff {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  overflow-y: auto;
+}
+.ff-bar {
+  position: sticky;
+  top: 0;
+  height: 4px;
+  background: var(--border-soft);
+  z-index: 2;
+}
+.ff-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.35s ease;
+}
+.ff-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 12px max(18px, env(safe-area-inset-left));
+}
+.ff-brand {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.ff-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ff-x {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.ff-x:hover {
+  background: var(--border-soft);
+}
+.ff-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px max(16px, env(safe-area-inset-right)) 96px max(16px, env(safe-area-inset-left));
+}
+.ff-card {
+  width: 100%;
+  max-width: 680px;
+  animation: ff-in 0.32s ease both;
+}
+.ff[data-dir='-1'] .ff-card {
+  animation-name: ff-back;
+}
+@keyframes ff-in {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+@keyframes ff-back {
+  from {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ff-card {
+    animation: none;
+  }
+}
+.ff-eyebrow {
+  margin: 0 0 10px;
+  color: var(--accent-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ff h1,
+.ff-q {
+  font-family: var(--font-outfit), 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 4.5vw, 2.2rem);
+  line-height: 1.2;
+  margin: 0 0 10px;
+}
+.ff h1 {
+  font-size: clamp(1.9rem, 6vw, 2.8rem);
+}
+.ff-req {
+  color: var(--accent-text);
+}
+.ff-lede {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 1.08rem;
+  line-height: 1.5;
+}
+.ff-note {
+  margin: 0 0 18px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 10px 10px 0;
+}
+.ff-meta {
+  color: var(--muted);
+  margin: 0 0 22px;
+}
+.ff-field {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ff-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 2px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: clamp(1.3rem, 4vw, 1.75rem);
+  padding: 8px 2px;
+  outline: none;
+  border-radius: 0;
+}
+.ff-input:focus {
+  border-bottom-color: var(--accent-hover);
+}
+.ff-input::placeholder {
+  color: var(--muted);
+  opacity: 0.55;
+}
+.ff-long {
+  font-size: 1.15rem;
+  resize: vertical;
+  border: 2px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 12px;
+}
+.ff-unit {
+  font-size: 1.3rem;
+  color: var(--muted);
+}
+.ff-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 460px;
+}
+.ff-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  font: inherit;
+  font-size: 1.1rem;
+  padding: 12px 14px;
+  min-height: 52px;
+  border: 1.5px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--text);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.ff-choice:hover {
+  background: rgba(var(--accent-rgb) / 0.28);
+}
+.ff-choice:active {
+  transform: scale(0.99);
+}
+.ff-choice.on {
+  border-color: var(--accent-hover);
+  background: rgba(var(--accent-rgb) / 0.4);
+  font-weight: 700;
+}
+.ff kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--accent-line);
+  border-radius: 6px;
+  background: var(--surface);
+  font: 700 0.8rem 'JetBrains Mono', ui-monospace, monospace;
+  color: var(--accent-text);
+}
+.ff-choice.on kbd {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.ff-tick {
+  margin-left: auto;
+  font-weight: 800;
+}
+.ff-go {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 24px;
+}
+.ff-btn {
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: inherit;
+  font-weight: 800;
+  font-size: 1.1rem;
+  padding: 12px 26px;
+  min-height: 50px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.08);
+}
+.ff-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.ff-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ff-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.ff-hint kbd {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 0;
+}
+@media (hover: none) {
+  .ff-hint,
+  .ff-choice kbd {
+    display: none;
+  }
+}
+.ff-err {
+  margin: 14px 0 0;
+  color: var(--danger);
+  font-weight: 600;
+}
+.ff-review ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.ff-review li button {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ff-review li button:hover {
+  background: var(--border-soft);
+}
+.ff-review li span {
+  color: var(--muted);
+}
+.ff-review li b {
+  text-align: right;
+  max-width: 55%;
+  overflow-wrap: anywhere;
+}
+.ff-review li.is-missing b {
+  color: var(--danger);
+}
+.ff-pad {
+  margin-top: 18px;
+  background: var(--field);
+  border-radius: 12px;
+}
+.ff-done {
+  text-align: center;
+}
+.ff-done .ff-go {
+  justify-content: center;
+}
+.ff-big-tick {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ok-soft);
+  color: var(--ok);
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+.ff-nav {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.ff-nav button {
+  width: 46px;
+  height: 42px;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.ff-nav button + button {
+  border-left: 1px solid rgba(0, 0, 0, 0.12);
+}
+.ff-nav button:hover {
+  background: var(--accent-hover);
+}

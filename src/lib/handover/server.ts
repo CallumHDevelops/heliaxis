@@ -58,6 +58,8 @@ import {
 import { approved, type DraftKey } from './settings-shared';
 import { customerState, headline, sendCheck, slotDef, slotStates, waitsOn, type Fix, type GenNeed, type Headline, type SlotCode, type SlotDoc, type SlotView } from './slots';
 import { ensureHandoverTasks } from './tasks';
+import { targetsFor } from '@/lib/requests/targets';
+const requestableCodes = (products: string[]) => targetsFor(products).map((t) => t.code);
 
 /**
  * The handover pack on the server (SPEC 4.2–4.10): what each item's state is on a job, making the
@@ -369,6 +371,8 @@ export type HandoverView = {
   stage: string;
   /** The job's technologies (Job details). None: the pack can't tell what applies, so the tab asks first. */
   products: string[];
+  /** Items an installer can be asked to fill in by link, or the office can answer one question at a time (src/lib/requests). */
+  requestable: string[];
   /** Something can be made, attached, released or rebuilt now: the tab asks for a refresh. */
   dirty: boolean;
   /** "Tell the customer" ticked by default on uploads (CRM settings). */
@@ -479,6 +483,7 @@ export async function handoverView(db: Db, projectId: string): Promise<HandoverV
     prep: prepList(l, views),
     stage: f.job.stage,
     products: f.job.products,
+    requestable: requestableCodes(f.job.products),
     dirty: isDirty(l, views, made),
     tellDefault: f.settings.tellOnUpload,
   };

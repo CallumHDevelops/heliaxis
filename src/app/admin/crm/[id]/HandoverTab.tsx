@@ -11,6 +11,7 @@ import { useMedia } from '../use-stored';
 import { CopySheet, InvoiceSheet, LibrarySheet, NotNeededSheet, OutstandingSheet, SendSheet, SignDesignSheet, UploadSheet, ValuesSheet } from './HandoverSheets';
 import { Mark } from './PackPanel';
 import { PlainSheet } from './RecordSheets';
+import { OfficeFill, RequestSheet, requestWords, useRequests } from './RequestInstaller';
 import { docNumber } from '@/lib/docs/packs';
 import { send, type Tab } from './record-shared';
 import './handover.css';
@@ -38,7 +39,9 @@ type Sheet =
   | { kind: 'send' }
   | { kind: 'invoice' }
   | { kind: 'library'; model: string }
-  | { kind: 'quick'; what: 'commissioned' | 'estimate' };
+  | { kind: 'quick'; what: 'commissioned' | 'estimate' }
+  | { kind: 'request'; code: SlotCode; title: string }
+  | { kind: 'fill'; code: SlotCode };
 
 const ICON: Record<State, ReactNode> = {
   complete: <Check size={16} strokeWidth={3} aria-hidden="true" />,
@@ -71,6 +74,8 @@ const FIX_LABEL: Record<Fix, string> = {
   commissioned: 'Add switch-on date',
   estimate: 'Add the estimate figures',
 };
+/** The electrician's own records (their step-by-step site app): asking for them means putting them on the job. */
+const SITE_ITEMS = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-HO-04'];
 const SITE_KEYS = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'EIC', 'CERT_OWN', 'HX-EV-01', 'HX-HP-01'];
 
 /** The sheets of values the office types, and the pack item each is kept on. */
@@ -146,6 +151,7 @@ export function HandoverTab({
     }
   }, [projectId]);
   const { reload } = useLiveRefresh(load, 30_000);
+  const req = useRequests(projectId);
 
   const done = (v: HandoverView & { notes?: string[] }, msg?: string) => {
     setView(v);
@@ -283,6 +289,9 @@ export function HandoverTab({
             </span>
           </div>
         ))}
+        {requestWords(req.data?.requests.find((r) => r.target === s.code && !r.cancelled_at)) && (
+          <p className="hv-asked">{requestWords(req.data?.requests.find((r) => r.target === s.code && !r.cancelled_at))}</p>
+        )}
         <div className="hv-acts__row">
           {shownFix && (
             <button type="button" className="crm-btn crm-btn--solar crm-btn--small" onClick={() => fix(s, shownFix)}>
@@ -306,6 +315,22 @@ export function HandoverTab({
               {h.label}
             </button>
           ))}
+          {/* Ask the installer for it (a private link, one question at a time), or answer it here the same way. */}
+          {s.state !== 'na' && (v.requestable.includes(s.code) || (SITE_ITEMS.includes(s.code) && s.state !== 'complete')) && (
+            <button
+              type="button"
+              className="crm-btn crm-btn--ghost crm-btn--small"
+              onClick={() => (v.requestable.includes(s.code) ? setSheet({ kind: 'request', code: s.code, title: s.title }) : openTab('site'))}
+              title={v.requestable.includes(s.code) ? 'Send an installer a link to answer it on their phone' : 'The electrician fills this in on their site app: put them on the job on the Site tab'}
+            >
+              Request installer information
+            </button>
+          )}
+          {s.state !== 'na' && v.requestable.includes(s.code) && (
+            <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => setSheet({ kind: 'fill', code: s.code })}>
+              {s.state === 'complete' ? 'Change the answers' : 'Complete it myself'}
+            </button>
+          )}
           {s.code !== 'HX-HO-19' &&
             (s.office ? (
               <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => void post({ action: 'restore', slot: s.code })}>
@@ -519,6 +544,21 @@ export function HandoverTab({
         </details>
       )}
 
+      {sheet?.kind === 'request' && (
+        <RequestSheet projectId={projectId} code={sheet.code} title={sheet.title} data={req.data} onClose={() => setSheet(null)} onSent={() => void req.reload()} />
+      )}
+      {sheet?.kind === 'fill' && (
+        <OfficeFill
+          projectId={projectId}
+          code={sheet.code}
+          me={me}
+          onClose={() => {
+            setSheet(null);
+            onChanged();
+            void reload();
+          }}
+        />
+      )}
       {sheet?.kind === 'quick' && (
         <QuickSheet
           projectId={projectId}
