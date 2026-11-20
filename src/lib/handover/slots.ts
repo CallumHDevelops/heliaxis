@@ -621,7 +621,11 @@ export type Fix =
   | 'notify-bc'
   | 'mid'
   | 'invoice'
-  | 'dno-sent';
+  | 'dno-sent'
+  /** Only the switch-on (commissioning) date is missing: a date box on the row. */
+  | 'commissioned'
+  /** Only the design's estimate figures (kWh a year, shade factor) are missing. */
+  | 'estimate';
 
 /** One of this unit's generated documents: made from these inputs now, or what it still needs. */
 export type GenNeed = { ready: true; hash: string } | { ready: false; state: 'missing' | 'waiting'; why: string; fix?: Fix; due?: string | null };
@@ -745,7 +749,7 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       if (docs.length) return docsState(docs);
       if (p.mcs_cert_no) return { state: 'missing', why: `Upload the MCS certificate (${p.mcs_cert_no}).`, fix: 'upload' };
       if (c.commissioned) return { state: 'waiting', why: dueWords(c.due.mcs, '10 working days') ?? 'Register it in the MCS database.', due: c.due.mcs ?? null, fix: 'mid' };
-      return { state: 'waiting', why: 'After the system is switched on.' };
+      return { state: 'waiting', why: 'After the system is switched on.', fix: 'commissioned' };
     case 'HX-HO-07':
       if (docs.length) return docsState(docs);
       // Once the MCS certificate is in (registered, its number saved or the certificate uploaded).
@@ -780,7 +784,7 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
       // An office upload (OWNER-DECISIONS 9): the notice as it went to the DNO (uploading it ticks the G98 notice as sent). The G98 data sheet helps fill it in.
       if (!c.dnoRoute) return { state: 'missing', why: 'Choose the DNO route on Paperwork.', fix: 'paperwork' };
       if (docs.length) return docsState(docs);
-      if (!c.commissioned) return { state: 'waiting', why: 'After the system is switched on.' };
+      if (!c.commissioned) return { state: 'waiting', why: 'After the system is switched on.', fix: 'commissioned' };
       return { state: 'missing', why: `Upload the G98 notice as it was sent to the DNO.${c.due.g98 ? ` ${dueWords(c.due.g98, '28 days')}.` : ''}`, due: c.due.g98 ?? null, fix: 'upload' };
     }
     case 'HX-HO-16': {

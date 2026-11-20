@@ -37,7 +37,8 @@ type Sheet =
   | { kind: 'bc' }
   | { kind: 'send' }
   | { kind: 'invoice' }
-  | { kind: 'library'; model: string };
+  | { kind: 'library'; model: string }
+  | { kind: 'quick'; what: 'commissioned' | 'estimate' };
 
 const ICON: Record<State, ReactNode> = {
   complete: <Check size={16} strokeWidth={3} aria-hidden="true" />,
@@ -67,6 +68,8 @@ const FIX_LABEL: Record<Fix, string> = {
   mid: 'Copy for MID',
   invoice: 'Final invoice',
   'dno-sent': 'Mark it sent to the DNO',
+  commissioned: 'Add switch-on date',
+  estimate: 'Add the estimate figures',
 };
 const SITE_KEYS = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'EIC', 'CERT_OWN', 'HX-EV-01', 'HX-HP-01'];
 
@@ -197,6 +200,9 @@ export function HandoverTab({
         return setSheet({ kind: 'mid' });
       case 'invoice':
         return setSheet({ kind: 'invoice' });
+      case 'commissioned':
+      case 'estimate':
+        return setSheet({ kind: 'quick', what: f });
       case 'dno-sent':
         if (window.confirm('Has the G98 Form B gone to the DNO? This ticks “G98 notice sent” on the checklist.')) void post({ action: 'dno-sent' }, 'Marked as sent to the DNO.');
         return;
@@ -513,6 +519,20 @@ export function HandoverTab({
         </details>
       )}
 
+      {sheet?.kind === 'quick' && (
+        <QuickSheet
+          projectId={projectId}
+          what={sheet.what}
+          today={today}
+          onClose={() => setSheet(null)}
+          onSaved={(msg) => {
+            setSheet(null);
+            setNotice(msg);
+            onChanged();
+            void post({ action: 'refresh' });
+          }}
+        />
+      )}
       {sheet?.kind === 'row' && (
         <PlainSheet label={rowOf(sheet.code).title} onClose={() => setSheet(null)}>
           <h2>
@@ -685,5 +705,74 @@ function TechPicker({ projectId, onSaved }: { projectId: string; onSaved: () => 
       </div>
       {err && <p className="crm-small">{err}</p>}
     </section>
+  );
+}
+
+/**
+ * When all an item lacks is one detail (the switch-on date; the design's estimate figures), it's typed
+ * here on the row instead of a trip to Job details. Saved on the job, so everything else that waits for it moves too.
+ */
+function QuickSheet({ projectId, what, today, onClose, onSaved }: { projectId: string; what: 'commissioned' | 'estimate'; today: string; onClose: () => void; onSaved: (msg: string) => void }) {
+  const [day, setDay] = useState(today);
+  const [kwh, setKwh] = useState('');
+  const [shade, setShade] = useState('1');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const title = what === 'commissioned' ? 'Switch-on (commissioning) date' : 'The design’s estimate figures';
+  async function save() {
+    setBusy(true);
+    setErr('');
+    try {
+      if (what === 'commissioned') {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('Choose the date.');
+        await send(`/api/crm/projects/${projectId}`, 'PATCH', { commissioned_at: `${day}T12:00:00.000Z` });
+        onSaved(`Switch-on date saved: ${shortDate(day)}.`);
+      } else {
+        const k = Number(kwh);
+        const sf = Number(shade);
+        if (!(k > 0)) throw new Error('Type the estimated generation in kWh a year.');
+        if (!(sf > 0 && sf <= 1)) throw new Error('The shade factor is between 0 and 1.');
+        await send(`/api/crm/projects/${projectId}`, 'PATCH', { system: { est_kwh_year: k, shade_factor: sf } });
+        onSaved('Estimate figures saved.');
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Not saved');
+      setBusy(false);
+    }
+  }
+  return (
+    <PlainSheet label={title} onClose={onClose}>
+      <h2>{title}</h2>
+      {what === 'commissioned' ? (
+        <>
+          <p className="crm-muted crm-small">The day the system was switched on. The warranty, the MCS certificate’s deadline and the G98 notice all count from it.</p>
+          <label className="crm-label" htmlFor="hv-q-day">
+            Switched on
+          </label>
+          <input id="hv-q-day" className="crm-input" type="date" value={day} max={today} onChange={(e) => setDay(e.target.value)} />
+        </>
+      ) : (
+        <>
+          <p className="crm-muted crm-small">From the MCS performance estimate in the design. The handover never works these out itself.</p>
+          <label className="crm-label" htmlFor="hv-q-kwh">
+            Estimated generation (kWh a year)
+          </label>
+          <input id="hv-q-kwh" className="crm-input" inputMode="decimal" value={kwh} onChange={(e) => setKwh(e.target.value)} />
+          <label className="crm-label" htmlFor="hv-q-sf">
+            Shade factor (0 to 1)
+          </label>
+          <input id="hv-q-sf" className="crm-input" inputMode="decimal" value={shade} onChange={(e) => setShade(e.target.value)} />
+        </>
+      )}
+      {err && <p className="crm-banner crm-banner--err">{err}</p>}
+      <div className="crm-actions">
+        <button type="button" className="crm-btn crm-btn--solar" disabled={busy} onClick={() => void save()}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+        <button type="button" className="crm-btn crm-btn--ghost" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </PlainSheet>
   );
 }

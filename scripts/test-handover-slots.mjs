@@ -237,7 +237,7 @@ const withInterval = I.scheduleInput(
 eq('maintenance schedule interval from the library, with its source', withInterval.input.rows.find((r) => r.item.startsWith('Battery')), { item: 'Battery (GivEnergy 9.5 kWh)', check: 'Check it’s charging and discharging in the app', who: 'You', often: 'Every 12 months', source: 'GivEnergy installation manual 4.2' });
 
 eq('estimate page: made with MIS 3002’s wording (copied in from the MCS estimate)', [I.shadingInput(facts()).ok, I.shadingInput(facts()).input?.note.startsWith('The performance of solar PV systems')], [true, true]);
-eq('estimate page: no design figures, Missing (the handover never works one out)', I.shadingInput(facts({ design: designOf({}) })).why, 'Add the estimated generation and the shade factor from the design on Job details.');
+eq('estimate page: no design figures, Missing (the handover never works one out)', I.shadingInput(facts({ design: designOf({}) })).why, 'Add the estimated generation and the shade factor from the design.');
 eq('estimate page: with verified wording (fixture), ready', I.shadingInput(facts(), { source: 'MIS 3002', issue: 'test', verified: true, importantNote: 'FIXTURE', shadingNote: 'FIXTURE 2' }).ok, true);
 
 eq('workmanship warranty: no term set, Missing, upload your own', [I.warrantyInput(facts()).ok, I.warrantyInput(facts()).fix], [false, 'settings']);

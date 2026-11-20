@@ -284,7 +284,7 @@ export function warrantyInput(f: HandoverFacts): Made<WarrantyInput> {
   const start = s.warrantyStart === 'commissioning' ? (f.job.commissionedOn ?? f.electrician?.signedOn ?? null) : f.job.handedOverOn;
   if (!start)
     return s.warrantyStart === 'commissioning'
-      ? missing('Add the switch-on (commissioning) date on Job details: the warranty is dated from it.', 'job')
+      ? missing('Add the switch-on (commissioning) date: the warranty is dated from it.', 'commissioned')
       : waiting('Dated when the pack goes to the customer.');
   const p = f.paperwork;
   return {
@@ -313,7 +313,7 @@ export type CompletionInput = JobHead & {
 };
 export function completionInput(f: HandoverFacts): Made<CompletionInput> {
   if (!approved(f.settings, 'completion')) return missing('Approve the completion sign-off wording in CRM settings.', 'settings');
-  if (!signed(f) && !f.job.commissionedOn) return f.electrician ? waitElectrician(f) : waiting('After the system is switched on.');
+  if (!signed(f) && !f.job.commissionedOn) return f.electrician ? waitElectrician(f) : waiting('After the system is switched on.', 'commissioned');
   const sig = f.data['HX-HO-08']?.customer ?? f.electrician?.customer.completion;
   if (!sig) return waiting(`Waiting for ${f.customer.first || 'the customer'} to sign (on the electrician’s phone or in their portal).`);
   return {
@@ -347,7 +347,7 @@ function enaFor(f: HandoverFacts, model: string | null): string | null {
   return null;
 }
 export function g98Input(f: HandoverFacts): Made<G98Input> {
-  if (!f.job.commissionedOn) return f.electrician && !signed(f) ? waitElectrician(f) : waiting('After the system is switched on.');
+  if (!f.job.commissionedOn) return f.electrician && !signed(f) ? waitElectrician(f) : waiting('After the system is switched on.', 'commissioned');
   if (!f.system.mpan) return missing('Add the MPAN on Job details.', 'job');
   const devices = equipmentOf(f)
     .filter((e) => e.what === 'Inverter' || e.what === 'Battery' || e.what === 'Battery inverter')
@@ -406,7 +406,7 @@ export function g99Input(f: HandoverFacts): Made<G99Input> {
 export type ShadingInput = JobHead & { kwh: number; shade: number; note: string; shadingNote: string | null; shading: string[]; sunPath: string | null; source: string };
 export function shadingInput(f: HandoverFacts, notes = MIS3002_NOTES): Made<ShadingInput> {
   const need = [f.design.est_kwh_year === null && 'the estimated generation', f.design.shade_factor === null && 'the shade factor'].filter(Boolean) as string[];
-  if (need.length) return missing(`Add ${list(need)} from the design on Job details.`, 'job');
+  if (need.length) return missing(`Add ${list(need)} from the design.`, 'estimate');
   if (!notes.verified) return missing('MIS 3002’s estimate wording has to be copied into the app first. Until then, upload your own estimate page.', 'upload');
   return {
     ok: true,
