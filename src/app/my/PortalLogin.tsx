@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { forgetProject, registerPortalWorker, rememberedProject } from './InstallApp';
 
-/** The last 6 of the inverter's serial number, and the postcode → their portal. */
+/** Their project number, surname or inverter serial (last 6), and the postcode → their portal. */
 export function PortalLogin({ forget = false }: { forget?: boolean }) {
   const [serial, setSerial] = useState('');
   const [postcode, setPostcode] = useState('');
@@ -27,7 +27,7 @@ export function PortalLogin({ forget = false }: { forget?: boolean }) {
     setBusy(true);
     setErr('');
     try {
-      const r = await fetch('/api/my/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serial, postcode }) });
+      const r = await fetch('/api/my/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: serial, postcode }) });
       const d = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
       if (r.ok && d.url) {
         window.location.assign(d.url);
@@ -43,21 +43,20 @@ export function PortalLogin({ forget = false }: { forget?: boolean }) {
   return (
     <form className="pt-card pt-login pt-action" onSubmit={go}>
       <h2>Open your project</h2>
-      <p>Enter the last 6 characters of your inverter’s serial number, and your postcode.</p>
+      <p>Enter your postcode and any one of: your project number, your surname, or the last 6 characters of your inverter’s serial number.</p>
       <label className="pt-login__field">
-        <span>Inverter serial number: last 6</span>
+        <span>Project number, surname or inverter serial</span>
         <input
-          className="pt-input pt-login__serial"
+          className="pt-input"
           value={serial}
-          onChange={(e) => setSerial(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(-6))}
+          onChange={(e) => setSerial(e.target.value)}
           autoComplete="off"
-          autoCapitalize="characters"
           spellCheck={false}
-          placeholder="e.g. 4A7B21"
+          placeholder="e.g. HX-0113, Jones or 4A7B21"
           required
-          maxLength={6}
+          maxLength={80}
         />
-        <small>It’s on the label on the side of your inverter, after “SN” or “S/N”.</small>
+        <small>Your project number is on your quote and our emails. The serial is on the label on the side of your inverter, after “SN”: just its last 6.</small>
       </label>
       <label className="pt-login__field">
         <span>Postcode</span>
@@ -68,7 +67,7 @@ export function PortalLogin({ forget = false }: { forget?: boolean }) {
           {err}
         </p>
       )}
-      <button type="submit" className="pt-btn" disabled={busy || serial.length !== 6 || !postcode.trim()}>
+      <button type="submit" className="pt-btn" disabled={busy || serial.trim().length < 2 || !postcode.trim()}>
         {busy ? 'Opening…' : 'Open my project'}
       </button>
       <p className="pt-login__small">Or use the link we sent you by WhatsApp or email.</p>

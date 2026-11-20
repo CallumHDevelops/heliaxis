@@ -10,7 +10,7 @@ import './[token]/portal.css';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'Your project',
-  description: 'Open your Heliaxis project with your inverter serial number and postcode.',
+  description: 'Open your Heliaxis project with your postcode and your project number, surname or inverter serial.',
   robots: { index: false, follow: false },
   manifest: '/my/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'My Heliaxis', statusBarStyle: 'black-translucent' },
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * heliaxis.co.uk/my: the customer opens their portal with the last 6 of their inverter serial number and their postcode
+ * heliaxis.co.uk/my: the customer opens their portal with their postcode and their project number, surname or inverter serial (last 6)
  * (or the link we sent). A phone that has opened a project before (the hx_my cookie, set by the portal) goes straight
  * back to it: this is also where the home-screen app starts. ?signout: forget it and show the form.
  */
