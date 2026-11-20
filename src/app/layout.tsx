@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Outfit } from "next/font/google";
+import localFont from "next/font/local";
 import { PublicTrackers } from "@/components/analytics/PublicTrackers";
 import { ThemeSync } from "@/components/theme/ThemeSync";
 import { SELF_ROUTE_SCRIPT } from "@/lib/theme/routes";
@@ -8,10 +8,13 @@ import { BOOT_SCRIPT } from "@/lib/theme/shared";
 import "./globals.css";
 import "./theme.css";
 
-const outfit = Outfit({
+// Served from the repo (src/app/fonts), not downloaded from Google at build time: that download failed often enough
+// to break deploys. One variable file covers weights 300 to 800.
+const outfit = localFont({
+  src: "./fonts/outfit-latin.woff2",
+  weight: "300 800",
   variable: "--font-outfit",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {

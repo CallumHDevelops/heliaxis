@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
-import { Hanken_Grotesk, JetBrains_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
 import './studio-base.css';
 
@@ -15,8 +14,9 @@ const ezra = localFont({
   variable: '--font-ezra',
   display: 'swap',
 });
-const hanken = Hanken_Grotesk({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-body', display: 'swap' });
-const mono = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '500', '600'], variable: '--font-mono', display: 'swap' });
+// From the repo (src/app/fonts), not fetched from Google at build time. Variable files: one each covers every weight used.
+const hanken = localFont({ src: '../../fonts/hanken-grotesk-latin.woff2', weight: '400 700', variable: '--font-body', display: 'swap' });
+const mono = localFont({ src: '../../fonts/jetbrains-mono-latin.woff2', weight: '400 600', variable: '--font-mono', display: 'swap' });
 
 export const metadata: Metadata = { title: 'Post Studio', robots: { index: false, follow: false } };
 
