@@ -7,12 +7,12 @@ import { gridRouteFor, homePrice, type BatteryOption, type CostSettings, type In
 type Field = { key: NumKey; label: string; unit: string; help: string };
 const FIELDS: { title: string; note?: string; fields: Field[] }[] = [
   {
-    title: 'Markup and inverter sizing',
-    note: 'Price = our cost × (1 + markup). Visitors see the low to high range (rounded to £50); payback uses the middle figure. They never see costs or the markup.',
+    title: 'Margin, minimum profit and inverter sizing',
+    note: 'Price = our cost ÷ (1 − margin), but never less than our cost plus the minimum profit. Low, middle and high are each worked out separately. Visitors see the low to high range (rounded to £50); payback uses the middle (halfway). They never see costs, margins or profit.',
     fields: [
-      { key: 'markupLow', label: 'Markup, low end', unit: '%', help: 'The bottom of the price range.' },
-      { key: 'markupMid', label: 'Markup, middle', unit: '%', help: 'Used for payback and the single "about" figure.' },
-      { key: 'markupHigh', label: 'Markup, high end', unit: '%', help: 'The top of the price range.' },
+      { key: 'marginLow', label: 'Margin on price, low end', unit: '%', help: 'The bottom of the price range. 30% means we keep 30p of every £1 charged.' },
+      { key: 'marginHigh', label: 'Margin on price, high end', unit: '%', help: 'The top of the price range. The middle figure, used for payback, is halfway between the two.' },
+      { key: 'minProfit', label: 'Minimum profit per job', unit: '£', help: 'No price is ever less than our cost plus this, whatever the margin says.' },
       { key: 'maxDcAcRatio', label: 'Most panels per inverter', unit: '× DC/AC', help: 'An inverter takes an array up to its AC rating times this (1.35 is typical), within its own panel input limit.' },
       { key: 'batteryKwPerKwh', label: 'AC power a battery needs', unit: 'kW per kWh', help: 'An inverter below 85% of this is never chosen with a battery. 0 turns the rule off.' },
       { key: 'workmanshipYears', label: 'Workmanship warranty', unit: 'years', help: 'Shown on the quote and in "What is included". 0 leaves it out until you confirm it.' },
@@ -107,7 +107,7 @@ export function EstimatorSettingsForm({ initial }: { initial: EstimatorSettings 
           Placeholder costs and generic GoodWe names are filled in so the page works. Replace them with your real figures, check the preview table, then save.
         </p>
         <label className="est-check">
-          <input type="checkbox" checked={flags.homeUsesCostModel} onChange={(e) => setFlags({ ...flags, homeUsesCostModel: e.target.checked })} /> Price homes from our costs plus markup (untick to go back to the fixed cost plus price per kWp)
+          <input type="checkbox" checked={flags.homeUsesCostModel} onChange={(e) => setFlags({ ...flags, homeUsesCostModel: e.target.checked })} /> Price homes from our costs, margin and minimum profit (untick to go back to the fixed cost plus price per kWp)
         </label>
         <label className="est-check">
           <input type="checkbox" checked={flags.solarOnlyInverter} onChange={(e) => setFlags({ ...flags, solarOnlyInverter: e.target.checked })} /> Allow a solar-only (non-hybrid) inverter on a home with no battery
@@ -359,7 +359,7 @@ function PreviewTable({ cfg }: { cfg: EstimatorSettings }) {
     <section className="qb-card">
       <b>Preview: what a visitor would be priced</b>
       <p className="crm-muted" style={{ margin: '0 0 10px' }}>
-        Updates as you type. Only you see the cost column: visitors see the low to high range, rounded to £50. A single-phase supply takes up to {cfg.inverters.filter((i) => i.active && i.phase === 'single').length ? Math.max(...cfg.inverters.filter((i) => i.active && i.phase === 'single').map((i) => Math.min(i.acKw * cfg.maxDcAcRatio, i.maxPvKwp))).toFixed(1) : '0'} kWp.
+        Updates as you type. Only you see cost and profit: visitors see the low to high range, rounded to £50. “floor” marks a price set by the minimum profit rather than the margin. A single-phase supply takes up to {cfg.inverters.filter((i) => i.active && i.phase === 'single').length ? Math.max(...cfg.inverters.filter((i) => i.active && i.phase === 'single').map((i) => Math.min(i.acKw * cfg.maxDcAcRatio, i.maxPvKwp))).toFixed(1) : '0'} kWp.
       </p>
       <div style={{ overflowX: 'auto' }}>
         <table className="est-bands est-preview">
@@ -369,9 +369,10 @@ function PreviewTable({ cfg }: { cfg: EstimatorSettings }) {
               <th>kWp</th>
               <th>Battery</th>
               <th>Our cost</th>
-              <th>Low</th>
-              <th>Middle</th>
-              <th>High</th>
+              <th>Low: profit</th>
+              <th>Low: price</th>
+              <th>High: profit</th>
+              <th>High: price</th>
               <th>Inverter</th>
               <th>Grid</th>
             </tr>
@@ -386,9 +387,16 @@ function PreviewTable({ cfg }: { cfg: EstimatorSettings }) {
                     <td className="crm-muted">{k === 0 ? ((n * cfg.panelWatts) / 1000).toFixed(2) : ''}</td>
                     <td>{o.label}</td>
                     <td>{gbp(p.cost)}</td>
-                    <td>{gbp50(p.low)}</td>
-                    <td>{gbp50(p.mid)}</td>
-                    <td>{gbp50(p.high)}</td>
+                    <td>{gbp(p.low - p.cost)}</td>
+                    <td>
+                      {gbp50(p.low)}
+                      {p.floor.low && <span className="crm-small" title="The minimum profit sets this price, not the margin"> · floor</span>}
+                    </td>
+                    <td>{gbp(p.high - p.cost)}</td>
+                    <td>
+                      {gbp50(p.high)}
+                      {p.floor.high && <span className="crm-small" title="The minimum profit sets this price, not the margin"> · floor</span>}
+                    </td>
                     <td>{p.inverter ? `${p.inverter.name}${p.capped ? ' (array too big for single phase)' : ''}` : 'None active'}</td>
                     <td>{p.inverter ? gridRouteFor(p.inverter.acKw) : ''}</td>
                   </tr>

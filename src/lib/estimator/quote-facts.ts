@@ -61,7 +61,7 @@ export function buildQuoteFacts(args: { reference: string; customerName: string;
     const phase: Phase = r.phase;
     const p = homePrice(live, r.panels, { phase, batteryKwh: r.batteryKwh });
     lineTotal = Math.round(r.cost);
-    lines = groupedLines(p.lines, batteryName, settings.markupMid, lineTotal).map((l) => ({ label: l.label, price: l.price }));
+    lines = groupedLines(p.lines, batteryName, lineTotal).map((l) => ({ label: l.label, price: l.price }));
   }
   const valid = new Date(now.getTime() + QUOTE_VALID_DAYS * 864e5);
   return {

@@ -85,10 +85,11 @@ export type EstimatorSettings = {
   costs: CostSettings;
   inverters: Inverter[];
   batteries: BatteryOption[];
-  /** Markup on cost, per cent: the low and high ends of the range shown, and the middle figure used for payback. */
-  markupLow: number;
-  markupMid: number;
-  markupHigh: number;
+  /** Margin on price, per cent (price = cost / (1 - margin)): the low and high ends of the range shown; the middle (halfway) is used for payback. */
+  marginLow: number;
+  marginHigh: number;
+  /** Pounds: no home job is priced under its cost plus this. */
+  minProfit: number;
   /** The most DC (panels) per AC (inverter) the sizing allows. */
   maxDcAcRatio: number;
   /** AC kW a battery needs per kWh to charge and discharge usefully (0 turns the rule off). */
@@ -107,7 +108,7 @@ export type EstimatorSettings = {
 };
 
 /** The settings that are plain numbers. */
-export type NumKey = 'importPence' | 'standingPence' | 'exportPence' | 'panelWatts' | 'homeFixed' | 'homePerKwp' | 'businessFixed' | 'businessPerKwp' | 'batteryPerKwh' | 'batteryKwh' | 'priceRisePct' | 'degradationPct' | 'co2PerKwh' | 'markupLow' | 'markupMid' | 'markupHigh' | 'maxDcAcRatio' | 'batteryKwPerKwh' | 'workmanshipYears';
+export type NumKey = 'importPence' | 'standingPence' | 'exportPence' | 'panelWatts' | 'homeFixed' | 'homePerKwp' | 'businessFixed' | 'businessPerKwp' | 'batteryPerKwh' | 'batteryKwh' | 'priceRisePct' | 'degradationPct' | 'co2PerKwh' | 'marginLow' | 'marginHigh' | 'minProfit' | 'maxDcAcRatio' | 'batteryKwPerKwh' | 'workmanshipYears';
 
 export const DEFAULT_SETTINGS: EstimatorSettings = {
   packages: [],
@@ -128,9 +129,9 @@ export const DEFAULT_SETTINGS: EstimatorSettings = {
   costs: DEFAULT_COSTS,
   inverters: DEFAULT_INVERTERS,
   batteries: DEFAULT_BATTERIES,
-  markupLow: 25,
-  markupMid: 30,
-  markupHigh: 35,
+  marginLow: 30,
+  marginHigh: 35,
+  minProfit: 2500,
   maxDcAcRatio: 1.35,
   batteryKwPerKwh: 0.5,
   solarOnlyInverter: false,
@@ -224,9 +225,9 @@ export function cleanSettings(v: unknown): EstimatorSettings {
     costs: cleanCosts(o.costs),
     inverters: cleanInverters(o.inverters),
     batteries: cleanBatteries(o.batteries),
-    markupLow: num('markupLow', 0, 200),
-    markupMid: num('markupMid', 0, 200),
-    markupHigh: num('markupHigh', 0, 200),
+    marginLow: num('marginLow', 0, 90),
+    marginHigh: num('marginHigh', 0, 90),
+    minProfit: num('minProfit', 0, 100000),
     maxDcAcRatio: num('maxDcAcRatio', 1, 2),
     batteryKwPerKwh: num('batteryKwPerKwh', 0, 2),
     solarOnlyInverter: bool(o.solarOnlyInverter, false),
@@ -245,7 +246,7 @@ export function cleanSettings(v: unknown): EstimatorSettings {
 }
 
 /**
- * The settings for the visitor's browser: the same, but with our costs and markups taken out and ready-made prices put in their place, so the page
+ * The settings for the visitor's browser: the same, but with our costs, margins and minimum profit taken out and ready-made prices put in their place, so the page
  * never carries what a job costs us. Estimates from this copy match the full settings exactly (the server re-prices every quote from the full ones).
  */
 export function publicSettings(s: EstimatorSettings): EstimatorSettings {
@@ -254,9 +255,9 @@ export function publicSettings(s: EstimatorSettings): EstimatorSettings {
     costs: { ...s.costs, panel: 0, mounting: 0, labourPerDay: 0, electrical: 0, admin: 0, ancillaryPerWatt: 0, scaffolding: 0 },
     inverters: [],
     batteries: s.batteries.map((b) => ({ ...b, cost: 0 })),
-    markupLow: 0,
-    markupMid: 0,
-    markupHigh: 0,
+    marginLow: 0,
+    marginHigh: 0,
+    minProfit: 0,
     priceTable: buildPriceTable(s),
   };
 }

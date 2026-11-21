@@ -1,7 +1,7 @@
 /**
  * The cost build-up behind a home's price, and the inverter sizing. Pure (no server imports): the website, the admin preview, the PDF and
- * the tests all use it. Heliaxis keeps its own costs in the admin; the price is those costs marked up. The customer never sees a cost or
- * the markup: the browser is given a ready-made price table (buildPriceTable) instead of the costs, and the server re-prices every quote
+ * the tests all use it. Heliaxis keeps its own costs in the admin; the price is each cost total divided by (1 minus the margin), never less than cost plus a minimum profit. The customer never sees a cost or
+ * the margin: the browser is given a ready-made price table (buildPriceTable) instead of the costs, and the server re-prices every quote
  * from the real settings.
  */
 
@@ -54,9 +54,11 @@ export type PricingSettings = {
   costs: CostSettings;
   inverters: Inverter[];
   batteries: BatteryOption[];
-  markupLow: number;
-  markupMid: number;
-  markupHigh: number;
+  /** Margin on price, per cent: price = cost / (1 - margin). The middle (for payback) is halfway between low and high. */
+  marginLow: number;
+  marginHigh: number;
+  /** Pounds: a job's price is never less than its cost plus this. */
+  minProfit: number;
   maxDcAcRatio: number;
   /** AC kW a battery needs per kWh to charge and discharge usefully (0 turns the rule off). */
   batteryKwPerKwh: number;
@@ -194,9 +196,11 @@ export function costBuild(s: PricingSettings, panels: number, inverter: Inverter
   return { ...l, total, days };
 }
 
-export const marked = (cost: number, pct: number) => cost * (1 + pct / 100);
+/** Price from cost at a margin on price, but never under cost plus the minimum profit. */
+export const priced = (cost: number, marginPct: number, minProfit: number) => Math.max(cost / (1 - Math.min(marginPct, 95) / 100), cost + minProfit);
+export const marginMid = (s: Pick<PricingSettings, 'marginLow' | 'marginHigh'>) => (s.marginLow + s.marginHigh) / 2;
 
-export type HomePrice = { cost: number; low: number; mid: number; high: number; inverter: Inverter | null; battery: BatteryOption | null; lines: CostLines; capped: boolean; capKwp: number };
+export type HomePrice = { cost: number; low: number; mid: number; high: number; /** Which prices the minimum profit sets (rather than the margin). */ floor: { low: boolean; mid: boolean; high: boolean }; inverter: Inverter | null; battery: BatteryOption | null; lines: CostLines; capped: boolean; capKwp: number };
 
 /** The full price for a home system from the cost build-up. */
 export function homePrice(s: PricingSettings, panels: number, opts: { phase?: Phase; batteryKwh?: number } = {}): HomePrice {
@@ -204,7 +208,10 @@ export function homePrice(s: PricingSettings, panels: number, opts: { phase?: Ph
   const battery = opts.batteryKwh && opts.batteryKwh > 0 ? batteryOption(s, opts.batteryKwh) : null;
   const sized = chooseInverter(s, kwp, { phase: opts.phase, batteryKwh: battery?.kwh });
   const lines = costBuild(s, panels, sized.inverter, battery);
-  return { cost: lines.total, low: marked(lines.total, s.markupLow), mid: marked(lines.total, s.markupMid), high: marked(lines.total, s.markupHigh), inverter: sized.inverter, battery, lines, capped: !sized.fits, capKwp: sized.capKwp };
+  const at = (m: number) => priced(lines.total, m, s.minProfit);
+  const floored = (m: number) => lines.total + s.minProfit > lines.total / (1 - Math.min(m, 95) / 100);
+  const mid = marginMid(s);
+  return { cost: lines.total, low: at(s.marginLow), mid: at(mid), high: at(s.marginHigh), floor: { low: floored(s.marginLow), mid: floored(mid), high: floored(s.marginHigh) }, inverter: sized.inverter, battery, lines, capped: !sized.fits, capKwp: sized.capKwp };
 }
 
 /** The most panels a supply takes (the largest inverter's capacity). */
@@ -243,10 +250,10 @@ export function tableRow(t: PriceTable, phase: Phase, batteryKwh: number, panels
 export type GroupedLine = { key: 'panels_inverter' | 'mounting' | 'battery' | 'scaffolding' | 'installation' | 'admin'; label: string; cost: number; price: number };
 
 /**
- * The quote's lines as a customer understands them, each at its cost times the mid markup in whole pounds, adding up exactly to the headline
- * mid price (any rounding goes into the installation line). Costs are never part of what is returned for display: only `price`.
+ * The quote's lines as a customer understands them, each at its share of the cost (scaled to the headline mid price) in whole pounds, adding up exactly to the
+ * headline mid price (any rounding goes into the installation line). Costs are never part of what is returned for display: only `price`.
  */
-export function groupedLines(l: CostLines, batteryName: string | null, markupMidPct: number, headlineMid: number): GroupedLine[] {
+export function groupedLines(l: CostLines, batteryName: string | null, headlineMid: number): GroupedLine[] {
   const g: Omit<GroupedLine, 'price'>[] = [
     { key: 'panels_inverter', label: 'Solar panels and GoodWe inverter', cost: l.panels + l.inverter },
     { key: 'mounting', label: 'Roof mounting system', cost: l.mounting },
@@ -255,7 +262,8 @@ export function groupedLines(l: CostLines, batteryName: string | null, markupMid
     { key: 'installation', label: 'Installation and electrical work', cost: l.labour + l.electrical + l.ancillaries },
     { key: 'admin', label: 'Grid application, design, MCS certification and handover', cost: l.admin },
   ];
-  const lines = g.map((x) => ({ ...x, price: Math.round(marked(x.cost, markupMidPct)) }));
+  const total = g.reduce((a, b) => a + b.cost, 0) || 1;
+  const lines = g.map((x) => ({ ...x, price: Math.round((x.cost / total) * headlineMid) }));
   const diff = Math.round(headlineMid) - lines.reduce((a, b) => a + b.price, 0);
   const inst = lines.find((x) => x.key === 'installation')!;
   inst.price += diff;

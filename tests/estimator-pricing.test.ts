@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cleanSettings, DEFAULT_SETTINGS, estimate, publicSettings, type EstimatorSettings, type Inputs } from '@/lib/estimator/calc';
-import { batteryOption, buildPriceTable, chooseInverter, costBuild, G98_LIMIT_KW, gridRouteFor, groupedLines, homePrice, marked, monthlyPayment, type Inverter } from '@/lib/estimator/pricing';
+import { batteryOption, buildPriceTable, chooseInverter, costBuild, G98_LIMIT_KW, gridRouteFor, groupedLines, homePrice, marginMid, monthlyPayment, priced, type Inverter } from '@/lib/estimator/pricing';
 
 const inv = (over: Partial<Inverter> & Pick<Inverter, 'acKw'>): Inverter => ({ id: `i${over.acKw}`, name: `Test ${over.acKw} kW`, phase: 'single', maxPvKwp: over.acKw * 1.5, hybrid: true, cost: 900, active: true, ...over });
 
@@ -11,22 +11,44 @@ const c = WORKED.costs;
 const base: Inputs = { who: 'home', yieldKwhPerKwp: 950, shade: 'none', usage: { kind: 'kwh', value: 3800 }, daytime: 'some', battery: false, ev: false, heatpump: false };
 
 describe('cost build-up', () => {
-  it('10 panels, no battery: the brief’s worked check', () => {
+  /** What a price should be, worked from the settings: cost / (1 - margin), never under cost + minimum profit. */
+  const expected = (cost: number, margin: number) => Math.max(cost / (1 - margin / 100), cost + WORKED.minProfit);
+
+  it('10 panels, no battery: the minimum profit sets the low price', () => {
     const l = costBuild(WORKED, 10, WORKED.inverters[0], null);
-    const expected = 10 * c.panel + 10 * c.mounting + c.labourPerDay + c.electrical + c.admin + c.ancillaryPerWatt * 10 * WORKED.panelWatts + c.scaffolding + 900;
-    expect(l.total).toBeCloseTo(expected, 2);
+    const sum = 10 * c.panel + 10 * c.mounting + c.labourPerDay + c.electrical + c.admin + c.ancillaryPerWatt * 10 * WORKED.panelWatts + c.scaffolding + 900;
+    expect(l.total).toBeCloseTo(sum, 2);
     expect(l.total).toBeCloseTo(5405, 2);
-    expect(marked(l.total, WORKED.markupLow)).toBeCloseTo(l.total * 1.25, 2);
     const p = homePrice(WORKED, 10);
-    expect(Math.round(p.low)).toBe(6756);
-    expect(Math.round(p.high)).toBe(7297);
-    expect(Math.round(p.mid / 50) * 50).toBe(7050);
+    expect(l.total / (1 - WORKED.marginLow / 100)).toBeCloseTo(7721, 0); // the margin alone would give this
+    expect(p.low).toBeCloseTo(expected(l.total, WORKED.marginLow), 2);
+    expect(Math.round(p.low)).toBe(7905);
+    expect(p.floor.low).toBe(true);
+    expect(Math.round(p.high)).toBe(8315);
+    expect(p.floor.high).toBe(false);
   });
-  it('10 panels with a 5 kWh battery adds the battery cost', () => {
+  it('10 panels with a 5 kWh battery: the margin sets both ends', () => {
     const p = homePrice(WORKED, 10, { batteryKwh: 5 });
     expect(p.cost).toBeCloseTo(5405 + WORKED.batteries.find((b) => b.kwh === 5)!.cost, 2);
-    expect(Math.round(p.low)).toBe(Math.round(6505 * 1.25));
-    expect(Math.round(p.high)).toBe(Math.round(6505 * 1.35));
+    expect(Math.round(p.low)).toBe(9293);
+    expect(Math.round(p.high)).toBe(10008);
+    expect(p.floor.low).toBe(false);
+  });
+  it('16 panels with an 8.3 kWh battery on a 6 kW hybrid', () => {
+    const s6 = { ...WORKED, inverters: [inv({ acKw: 6, cost: 1000 })] };
+    const p = homePrice(s6, 16, { batteryKwh: 8.3 });
+    expect(p.cost).toBeCloseTo(7818, 2);
+    expect(Math.round(p.low)).toBe(11169);
+    expect(Math.round(p.high)).toBe(12028);
+    expect(p.low).toBeCloseTo(expected(p.cost, s6.marginLow), 2);
+  });
+  it('the minimum profit applies to low, middle and high separately', () => {
+    const cheap = { ...WORKED, minProfit: 3000 };
+    const p = homePrice(cheap, 10);
+    expect(p.low).toBeCloseTo(p.cost + 3000, 2);
+    expect(p.mid).toBeCloseTo(priced(p.cost, marginMid(cheap), 3000), 2);
+    expect(p.high).toBeCloseTo(Math.max(p.cost / (1 - cheap.marginHigh / 100), p.cost + 3000), 2);
+    expect(homePrice({ ...WORKED, minProfit: 0 }, 10).low).toBeCloseTo(5405 / 0.7, 2);
   });
   it('fitting labour is a day per panelsPerDay, never less than one day', () => {
     expect(costBuild(WORKED, 1, null, null).labour).toBe(c.labourPerDay);
@@ -38,11 +60,12 @@ describe('cost build-up', () => {
     expect(costBuild(off, 10, null, null).scaffolding).toBe(0);
     expect(costBuild(off, 10, null, null).total).toBeCloseTo(costBuild(WORKED, 10, null, null).total - c.scaffolding, 2);
   });
-  it('the markup range is ordered low, mid, high', () => {
-    const p = homePrice(DEFAULT_SETTINGS, 12);
+  it('the price range is ordered low, mid, high, with the middle margin halfway', () => {
+    const p = homePrice(DEFAULT_SETTINGS, 16, { batteryKwh: 8.3 });
     expect(p.low).toBeLessThan(p.mid);
     expect(p.mid).toBeLessThan(p.high);
-    expect(p.mid).toBeCloseTo(p.cost * 1.3, 2);
+    expect(marginMid(DEFAULT_SETTINGS)).toBe(32.5);
+    expect(p.mid).toBeCloseTo(p.cost / (1 - 0.325), 2);
   });
 });
 
@@ -93,7 +116,7 @@ describe('inverter sizing', () => {
 });
 
 describe('the estimate uses the cost model for homes', () => {
-  it('prices from the cost build-up, with the markup range and the chosen inverter', () => {
+  it('prices from the cost build-up, with the margin range and the chosen inverter', () => {
     const e = estimate(base, DEFAULT_SETTINGS);
     expect(e.pricing).toBe('costModel');
     const p = homePrice(DEFAULT_SETTINGS, e.panels);
@@ -158,7 +181,7 @@ describe('grouped lines for the quote', () => {
     for (const [panels, kwh] of [[10, 0], [10, 5], [14, 8.3], [7, 0], [18, 5]] as const) {
       const p = homePrice(DEFAULT_SETTINGS, panels, { batteryKwh: kwh });
       const headline = Math.round(p.mid);
-      const lines = groupedLines(p.lines, p.battery?.name ?? null, DEFAULT_SETTINGS.markupMid, headline);
+      const lines = groupedLines(p.lines, p.battery?.name ?? null, headline);
       expect(lines.reduce((a, b) => a + b.price, 0)).toBe(headline);
       expect(lines.some((l) => l.key === 'battery')).toBe(kwh > 0);
       expect(lines.every((l) => Number.isInteger(l.price))).toBe(true);
@@ -167,11 +190,11 @@ describe('grouped lines for the quote', () => {
 });
 
 describe('settings', () => {
-  it('seeds the placeholder inverters, batteries, markups and notices; award and finance are off', () => {
+  it('seeds the placeholder inverters, batteries, margins and notices; award and finance are off', () => {
     const s = cleanSettings({});
     expect(s.inverters.map((i) => i.cost)).toEqual([750, 900, 1000, 1400]);
     expect(s.batteries.map((b) => [b.kwh, b.cost])).toEqual([[5, 1100], [8.3, 1500]]);
-    expect([s.markupLow, s.markupMid, s.markupHigh]).toEqual([25, 30, 35]);
+    expect([s.marginLow, s.marginHigh, s.minProfit]).toEqual([30, 35, 2500]);
     expect(s.award.on).toBe(false);
     expect(s.finance.askOn).toBe(false);
     expect(s.finance.figuresOn).toBe(false);

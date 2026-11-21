@@ -28,7 +28,7 @@ describe('the PDF quote’s figures', () => {
   it('never carries a cost: the facts hold only what a customer sees', () => {
     const f = buildQuoteFacts({ ...args, settings: { ...DEFAULT_SETTINGS, pdfShowLinePrices: true } });
     const json = JSON.stringify(f);
-    expect(json).not.toMatch(/markup|"cost"|labourPerDay|ancillar/i);
+    expect(json).not.toMatch(/markup|margin|profit|"cost"|labourPerDay|ancillar/i);
     // No fitted line equals one of our raw costs (the placeholder inverter and battery).
     expect((f.lines ?? []).map((l) => l.price)).not.toContain(900);
   });
@@ -72,7 +72,7 @@ describe('the PDF and the email', () => {
     expect(m.html).toContain('ref=HX-EST-ABC234');
     expect(m.html).toContain('Unsubscribe');
     expect(m.text).toContain('Unsubscribe from follow-ups');
-    expect(m.html).not.toMatch(/markup/i);
+    expect(m.html).not.toMatch(/markup|profit|margin on/i);
   });
   it('unsubscribe links are signed per reference', () => {
     const t = unsubscribeToken('HX-EST-ABC234');
