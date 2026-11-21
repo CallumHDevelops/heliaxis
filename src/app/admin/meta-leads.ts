@@ -3,13 +3,13 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { ukDay } from '@/lib/bank-holidays';
 import { isProjectStage } from '@/lib/crm/stages';
 import { relativeTime } from '@/lib/enquiries';
-import { isMetaLead } from '@/lib/lead-source';
+import { leadSourceLabel } from '@/lib/lead-source';
 import { sourcesNow } from '@/lib/lead-source-server';
 import { byUrgency, followUp, QUIET_AFTER_HOURS, QUIET_LEAD_DAYS, type FollowUp, type FollowUpKey } from '@/lib/meta-lead-followup';
 import { missingColumn } from '@/lib/projects/server';
 import type { PortalKey } from '@/lib/portals';
 
-/** One new Meta lead on the dashboard. Times are worked out here, so the page shows what the server said. */
+/** One new lead on the dashboard, from any source (ads, the website, WhatsApp, the estimator…). Times are worked out here, so the page shows what the server said. */
 export type HubMetaLead = {
   id: string;
   name: string;
@@ -17,7 +17,7 @@ export type HubMetaLead = {
   ref: string | null;
   postcode: string | null;
   phone: string | null;
-  /** The ad's name now, "Organic", "WhatsApp ad"… (src/lib/lead-source.ts sourceNow). */
+  /** Where they came from: the ad's name now for Meta leads, else "Website", "WhatsApp"… (src/lib/lead-source.ts sourceNow). */
   ad: string;
   /** "was Video 1" when the ad has been renamed since they came in. */
   note: string | null;
@@ -32,7 +32,7 @@ export type HubMetaLead = {
   chat: string | null;
 };
 export type HubMetaLeads = {
-  /** Meta leads someone needs to get to, all of them. */
+  /** Leads someone needs to get to, from every source, all of them. */
   count: number;
   /** More than we read (LIMIT): show the count with a "+". */
   more: boolean;
@@ -40,7 +40,7 @@ export type HubMetaLeads = {
   today: number;
   /** The most urgent few. */
   rows: HubMetaLead[];
-  /** With none to get to: when the last Meta lead came in ("3 days ago"), or null if there's never been one. */
+  /** With none to get to: when the last lead came in ("3 days ago"), or null if there's never been one. */
   last: string | null;
   /** How many of them haven't been contacted (the footer's link lists those). */
   notContacted: number;
@@ -50,8 +50,6 @@ export type HubMetaLeads = {
 
 const LIMIT = 1000;
 const SHOWN = 6;
-// Narrowed in the query, then exactly in code (isMetaLead): Meta's forms and ad links, and WhatsApp ad chats.
-const META_OR = 'source.ilike.meta%,source.ilike.whatsapp-ad%';
 
 /** "5 minutes ago", "yesterday", "3 days ago", "on 12 Oct": the empty panel's "The last one came in …". */
 function cameIn(iso: string, now: number) {
@@ -117,7 +115,7 @@ async function surveysFor(db: Db, ids: string[]): Promise<Set<string>> {
 }
 
 /**
- * Dashboard → New Meta leads, for Enquiries and CRM staff: the Meta leads someone needs to get to now
+ * Dashboard → New leads, for Enquiries and CRM staff: the leads (every source) someone needs to get to now
  * (src/lib/meta-lead-followup.ts: free chat ending, not contacted, gone quiet; none with a message
  * lined up), most urgent first, how many came in today, and for CRM staff each one's open job. Every
  * read is defensive: a failure hides the panel rather than the dashboard.
@@ -128,7 +126,8 @@ export async function newMetaLeads(keys: PortalKey[], now = Date.now()): Promise
   if (!enquiries && !crm) return null;
   const db = createAdminClient();
   const iso = (ms: number) => new Date(ms).toISOString();
-  const metaLeads = (cols: string) => db.from('enquiries').select(cols).or(META_OR);
+  // Every lead, whatever its source: the follow-up rules (not contacted, free chat ending, gone quiet) are the same for all of them.
+  const metaLeads = (cols: string) => db.from('enquiries').select(cols);
 
   // Everyone still at New, then (once the chat times are there) those we've been in touch with whose
   // free chat is open, or who came in lately and have gone quiet.
@@ -149,9 +148,7 @@ export async function newMetaLeads(keys: PortalKey[], now = Date.now()): Promise
     queuedFor(db),
   ]);
   const seen = new Set<string>();
-  const leads = [...fresh.rows, ...((talking?.data ?? []) as unknown as Row[]), ...((quiet?.data ?? []) as unknown as Row[])].filter(
-    (e) => isMetaLead(e.source) && !seen.has(e.id) && !!seen.add(e.id)
-  );
+  const leads = [...fresh.rows, ...((talking?.data ?? []) as unknown as Row[]), ...((quiet?.data ?? []) as unknown as Row[])].filter((e) => !seen.has(e.id) && !!seen.add(e.id));
   const surveys = await surveysFor(db, leads.filter((e) => e.status !== 'new').map((e) => e.id));
   const all = leads
     .map((e) => ({ e, why: followUp(e, { queued: queued.has(e.id), surveyBooked: surveys.has(e.id), now }) }))
@@ -182,8 +179,8 @@ export async function newMetaLeads(keys: PortalKey[], now = Date.now()): Promise
 
   let last: string | null = null;
   if (!all.length) {
-    const { data } = await db.from('enquiries').select('source, created_at').or(META_OR).order('created_at', { ascending: false }).limit(50);
-    const newest = ((data ?? []) as { source: string | null; created_at: string }[]).find((e) => isMetaLead(e.source));
+    const { data } = await db.from('enquiries').select('source, created_at').order('created_at', { ascending: false }).limit(1);
+    const newest = ((data ?? []) as { source: string | null; created_at: string }[])[0];
     last = newest ? cameIn(newest.created_at, now) : null;
   }
   const ads = await shown;
@@ -201,7 +198,7 @@ export async function newMetaLeads(keys: PortalKey[], now = Date.now()): Promise
         ref: e.customer_ref || null,
         postcode: e.postcode || null,
         phone: e.phone || null,
-        ad: ads.get(e.id)?.ad ?? 'Meta',
+        ad: ads.get(e.id)?.ad ?? ads.get(e.id)?.label ?? leadSourceLabel(e.source),
         note: ads.get(e.id)?.note ?? null,
         at: e.created_at,
         ago: relativeTime(e.created_at),
@@ -212,6 +209,6 @@ export async function newMetaLeads(keys: PortalKey[], now = Date.now()): Promise
     }),
     last,
     notContacted,
-    seeAll: enquiries && notContacted ? '/admin/enquiries?source=meta&status=new' : null,
+    seeAll: enquiries && notContacted ? '/admin/enquiries?status=new' : null,
   };
 }

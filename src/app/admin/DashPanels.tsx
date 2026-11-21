@@ -7,14 +7,14 @@ import type { HubFollowUp, HubTask } from './HubView';
 import { dueLabel } from './HubMyDay';
 import type { HubMetaLeads } from './meta-leads';
 
-/** Dashboard → New Meta leads: the ones someone needs to get to, with why, WhatsApp, Call and Open. */
+/** Dashboard → New leads (every source): the ones someone needs to get to, with why, WhatsApp, Call and Open. */
 export function MetaLeadsPanel({ leads }: { leads: HubMetaLeads }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   return (
     <section className="nu" aria-labelledby="nu-leads-h">
       <div className="nu-head">
-        <h2 id="nu-leads-h">New Meta leads</h2>
+        <h2 id="nu-leads-h">New leads</h2>
         {leads.count > 0 && (
           <span className="nu-count" aria-label={`${leads.count}${leads.more ? ' or more' : ''} new`}>
             {leads.count.toLocaleString('en-GB')}
@@ -31,7 +31,7 @@ export function MetaLeadsPanel({ leads }: { leads: HubMetaLeads }) {
       </div>
       {leads.rows.length === 0 ? (
         <p className="nu-empty">
-          Nobody to get to: every Meta lead has been contacted or has a message lined up. {leads.last ? `The last one came in ${leads.last}.` : 'None have come in from Meta yet.'}
+          Nobody to get to: every lead has been contacted or has a message lined up. {leads.last ? `The last one came in ${leads.last}.` : 'No leads have come in yet.'}
         </p>
       ) : (
         <ul className="nu-list">
