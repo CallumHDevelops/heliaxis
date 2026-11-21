@@ -8,6 +8,7 @@ import { SITE_URL } from './copy';
 import { makeEstimatePdf } from './quote-pdf';
 import { quoteEmail } from './quote-email';
 import type { QuoteFacts } from './quote-facts';
+import { grantPermission } from '@/lib/whatsapp/permission';
 import { unsubscribeUrl } from './unsubscribe';
 import { sendQuoteOnWhatsApp } from './quote-whatsapp';
 import type { Delivery } from './quote-input';
@@ -60,6 +61,8 @@ export type DeliverArgs = {
  */
 export async function deliverQuote(a: DeliverArgs): Promise<{ pdfPath: string | null }> {
   const db = createAdminClient();
+  // Their separate, unticked yes to WhatsApp offers and news, recorded before anything is sent so it is the first record. The quote itself needs no tick box.
+  if (a.whatsappMarketing) await grantPermission(a.enquiryId, 'estimator-marketing');
   let bytes: Uint8Array | null = null;
   let pdfPath: string | null = null;
   try {

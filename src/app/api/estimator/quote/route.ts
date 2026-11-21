@@ -6,7 +6,6 @@ import { ATTR_COOKIE, CONSENT_COOKIE, hasConsent, parseAttribution, parseFirstTo
 import { classifyChannel } from '@/lib/search/channel';
 import { ensureOpportunity } from '@/lib/crm/server';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
-import { grantPermission } from '@/lib/whatsapp/permission';
 import { leadRef } from '@/lib/notification-refs';
 import { estimate } from '@/lib/estimator/calc';
 import { readEstimatorSettings } from '@/lib/estimator/settings';
@@ -126,9 +125,6 @@ export async function POST(req: NextRequest) {
 
     after(async () => {
       if (attribution?.fbc) await db.from('enquiries').update({ meta_fbc: attribution.fbc }).eq('id', enquiryId).then(() => null, () => null);
-      // WhatsApp: asking for it by WhatsApp is the request for the quote. Marketing is its own, separate yes.
-      if (consent.whatsappMarketing) await grantPermission(enquiryId, 'estimator-marketing');
-      else if (delivery !== 'email') await grantPermission(enquiryId, 'website-form');
       await ensureOpportunity(enquiryId, source);
       await db.from('crm_lead_origins').update(channelFields).eq('enquiry_id', enquiryId).then(() => null, () => null);
     });

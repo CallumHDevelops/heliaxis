@@ -101,10 +101,17 @@ const TEMPLATE_ERRORS: Record<number, string> = {
   132016: 'Meta has turned this template off. Try another one.',
 };
 
-/** A pre-approved template. `params` fill the body's {{1}}, {{2}}… in order. */
-export async function sendTemplate(to: string, name: string, lang: string, params: string[] = []): Promise<SendResult> {
+/** A document header for a template that has one: Meta fetches the PDF from `link`, and the customer sees it as `filename`. */
+export type TemplateDocumentHeader = { link: string; filename: string };
+
+/** A pre-approved template. `params` fill the body's {{1}}, {{2}}… in order; `header` is the document for a template with a document header. */
+export async function sendTemplate(to: string, name: string, lang: string, params: string[] = [], header?: TemplateDocumentHeader): Promise<SendResult> {
   // Meta refuses a blank with line breaks, tabs or 4+ spaces in a row.
   const values = params.map((p) => p.replace(/\s*[\r\n\t]+\s*/g, ' ').replace(/ {4,}/g, '   ').trim());
+  const components = [
+    ...(header ? [{ type: 'header', parameters: [{ type: 'document', document: { link: header.link, filename: header.filename } }] }] : []),
+    ...(values.length ? [{ type: 'body', parameters: values.map((text) => ({ type: 'text', text })) }] : []),
+  ];
   const r: SendResult = await graph(messagesPath(), {
     method: 'POST',
     body: JSON.stringify({
@@ -114,9 +121,7 @@ export async function sendTemplate(to: string, name: string, lang: string, param
       template: {
         name,
         language: { code: lang },
-        ...(values.length
-          ? { components: [{ type: 'body', parameters: values.map((text) => ({ type: 'text', text })) }] }
-          : {}),
+        ...(components.length ? { components } : {}),
       },
     }),
   });

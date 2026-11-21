@@ -6,6 +6,7 @@ import { canAccess } from '@/lib/portals';
 import { callBackTask } from './call-back';
 import { suggestCall } from '@/lib/crm/call-suggest';
 import { inboundMediaColumns, storeMediaSoon } from './media';
+import { replyWithEstimate } from '@/lib/estimator/quote-whatsapp';
 import { defaultTemplate, markRead, sendDocument, sendTemplate, sendText, whatsappConfigured } from './api';
 import {
   fillReply,
@@ -192,6 +193,9 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
   if (m.type !== 'reaction' && word !== 'stop') await tellScheduledAuthors(db, enquiry);
   const kept = word ? await stopOrStart(db, { ...enquiry, wa_last_inbound_at: at }, m.from, word, at) : false;
   if (!word) await grantPermission(enquiry.id, 'inbound', { at });
+
+  // "Please send my estimate HX-EST-XXXXXX": reply with that estimate's PDF, now the 24-hour window is open (no template needed).
+  if (kind === 'text' && !word) await replyWithEstimate(enquiry.id, m.from, body).catch(() => null);
 
   // They answered — stop any follow-up sequence on their opportunities.
   await db
