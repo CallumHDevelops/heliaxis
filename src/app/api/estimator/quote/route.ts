@@ -11,6 +11,8 @@ import { leadRef } from '@/lib/notification-refs';
 import { estimate } from '@/lib/estimator/calc';
 import { readEstimatorSettings } from '@/lib/estimator/settings';
 import { buildEstimateMessage } from '@/lib/estimator/lead';
+import { buildQuoteFacts } from '@/lib/estimator/quote-facts';
+import { deliverQuote } from '@/lib/estimator/quote-send';
 import { buildConsent, DELIVERIES, makeReference, normaliseUkMobile, ownImagePath, parseQuoteInputs, validEmail, type Delivery } from '@/lib/estimator/quote-input';
 
 export const dynamic = 'force-dynamic';
@@ -131,6 +133,10 @@ export async function POST(req: NextRequest) {
       await db.from('crm_lead_origins').update(channelFields).eq('enquiry_id', enquiryId).then(() => null, () => null);
     });
     after(() => notifyEnquiryTeam(`New estimate request: ${name}${postcode ? ` (${postcode})` : ''}`, `${gbp50(r.costLow)} – ${gbp50(r.costHigh)} · ${r.panels} panels · ${reference}`, `/admin/enquiries?enquiry=${enquiryId}`, { tag: `enq-${enquiryId}`, ref: leadRef(enquiryId) }).catch(() => {}));
+
+    // The PDF, the email and the WhatsApp go after the reply, so the visitor sees "on its way" at once.
+    const facts = buildQuoteFacts({ reference, customerName: name, address, postcode, inputs: parsed.inputs, settings, imp: parsed.imp, exp: parsed.exp });
+    after(() => deliverQuote({ reference, enquiryId, name, email, mobile, delivery, facts, mapPath: ownImagePath(body.mapPath), origin: req.nextUrl.origin, whatsappMarketing: consent.whatsappMarketing }).then(() => null, (e) => console.error('Estimator quote: delivery failed', e)));
 
     return NextResponse.json({ ok: true, reference, enquiryId, delivery });
   } catch (e) {
