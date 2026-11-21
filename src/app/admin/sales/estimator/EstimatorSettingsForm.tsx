@@ -315,6 +315,10 @@ export function EstimatorSettingsForm({ initial }: { initial: EstimatorSettings 
             </div>
           </div>
           <div className="est-field">
+            <label htmlFor="fi-l">Official scheme page (https://)</label>
+            <input id="fi-l" className="crm-input" value={finance.link} onChange={(e) => setFinance({ ...finance, link: e.target.value })} placeholder="https://" />
+          </div>
+          <div className="est-field">
             <label htmlFor="fi-t">Term</label>
             <div className="est-input">
               <input id="fi-t" className="crm-input" inputMode="numeric" value={String(finance.termYears)} onChange={(e) => setFinance({ ...finance, termYears: Number(e.target.value.replace(/\D/g, '')) || 10 })} />

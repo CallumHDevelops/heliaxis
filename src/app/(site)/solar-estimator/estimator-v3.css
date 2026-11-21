@@ -48,3 +48,4 @@
   .est-headbtns .btn{flex:1 1 100%}
 }
 @media print{.est-sticky,.est-quotecard,.est-choice,.est-upsell{display:none!important}}
+@media(max-width:840px){body:has(.est-sticky) .hx-wa-fab{display:none}}

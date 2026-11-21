@@ -24,6 +24,7 @@ import { SurveyModal } from './SurveyModal';
 import { PHONE, PHONE_HREF, QuoteCapture, QuoteModal, StickyBar, TalkLine, useExitIntent, type QuoteDone } from './QuoteParts';
 import { whatsappHref } from '@/components/site/WhatsAppButton';
 import { includedItems } from '@/lib/estimator/included';
+import { TrustBar } from './TrustBar';
 import { track } from '@/lib/estimator/analytics';
 import { pixel } from '@/lib/meta-pixel';
 import { panelPolygon, pointsAttr, toPixel, MAP_SIZE } from '@/lib/estimator/overlay';
@@ -113,6 +114,18 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
   const [yieldData, setYieldData] = useState<Yield>(null);
   const [yieldNote, setYieldNote] = useState('');
   const head = useRef<HTMLDivElement>(null);
+
+  // "Add to my quote" further down the page ticks that extra (and the battery's size stays as it was).
+  useEffect(() => {
+    const onAdd = (e: Event) => {
+      const what = (e as CustomEvent<string>).detail;
+      if (what === 'battery') setBattery(true);
+      else if (what === 'ev') setEv(true);
+      else if (what === 'heatpump') setHeatpump(true);
+    };
+    window.addEventListener('hx-est-add', onAdd);
+    return () => window.removeEventListener('hx-est-add', onAdd);
+  }, []);
 
   const pcOk = PC.test(postcode.trim());
   const picker = addressPicker && roofLookup && !skipLookup && !typed;
@@ -217,10 +230,11 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
           <span className="eyebrow">South Wales · Free instant estimate</span>
           <h1>{who === 'business' ? 'See what solar could do for your business.' : 'See what solar could do for your home.'}</h1>
           <p>Answer six quick questions. You’ll get a system size, a price range and your savings, and we’ll send you a full quote as a PDF.</p>
+          <TrustBar award={settings.award} />
         </div>
       </section>
 
-      <div className="wrap est-wrap" ref={head}>
+      <div className="wrap est-wrap" id="estimator" ref={head}>
         {!done ? (
           <div className="est-card est-wiz">
             {looking && <Finding address={picker ? query : [house, postcode].filter(Boolean).join(', ')} done={lookDone} />}

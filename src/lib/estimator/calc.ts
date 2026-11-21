@@ -54,7 +54,7 @@ export type Notices = { vatLine: string; vatExpires: string; priceRiseLine: stri
 /** The GoodWe award block: built, and off until the exact wording from the award is entered. */
 export type Award = { on: boolean; title: string; wording: string; link: string; imageUrl: string };
 /** Finance copy. Off until Heliaxis's status for credit broking is confirmed; figures only when switched on with a rate. */
-export type Finance = { askOn: boolean; figuresOn: boolean; aprPct: number; termYears: number };
+export type Finance = { askOn: boolean; figuresOn: boolean; aprPct: number; termYears: number; /** The official Warm Homes Loan page to link to (left empty until confirmed). */ link: string };
 
 export type EstimatorSettings = {
   /** The packages on sale and their prices (homes). Empty: the formula below is used. */
@@ -139,7 +139,7 @@ export const DEFAULT_SETTINGS: EstimatorSettings = {
   // PLACEHOLDER: the price-rise line is a forecast until Ofgem announces (due 25 Nov 2026); Callum replaces it with Ofgem's figure.
   notices: { vatLine: '0% VAT on home solar and batteries ends 31 March 2027.', vatExpires: '2027-03-31', priceRiseLine: 'Energy bills are forecast to rise by about 26% in January 2027 (Cornwall Insight).', priceRiseExpires: '2026-11-25' },
   award: { on: false, title: '', wording: '', link: '', imageUrl: '' },
-  finance: { askOn: false, figuresOn: false, aprPct: 0, termYears: 10 },
+  finance: { askOn: false, figuresOn: false, aprPct: 0, termYears: 10, link: '' },
 };
 
 /** Settings from storage or a request, each number kept within a sensible range, the rest defaulted. */
@@ -240,7 +240,7 @@ export function cleanSettings(v: unknown): EstimatorSettings {
     },
     // The award stays off until its wording is filled in.
     award: { on: bool(aw.on, false) && !!txt(aw.wording, 400), title: txt(aw.title, 100), wording: txt(aw.wording, 400), link: txt(aw.link, 300), imageUrl: txt(aw.imageUrl, 300) },
-    finance: { askOn: bool(fi.askOn, false), figuresOn: bool(fi.figuresOn, false) && Number(fi.aprPct) > 0, aprPct: Math.min(100, Math.max(0, Number(fi.aprPct) || 0)), termYears: Math.min(25, Math.max(1, Math.round(Number(fi.termYears) || 10))) },
+    finance: { askOn: bool(fi.askOn, false), figuresOn: bool(fi.figuresOn, false) && Number(fi.aprPct) > 0, aprPct: Math.min(100, Math.max(0, Number(fi.aprPct) || 0)), termYears: Math.min(25, Math.max(1, Math.round(Number(fi.termYears) || 10))), link: /^https:\/\//.test(txt(fi.link, 300)) ? txt(fi.link, 300) : '' },
   };
 }
 
