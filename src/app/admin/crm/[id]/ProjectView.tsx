@@ -24,6 +24,7 @@ import { defaultDocsView, DocsHub, type DocsView } from './DocsHub';
 import { ReviewSheet } from './ReviewSheet';
 import { SurveyLinkSheet } from './SurveyLinkSheet';
 import { CallSuggestions } from './CallSuggestions';
+import { AppointmentSheet } from './AppointmentSheet';
 import { EmailComposerV2, SEND_QUOTE } from './ProjectExtras';
 import { RecordFabs } from './RecordFabs';
 import { RecordHeader } from './RecordHeader';
@@ -834,6 +835,22 @@ export function ProjectView({
           onTile={() => {
             closeSheet();
             if (primary.tile) void runAction(primary.tile.action, primary.tile.action === primary.action ? primary.to : undefined);
+          }}
+        />
+      )}
+      {sheet === 'appointment' && (
+        <AppointmentSheet
+          projectId={id}
+          customer={c.name}
+          postcode={p.postcode || c.postcode}
+          address={p.address}
+          needsSurvey={!noSurveyNeeded(p)}
+          today={today}
+          onClose={closeSheet}
+          onDone={(m) => {
+            closeSheet();
+            setNotice(m);
+            void reload();
           }}
         />
       )}

@@ -19,7 +19,7 @@ import { SnippetPicker, WhatsAppDocSend, type CrmDoc } from './ProjectExtras';
 import { copyText, send, type Area, type Customer, type Project, type WaInfo } from './record-shared';
 
 /** What the + sheet can open. */
-export type SheetKey = null | 'menu' | 'quote' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review' | 'surveylink' | 'portal' | 'jobedit';
+export type SheetKey = null | 'menu' | 'quote' | 'task' | 'next' | 'whatsapp' | 'note' | 'call' | 'visit' | 'email' | 'photo' | 'stage' | 'delete' | 'link' | 'newproject' | 'document' | 'review' | 'surveylink' | 'portal' | 'jobedit' | 'appointment';
 
 /** The + sheet's icons, all from the brand kit (see BrandIcon). */
 const MENU_ICONS = {
@@ -39,6 +39,7 @@ const MENU_ICONS = {
   surveylink: 'calendar',
   portal: 'house',
   jobedit: 'clipboard',
+  appointment: 'calendar',
 } as const;
 
 /** "Add to Jane": the + button's sheet. WhatsApp has its own green button now; the stage's own action is the last tile. */
@@ -47,6 +48,7 @@ export function ActionMenu({ customer, tile, portal = false, quotes = false, onP
     // A quote for this customer and job, opened in the quote builder (read the OpenSolar PDF, price it, send it).
     ...(quotes ? ([['quote', 'quote', 'Quote', 'Price it and send it']] as typeof items) : []),
     ['task', 'task', 'Task', 'Who and when'],
+    ['appointment', 'appointment', 'Appointment', 'Add to my diary'],
     ['note', 'note', 'Note'],
     ['jobedit', 'jobedit', 'Edit job details', 'Products, value, address, notes'],
     ['call', 'call', 'Log a call'],
