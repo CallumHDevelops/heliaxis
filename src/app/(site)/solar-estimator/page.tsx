@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { withSeoOverride } from '@/lib/seo/overrides';
 import './solar-estimator.css';
+import { publicSettings } from '@/lib/estimator/calc';
 import { readEstimatorSettings } from '@/lib/estimator/settings';
 import { SolarEstimatorApp } from './SolarEstimatorApp';
 import { EstimatorExtras } from './EstimatorExtras';
@@ -21,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function SolarEstimatorPage() {
   return (
     <>
-      <SolarEstimatorApp settings={await readEstimatorSettings()} roofLookup={!!process.env.GOOGLE_SOLAR_API_KEY} addressPicker={!!process.env.IDEAL_POSTCODES_API_KEY} />
+      <SolarEstimatorApp settings={publicSettings(await readEstimatorSettings())} roofLookup={!!process.env.GOOGLE_SOLAR_API_KEY} addressPicker={!!process.env.IDEAL_POSTCODES_API_KEY} />
       <EstimatorExtras />
     </>
   );

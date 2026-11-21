@@ -13,7 +13,8 @@ export const QUOTE_HREF = '/free-solar-quote';
  * into page copy. Renders nothing when no active package has a price.
  */
 export async function PackagesBand({ quoteHref = QUOTE_HREF }: { quoteHref?: string }) {
-  const cards = packageCards((await readEstimatorSettings()).packages);
+  const settings = await readEstimatorSettings();
+  const cards = packageCards(settings.packages, settings);
   if (!cards.length) return null;
   return (
     <section className="sec pkgband" aria-labelledby="pkgband-h">

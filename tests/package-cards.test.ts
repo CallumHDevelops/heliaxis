@@ -10,6 +10,7 @@ const pkg = (o: Partial<Package>): Package => ({
   includes: ['Panels', ' ', 'Inverter'],
   active: true,
   batteryKwh: 0,
+  pricing: 'bands',
   bands: [],
   ...o,
 });

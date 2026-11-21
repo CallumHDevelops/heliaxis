@@ -620,9 +620,9 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
             <div className="tile">
               <div className="k">Installed cost</div>
               <div className="v">
-                {gbpRound(r.costLow, 100)} – {gbpRound(r.costHigh, 100)}
+                {gbpRound(r.costLow)} – {gbpRound(r.costHigh)}
               </div>
-              <small>indicative{home ? ', 0% VAT where it applies' : ', before VAT'}</small>
+              <small>fitted{home ? ', 0% VAT' : ', + VAT'}</small>
             </div>
             <div className="tile">
               <div className="k">Pays for itself in</div>
@@ -757,7 +757,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
               <Stepper label="You export at" value={rates.exp} onChange={(n) => setRates({ ...rates, exp: n })} />
             </div>
           </div>
-          {r.needsG99 && <p className="est-note">A system over 3.68 kW needs approval from your network operator (a G99 application). We handle that for you.</p>}
+          {r.gridRoute && <p className="est-note">{r.gridRoute === 'G99' ? 'We handle the grid application for you: your network operator approves a system this size before it goes in (a G99 application).' : 'We handle the grid application for you: this size just needs your network operator told after the install (a G98 notification).'}</p>}
           {note && <p className="est-note">{note}</p>}
         </div>
       </div>
@@ -772,7 +772,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
           <li>Yield: {num(inputs.yieldKwhPerKwp)} kWh per kWp a year for your postcode, roof direction and pitch ({source === 'pvgis' ? 'EU PVGIS data' : 'typical South Wales figure'}), less shading of {inputs.shade === 'none' ? '0' : inputs.shade === 'some' ? '10' : '22'}%.</li>
           <li>Electricity price {settings.importPence}p per kWh; export payment {settings.exportPence}p per kWh (Smart Export Guarantee rates vary from about 4p to 15p).</li>
           <li>You use about {Math.round(r.selfPct * 100)}% of the solar yourself, based on who is home in the day (a bigger system exports more of what it makes){r.batteryKwh ? ', with the battery' : ''}{inputs.ev ? ', and an electric car' : ''}{inputs.heatpump ? ', and a heat pump' : ''}.</li>
-          <li>{r.packageName ? `Priced from our ${r.packageName} package for ${r.panels} panels${r.batteryKwh ? ', with its battery' : ''}.` : `${home ? 'Home' : 'Business'} price £${(home ? settings.homeFixed : settings.businessFixed).toLocaleString('en-GB')} fixed plus £${(home ? settings.homePerKwp : settings.businessPerKwp).toLocaleString('en-GB')} per kWp installed${r.batteryKwh ? `, plus £${(settings.batteryPerKwh * settings.batteryKwh).toLocaleString('en-GB')} for the battery` : ''}.`} Savings are shown ±12% and prices ±8%. The survey sets the real price.</li>
+          <li>{r.pricing === 'costModel' ? `Priced for ${r.panels} panels with ${r.inverter ?? 'a GoodWe hybrid inverter'}${r.batteryKwh ? ' and a battery' : ''}, including scaffolding, fitting, electrical work, the grid application and MCS certificate.` : r.packageName ? `Priced from our ${r.packageName} package for ${r.panels} panels${r.batteryKwh ? ', with its battery' : ''}.` : `${home ? 'Home' : 'Business'} price £${(home ? settings.homeFixed : settings.businessFixed).toLocaleString('en-GB')} fixed plus £${(home ? settings.homePerKwp : settings.businessPerKwp).toLocaleString('en-GB')} per kWp installed${r.batteryKwh ? `, plus £${(settings.batteryPerKwh * settings.batteryKwh).toLocaleString('en-GB')} for the battery` : ''}.`} Savings are shown ±12%. The survey sets the real price.</li>
           <li>25-year figure: panels lose {settings.degradationPct}% a year and electricity prices are assumed {settings.priceRisePct ? `to rise ${settings.priceRisePct}% a year` : 'not to rise (today’s prices, a cautious view)'}.</li>
           <li>CO₂: about {r.co2Tonnes.toFixed(1)} tonnes a year, at {settings.co2PerKwh} kg per kWh.</li>
         </ul>

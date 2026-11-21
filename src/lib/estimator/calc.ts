@@ -8,6 +8,26 @@
  * visitor and changed by Heliaxis without touching code.
  */
 
+import {
+  batteryOption,
+  buildPriceTable,
+  chooseInverter,
+  cleanBatteries,
+  cleanCosts,
+  cleanInverters,
+  DEFAULT_BATTERIES,
+  DEFAULT_COSTS,
+  DEFAULT_INVERTERS,
+  gridRouteFor,
+  homePrice,
+  tableRow,
+  type BatteryOption,
+  type CostSettings,
+  type Inverter,
+  type Phase,
+  type PriceTable,
+} from './pricing';
+
 /** One price on a package's list: what a system of this many panels costs, installed. */
 export type PriceBand = { panels: number; price: number };
 /**
@@ -24,8 +44,17 @@ export type Package = {
   active: boolean;
   /** solar_battery: the battery in the package, kWh (the prices include it). */
   batteryKwh: number;
+  /** 'costModel' (the default): the price is built up from our costs and marked up. 'bands': the hand-typed price list below (a fixed promotional price). */
+  pricing: 'costModel' | 'bands';
   bands: PriceBand[];
 };
+
+/** The "why now" strip: each line hides itself after its expiry date (YYYY-MM-DD). */
+export type Notices = { vatLine: string; vatExpires: string; priceRiseLine: string; priceRiseExpires: string };
+/** The GoodWe award block: built, and off until the exact wording from the award is entered. */
+export type Award = { on: boolean; title: string; wording: string; link: string; imageUrl: string };
+/** Finance copy. Off until Heliaxis's status for credit broking is confirmed; figures only when switched on with a rate. */
+export type Finance = { askOn: boolean; figuresOn: boolean; aprPct: number; termYears: number };
 
 export type EstimatorSettings = {
   /** The packages on sale and their prices (homes). Empty: the formula below is used. */
@@ -51,10 +80,34 @@ export type EstimatorSettings = {
   degradationPct: number;
   /** kg of CO₂ saved per kWh of solar used or exported. */
   co2PerKwh: number;
+  /** Homes: price from the cost build-up (true), or the old fixed cost plus price per kWp (false). Businesses always use the formula. */
+  homeUsesCostModel: boolean;
+  costs: CostSettings;
+  inverters: Inverter[];
+  batteries: BatteryOption[];
+  /** Markup on cost, per cent: the low and high ends of the range shown, and the middle figure used for payback. */
+  markupLow: number;
+  markupMid: number;
+  markupHigh: number;
+  /** The most DC (panels) per AC (inverter) the sizing allows. */
+  maxDcAcRatio: number;
+  /** AC kW a battery needs per kWh to charge and discharge usefully (0 turns the rule off). */
+  batteryKwPerKwh: number;
+  /** Allow a solar-only (non-hybrid) inverter on a home with no battery. */
+  solarOnlyInverter: boolean;
+  /** Years of workmanship warranty to quote; 0 leaves the line out until confirmed. */
+  workmanshipYears: number;
+  /** Show grouped prices on the PDF's what's-included list. */
+  pdfShowLinePrices: boolean;
+  notices: Notices;
+  award: Award;
+  finance: Finance;
+  /** The browser's copy only: ready-made prices in place of the costs (see publicSettings). */
+  priceTable?: PriceTable;
 };
 
-/** The settings that are plain numbers (everything but the packages). */
-export type NumKey = Exclude<keyof EstimatorSettings, 'packages'>;
+/** The settings that are plain numbers. */
+export type NumKey = 'importPence' | 'standingPence' | 'exportPence' | 'panelWatts' | 'homeFixed' | 'homePerKwp' | 'businessFixed' | 'businessPerKwp' | 'batteryPerKwh' | 'batteryKwh' | 'priceRisePct' | 'degradationPct' | 'co2PerKwh' | 'markupLow' | 'markupMid' | 'markupHigh' | 'maxDcAcRatio' | 'batteryKwPerKwh' | 'workmanshipYears';
 
 export const DEFAULT_SETTINGS: EstimatorSettings = {
   packages: [],
@@ -71,6 +124,22 @@ export const DEFAULT_SETTINGS: EstimatorSettings = {
   priceRisePct: 0,
   degradationPct: 0.5,
   co2PerKwh: 0.2,
+  homeUsesCostModel: true,
+  costs: DEFAULT_COSTS,
+  inverters: DEFAULT_INVERTERS,
+  batteries: DEFAULT_BATTERIES,
+  markupLow: 25,
+  markupMid: 30,
+  markupHigh: 35,
+  maxDcAcRatio: 1.35,
+  batteryKwPerKwh: 0.5,
+  solarOnlyInverter: false,
+  workmanshipYears: 0,
+  pdfShowLinePrices: false,
+  // PLACEHOLDER: the price-rise line is a forecast until Ofgem announces (due 25 Nov 2026); Callum replaces it with Ofgem's figure.
+  notices: { vatLine: '0% VAT on home solar and batteries ends 31 March 2027.', vatExpires: '2027-03-31', priceRiseLine: 'Energy bills are forecast to rise by about 26% in January 2027 (Cornwall Insight).', priceRiseExpires: '2026-11-25' },
+  award: { on: false, title: '', wording: '', link: '', imageUrl: '' },
+  finance: { askOn: false, figuresOn: false, aprPct: 0, termYears: 10 },
 };
 
 /** Settings from storage or a request, each number kept within a sensible range, the rest defaulted. */
@@ -99,6 +168,7 @@ export function cleanPackages(v: unknown): Package[] {
       includes: (Array.isArray(p.includes) ? p.includes : []).slice(0, 12).map((x) => txt(x, 120)).filter(Boolean),
       active: p.active !== false,
       batteryKwh: kind === 'solar_battery' && Number.isFinite(kwh) ? Math.min(30, Math.max(0, kwh)) : 0,
+      pricing: p.pricing === 'bands' ? 'bands' : 'costModel',
       bands: [...bands].map(([panels, price]) => ({ panels, price })).sort((a, b) => a.panels - b.panels),
     });
   }
@@ -127,6 +197,13 @@ export function cleanSettings(v: unknown): EstimatorSettings {
     const n = Number(o[k]);
     return Number.isFinite(n) && o[k] !== '' && o[k] != null ? Math.min(hi, Math.max(lo, n)) : DEFAULT_SETTINGS[k];
   };
+  const bool = (v: unknown, d: boolean) => (v === undefined || v === null ? d : v === true || v === 'true');
+  const obj = (v: unknown) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {});
+  const date = (v: unknown, d: string) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v ?? '')) ? String(v) : v === '' ? '' : d);
+  const nt = obj(o.notices);
+  const aw = obj(o.award);
+  const fi = obj(o.finance);
+  const dn = DEFAULT_SETTINGS.notices;
   return {
     packages: cleanPackages(o.packages),
     importPence: num('importPence', 5, 100),
@@ -143,6 +220,44 @@ export function cleanSettings(v: unknown): EstimatorSettings {
     priceRisePct: num('priceRisePct', 0, 10),
     degradationPct: num('degradationPct', 0, 3),
     co2PerKwh: num('co2PerKwh', 0.01, 0.8),
+    homeUsesCostModel: bool(o.homeUsesCostModel, true),
+    costs: cleanCosts(o.costs),
+    inverters: cleanInverters(o.inverters),
+    batteries: cleanBatteries(o.batteries),
+    markupLow: num('markupLow', 0, 200),
+    markupMid: num('markupMid', 0, 200),
+    markupHigh: num('markupHigh', 0, 200),
+    maxDcAcRatio: num('maxDcAcRatio', 1, 2),
+    batteryKwPerKwh: num('batteryKwPerKwh', 0, 2),
+    solarOnlyInverter: bool(o.solarOnlyInverter, false),
+    workmanshipYears: Math.round(num('workmanshipYears', 0, 50)),
+    pdfShowLinePrices: bool(o.pdfShowLinePrices, false),
+    notices: {
+      vatLine: nt.vatLine === undefined ? dn.vatLine : txt(nt.vatLine, 200),
+      vatExpires: date(nt.vatExpires, dn.vatExpires),
+      priceRiseLine: nt.priceRiseLine === undefined ? dn.priceRiseLine : txt(nt.priceRiseLine, 220),
+      priceRiseExpires: date(nt.priceRiseExpires, dn.priceRiseExpires),
+    },
+    // The award stays off until its wording is filled in.
+    award: { on: bool(aw.on, false) && !!txt(aw.wording, 400), title: txt(aw.title, 100), wording: txt(aw.wording, 400), link: txt(aw.link, 300), imageUrl: txt(aw.imageUrl, 300) },
+    finance: { askOn: bool(fi.askOn, false), figuresOn: bool(fi.figuresOn, false) && Number(fi.aprPct) > 0, aprPct: Math.min(100, Math.max(0, Number(fi.aprPct) || 0)), termYears: Math.min(25, Math.max(1, Math.round(Number(fi.termYears) || 10))) },
+  };
+}
+
+/**
+ * The settings for the visitor's browser: the same, but with our costs and markups taken out and ready-made prices put in their place, so the page
+ * never carries what a job costs us. Estimates from this copy match the full settings exactly (the server re-prices every quote from the full ones).
+ */
+export function publicSettings(s: EstimatorSettings): EstimatorSettings {
+  return {
+    ...s,
+    costs: { ...s.costs, panel: 0, mounting: 0, labourPerDay: 0, electrical: 0, admin: 0, ancillaryPerWatt: 0, scaffolding: 0 },
+    inverters: [],
+    batteries: s.batteries.map((b) => ({ ...b, cost: 0 })),
+    markupLow: 0,
+    markupMid: 0,
+    markupHigh: 0,
+    priceTable: buildPriceTable(s),
   };
 }
 
@@ -207,6 +322,8 @@ export type Inputs = {
   batteryKwh?: number;
   /** kWh per kWp a year for each panel the roof takes, best face first (a roof with more than one face). Overrides yieldKwhPerKwp. */
   panelYields?: number[];
+  /** Homes: the supply. Single phase unless they say three ('unknown' counts as single). */
+  phase?: Phase | 'unknown';
 };
 
 export type Estimate = {
@@ -244,8 +361,19 @@ export type Estimate = {
   roofPanels: number;
   /** Money position at the end of each year, 0 to 25 (negative until the system has paid for itself). */
   cashflow: number[];
-  /** The package whose price list priced it (homes), or null when the formula did. */
+  /** The package whose card it sits under (homes), or null when there is none. */
   packageName: string | null;
+  /** How the price was made. */
+  pricing: 'costModel' | 'bands' | 'formula';
+  /** The inverter chosen (homes), its AC rating, and the grid route: G98 (we notify after install) or G99 (we apply before). */
+  inverter: string | null;
+  acKw: number;
+  gridRoute: 'G98' | 'G99' | null;
+  phase: Phase;
+  /** A single-phase supply takes no bigger array, so the system was held at the largest the inverters take. */
+  phaseCapped: boolean;
+  /** The array the largest inverter takes on this supply, kWp (0: not known). */
+  phaseCapKwp: number;
 };
 
 const EV_KWH = 2000;
@@ -295,7 +423,13 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
   let wanted = minPanels;
   while (wanted < typeMax && genFor(wanted) < target) wanted++;
   const cap = roofCap ? Math.min(typeMax, roofCap) : typeMax;
-  const panels = i.sizeMode === 'roof' && roofCap ? cap : Math.min(wanted, cap);
+  const phase: Phase = home && i.phase === 'three' ? 'three' : 'single';
+  // A single-phase supply takes no more than its largest inverter does (the array is held there, and the page says so).
+  const supplyCapKwp = home ? (s.priceTable ? s.priceTable.capKwp[phase] : chooseInverter(s, 0, { phase }).capKwp) : 0;
+  const supplyCap = supplyCapKwp > 0 ? Math.floor((supplyCapKwp * 1000) / s.panelWatts + 1e-9) : Infinity;
+  const uncapped = i.sizeMode === 'roof' && roofCap ? cap : Math.min(wanted, cap);
+  const panels = Math.max(1, Math.min(uncapped, supplyCap));
+  const phaseCapped = panels < uncapped;
   const roofLimited = !!roofCap && wanted > roofCap && i.sizeMode !== 'roof';
   const kwp = (panels * s.panelWatts) / 1000;
   const generation = genFor(panels);
@@ -303,9 +437,13 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
   // How much is used in the building: limited by what is made and by what the building uses while the sun is up. A battery, an
   // electric car and a heat pump all raise that daytime use; a bigger system on the same use exports more of what it makes.
   // A home's price comes from the matching package's price list when there is one; the battery is then the package's.
-  const pkgSolar = home ? s.packages.find((p) => p.active && p.kind === 'solar' && p.bands.length) : undefined;
-  const pkgBattery = home && i.battery ? s.packages.find((p) => p.active && p.kind === 'solar_battery' && p.bands.length) : undefined;
-  const batteryKwh = i.battery ? (pkgBattery?.batteryKwh || (i.batteryKwh ?? s.batteryKwh)) : 0;
+  // A package set to 'bands' keeps a hand-typed price list (a fixed promotional price); otherwise a home is priced from the cost build-up.
+  const pkgSolar = home ? s.packages.find((p) => p.active && p.kind === 'solar' && p.pricing === 'bands' && p.bands.length) : undefined;
+  const pkgBattery = home && i.battery ? s.packages.find((p) => p.active && p.kind === 'solar_battery' && p.pricing === 'bands' && p.bands.length) : undefined;
+  const useBands = home && (i.battery ? !!pkgBattery : !!pkgSolar);
+  const useCostModel = home && !useBands && s.homeUsesCostModel;
+  const wantKwh = i.batteryKwh ?? s.batteryKwh;
+  const batteryKwh = !i.battery ? 0 : useCostModel ? (batteryOption(s, wantKwh)?.kwh ?? wantKwh) : (pkgBattery?.batteryKwh || wantKwh);
   const batteryBonus = batteryKwh > 0 ? (home ? 0.3 : 0.2) * ((1 - Math.exp(-batteryKwh / 4)) / (1 - Math.exp(-5 / 4))) : 0;
   const dayShare = Math.min(0.9, DAY_SHARE[home ? 'home' : 'business'][i.daytime] + batteryBonus + (i.ev ? 0.04 : 0) + (i.heatpump ? 0.04 : 0));
   const selfUsed = Math.min(generation, softMin(generation * 0.95, consumption * dayShare * 1.15));
@@ -317,13 +455,30 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
   const formulaSolar = home ? s.homeFixed + kwp * s.homePerKwp : s.businessFixed + kwp * s.businessPerKwp;
   const fromBattery = pkgBattery ? priceFromBands(pkgBattery.bands, panels) : null;
   const fromSolar = pkgSolar ? priceFromBands(pkgSolar.bands, panels) : null;
-  // Solar and battery package: its own price. Otherwise the solar package (or formula) plus the battery at its price per kWh.
-  const cost = fromBattery ?? (fromSolar ?? formulaSolar) + batteryKwh * s.batteryPerKwh;
-  const packageName = fromBattery !== null ? (pkgBattery?.name ?? null) : fromSolar !== null ? (pkgSolar?.name ?? null) : null;
+  // The home's inverter and (on the cost model) price: from the browser's price table, or worked out from the costs.
+  const sized = home ? (s.priceTable ? tableRow(s.priceTable, phase, batteryKwh, panels) : (() => { const p = homePrice(s, panels, { phase, batteryKwh }); return p.inverter ? { low: p.low, mid: p.mid, high: p.high, inverter: p.inverter.name, acKw: p.inverter.acKw } : null; })()) : null;
+  let cost: number;
+  let costLow: number;
+  let costHigh: number;
+  let packageName: string | null;
+  let pricing: Estimate['pricing'];
+  if (useCostModel && sized) {
+    cost = sized.mid;
+    costLow = sized.low;
+    costHigh = sized.high;
+    packageName = s.packages.find((p) => p.active && p.kind === (batteryKwh > 0 ? 'solar_battery' : 'solar'))?.name ?? null;
+    pricing = 'costModel';
+  } else {
+    // Solar and battery package: its own price. Otherwise the solar package (or formula) plus the battery at its price per kWh.
+    cost = fromBattery ?? (fromSolar ?? formulaSolar) + batteryKwh * s.batteryPerKwh;
+    costLow = cost * (1 - 0.08);
+    costHigh = cost * (1 + 0.08);
+    packageName = fromBattery !== null ? (pkgBattery?.name ?? null) : fromSolar !== null ? (pkgSolar?.name ?? null) : null;
+    pricing = useBands ? 'bands' : 'formula';
+  }
   const savingLow = saving * (1 - SPREAD);
   const savingHigh = saving * (1 + SPREAD);
-  const costLow = cost * (1 - 0.08);
-  const costHigh = cost * (1 + 0.08);
+  const gridRoute = home ? (sized ? gridRouteFor(sized.acKw) : kwp > 3.68 ? 'G99' : 'G98') : null;
 
   const cashflow = [-cost];
   let total = 0;
@@ -360,7 +515,14 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
     billNow,
     billAfter: Math.max(billNow - saving, 0),
     monthly,
-    needsG99: home && kwp > 3.68,
+    needsG99: gridRoute === 'G99',
+    gridRoute,
+    inverter: sized?.inverter ?? null,
+    acKw: sized?.acKw ?? 0,
+    phase,
+    phaseCapped,
+    phaseCapKwp: supplyCapKwp,
+    pricing,
     batteryKwh,
     roofLimited,
     panelsWanted: wanted,

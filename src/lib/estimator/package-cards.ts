@@ -1,4 +1,5 @@
-import type { Package } from './calc';
+import type { EstimatorSettings, Package } from './calc';
+import { homePrice } from './pricing';
 
 /** What the website shows for one package: everything comes from the admin (Sales › Solar estimator › Packages and prices). */
 export type PackageCard = {
@@ -18,10 +19,16 @@ const gbp = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`;
  * The active packages as cards, in the order they were entered. Returns [] when no active package has a price,
  * so the band can hide itself: a page must look right before any packages are set up.
  */
-export function packageCards(packages: Package[]): PackageCard[] {
+export function packageCards(packages: Package[], settings?: EstimatorSettings): PackageCard[] {
   const active = packages.filter((p) => p.active && p.name.trim());
-  if (!active.some((p) => p.bands.length)) return [];
+  const priced = (p: Package) => (p.pricing === 'bands' ? p.bands.length > 0 : !!settings?.homeUsesCostModel);
+  if (!active.some(priced)) return [];
   return active.map((p) => {
+    if (p.pricing !== 'bands' && settings?.homeUsesCostModel) {
+      // From the cost build-up: the low end of the range for the smallest usual home system (6 panels), rounded to £50.
+      const from = homePrice(settings, 6, { batteryKwh: p.kind === 'solar_battery' ? p.batteryKwh || settings.batteryKwh : 0 }).low;
+      return { id: p.id, name: p.name.trim(), summary: p.summary.trim(), includes: p.includes.map((l) => l.trim()).filter(Boolean), fromPrice: `From ${gbp(Math.round(from / 50) * 50)} fitted`, sizeLine: null };
+    }
     const prices = p.bands.map((b) => b.price).filter((n) => Number.isFinite(n) && n > 0);
     const panels = p.bands.map((b) => b.panels).filter((n) => Number.isFinite(n) && n > 0);
     const lo = panels.length ? Math.min(...panels) : 0;
