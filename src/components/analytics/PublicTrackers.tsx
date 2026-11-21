@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { isTrackableAnalyticsPath } from '@/lib/analytics-paths';
 import { ClickHeatmapTracker } from '@/components/analytics/ClickHeatmapTracker';
 import { CookieBanner, useConsent } from '@/components/analytics/CookieBanner';
+import { MetaPixel } from '@/components/analytics/MetaPixel';
 import { UmamiScript } from '@/components/analytics/UmamiScript';
 
 const GA_ID = 'G-6LLJCP5HG6';
@@ -63,6 +64,7 @@ export function PublicTrackers({ off = false }: { /** The customer portal's own 
               gtag('config', '${GA_ID}', { send_page_view: true });
             `}
           </Script>
+          <MetaPixel />
         </>
       )}
       <UmamiScript />

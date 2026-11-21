@@ -25,6 +25,7 @@ import { PHONE, PHONE_HREF, QuoteCapture, QuoteModal, StickyBar, TalkLine, useEx
 import { whatsappHref } from '@/components/site/WhatsAppButton';
 import { includedItems } from '@/lib/estimator/included';
 import { track } from '@/lib/estimator/analytics';
+import { pixel } from '@/lib/meta-pixel';
 import { panelPolygon, pointsAttr, toPixel, MAP_SIZE } from '@/lib/estimator/overlay';
 
 const gbp = (n: number) => '£' + Math.round(n).toLocaleString('en-GB');
@@ -536,7 +537,8 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
   useExitIntent(!quoteDone && !booking, () => setExitOpen(true));
   useEffect(() => {
     track('est_results_viewed');
-  }, []);
+    pixel('ViewContent', { content_name: 'solar-estimate', content_category: inputs.who, currency: 'GBP', value: Math.round(r.cost), kwp: Number(r.kwp.toFixed(2)), battery: r.batteryKwh > 0 });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   /** The answers (never prices) the server works the quote out from. */
   const quotePayload = () => ({
     inputs: { who: inputs.who, yieldKwhPerKwp: inputs.yieldKwhPerKwp, monthlyPerKwp: inputs.monthlyPerKwp, shade: inputs.shade, usage: inputs.usage, daytime: inputs.daytime, battery: inputs.battery, batteryKwh: inputs.batteryKwh, ev: inputs.ev, heatpump: inputs.heatpump, maxPanels: inputs.maxPanels, sizeMode: inputs.sizeMode, phase: inputs.phase },
@@ -788,7 +790,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
         <div className="est-card est-pad est-quotecard" id="est-quote" ref={captureRef}>
           <h3>Send me my full quote</h3>
           <p className="est-sub">A PDF of this estimate with what is included and what happens next, by email, WhatsApp or both.</p>
-          <QuoteCapture buildPayload={quotePayload} onDone={setQuoteDone} onBook={bookSurvey} done={quoteDone} />
+          <QuoteCapture buildPayload={quotePayload} onDone={setQuoteDone} onBook={bookSurvey} done={quoteDone} pixelData={{ currency: 'GBP', value: Math.round(r.cost), kwp: Number(r.kwp.toFixed(2)), battery: r.batteryKwh > 0 }} />
         </div>
       </div>
 
@@ -913,7 +915,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
       <QuoteModal open={exitOpen} onClose={() => setExitOpen(false)}>
         <h3 className="est-qmodal__h">Want this sent to you?</h3>
         <p className="est-sub">We’ll email your estimate as a PDF.</p>
-        <QuoteCapture buildPayload={quotePayload} onDone={setQuoteDone} onBook={bookSurvey} done={quoteDone} />
+        <QuoteCapture buildPayload={quotePayload} onDone={setQuoteDone} onBook={bookSurvey} done={quoteDone} pixelData={{ currency: 'GBP', value: Math.round(r.cost), kwp: Number(r.kwp.toFixed(2)), battery: r.batteryKwh > 0 }} />
       </QuoteModal>
       <SurveyModal open={booking} onClose={() => setBooking(false)} who={inputs.who} postcode={postcode} address={knownAddress} picks={['Solar panels', ...(inputs.battery ? ['Battery storage'] : []), ...(inputs.heatpump ? ['Heat pump'] : []), ...(inputs.ev ? ['EV charger'] : [])]} message={estimateMessage(r, inputs, roofHit?.address ?? '')} onSent={sent} />
 

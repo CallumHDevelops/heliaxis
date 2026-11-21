@@ -10,6 +10,8 @@ import { leadRef } from '@/lib/notification-refs';
 import { estimate } from '@/lib/estimator/calc';
 import { readEstimatorSettings } from '@/lib/estimator/settings';
 import { buildEstimateMessage } from '@/lib/estimator/lead';
+import { sendLead } from '@/lib/meta-capi';
+import { SITE_URL } from '@/lib/estimator/copy';
 import { buildQuoteFacts } from '@/lib/estimator/quote-facts';
 import { deliverQuote } from '@/lib/estimator/quote-send';
 import { buildConsent, DELIVERIES, makeReference, normaliseUkMobile, ownImagePath, parseQuoteInputs, validEmail, type Delivery } from '@/lib/estimator/quote-input';
@@ -79,7 +81,11 @@ export async function POST(req: NextRequest) {
     const message = `${summary}\nQuote reference: ${reference}\nInverter: ${r.inverter ?? 'to be confirmed'}\nGrid: ${r.gridRoute ?? 'to be confirmed'}`;
 
     // Where they came from (only with cookie consent, as on every other form).
-    const attribution = hasConsent(req.cookies.get(CONSENT_COOKIE)?.value) ? parseAttribution(req.cookies.get(ATTR_COOKIE)?.value) : null;
+    const consented = hasConsent(req.cookies.get(CONSENT_COOKIE)?.value);
+    const attribution = consented ? parseAttribution(req.cookies.get(ATTR_COOKIE)?.value) : null;
+    // Meta's click id (from the ad click) and browser id, only for a visitor who accepted cookies.
+    const fbc = consented ? (attribution?.fbc ?? req.cookies.get('_fbc')?.value ?? null) : null;
+    const fbp = consented ? (req.cookies.get('_fbp')?.value ?? null) : null;
     const origin = attribution ?? parseFirstTouch(body.ft);
     const channelFields = {
       channel: classifyChannel(origin),
@@ -124,7 +130,8 @@ export async function POST(req: NextRequest) {
     if (qErr) console.error('❌ Estimator quote: could not store the quote (estimator-quotes.sql run?):', qErr.message);
 
     after(async () => {
-      if (attribution?.fbc) await db.from('enquiries').update({ meta_fbc: attribution.fbc }).eq('id', enquiryId).then(() => null, () => null);
+      // The click id on the enquiry, so survey booked / quote sent / won join up with the ad (src/lib/meta-capi.ts sendStageToMeta).
+      if (fbc) await db.from('enquiries').update({ meta_fbc: fbc }).eq('id', enquiryId).then(() => null, () => null);
       await ensureOpportunity(enquiryId, source);
       await db.from('crm_lead_origins').update(channelFields).eq('enquiry_id', enquiryId).then(() => null, () => null);
     });
@@ -133,6 +140,26 @@ export async function POST(req: NextRequest) {
     // The PDF, the email and the WhatsApp go after the reply, so the visitor sees "on its way" at once.
     const facts = buildQuoteFacts({ reference, customerName: name, address, postcode, inputs: parsed.inputs, settings, imp: parsed.imp, exp: parsed.exp });
     after(() => deliverQuote({ reference, enquiryId, name, email, mobile, delivery, facts, mapPath: ownImagePath(body.mapPath), origin: req.nextUrl.origin, whatsappMarketing: consent.whatsappMarketing }).then(() => null, (e) => console.error('Estimator quote: delivery failed', e)));
+
+    // Meta Lead, once, with the same event_id the browser Pixel uses (Meta keeps one). Only for a visitor who accepted cookies.
+    if (consented) {
+      after(() =>
+        sendLead({
+          enquiryId,
+          email,
+          phone: mobile,
+          postcode,
+          ip: req.headers.get('x-real-ip') ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+          userAgent: req.headers.get('user-agent'),
+          fbp,
+          fbc,
+          sourceUrl: `${SITE_URL()}/solar-estimator`,
+          value: r.cost,
+          kwp: r.kwp,
+          battery: r.batteryKwh > 0,
+        }).then(() => null, () => null),
+      );
+    }
 
     return NextResponse.json({ ok: true, reference, enquiryId, delivery });
   } catch (e) {

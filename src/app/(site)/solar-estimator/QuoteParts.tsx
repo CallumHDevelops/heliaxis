@@ -7,6 +7,7 @@ import { WhatsAppIcon, whatsappHref } from '@/components/site/WhatsAppButton';
 import { firstTouch } from '@/lib/first-touch';
 import { CONSENT_WORDING, type Delivery } from '@/lib/estimator/quote-input';
 import { track } from '@/lib/estimator/analytics';
+import { pixel } from '@/lib/meta-pixel';
 
 export const PHONE = '01633 965205';
 export const PHONE_HREF = 'tel:01633965205';
@@ -24,7 +25,7 @@ export type QuoteDone = { reference: string; enquiryId: string; delivery: Delive
  * want it (email, WhatsApp or both). Asking for the quote is the request, so it needs no tick box; the two boxes are about follow-ups only.
  * The browser sends the answers to the questions, never prices: the server works the figures out again.
  */
-export function QuoteCapture({ buildPayload, onDone, onBook, done }: { buildPayload: () => Record<string, unknown>; onDone: (d: QuoteDone) => void; onBook: () => void; done: QuoteDone | null }) {
+export function QuoteCapture({ buildPayload, onDone, onBook, done, pixelData }: { buildPayload: () => Record<string, unknown>; onDone: (d: QuoteDone) => void; onBook: () => void; done: QuoteDone | null; /** Sent with the Pixel's Lead (the value and size); the Lead's eventID is the enquiry id, which the server uses too, so Meta counts it once. */ pixelData?: Record<string, unknown> }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -52,6 +53,7 @@ export function QuoteCapture({ buildPayload, onDone, onBook, done }: { buildPayl
         return;
       }
       track('est_quote_requested', { delivery });
+      pixel('Lead', { content_name: 'solar-estimate', ...pixelData }, d.enquiryId);
       onDone({ reference: d.reference, enquiryId: d.enquiryId, delivery });
     } catch {
       setErr('We could not send that just now. Please check your connection and try again.');

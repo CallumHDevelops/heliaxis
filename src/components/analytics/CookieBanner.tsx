@@ -39,12 +39,12 @@ function saveConsent(v: 'yes' | 'no') {
   window.dispatchEvent(new Event(EVENT));
 }
 
-/** Google Analytics' own cookies, on this host and the parent domains it may have used. */
+/** Google Analytics' and the Meta Pixel's own cookies, on this host and the parent domains it may have used. */
 function clearAnalyticsCookies() {
   const names = document.cookie
     .split(';')
     .map((c) => c.split('=')[0].trim())
-    .filter((n) => n === '_ga' || n.startsWith('_ga_') || n === '_gid' || n === '_gat');
+    .filter((n) => n === '_ga' || n.startsWith('_ga_') || n === '_gid' || n === '_gat' || n === '_fbp' || n === '_fbc');
   const parts = window.location.hostname.split('.');
   const domains = [''];
   for (let i = 0; i < parts.length - 1; i++) domains.push(`.${parts.slice(i).join('.')}`);
@@ -108,8 +108,8 @@ export function CookieBanner({ consent }: { consent: Consent }) {
       <style>{CSS}</style>
       <h2>Cookies</h2>
       <p>
-        Can we use cookies to see how people use our website (Google Analytics) and which of our adverts brought you here? Nothing
-        is stored unless you say yes, and the website works the same either way.{' '}
+        Can we use cookies to see how people use our website (Google Analytics) and which of our adverts brought you here, and
+        let Meta (Facebook and Instagram) measure our adverts (the Meta Pixel)? Nothing is stored unless you say yes, and the website works the same either way.{' '}
         <Link href="/privacy-policy#cookies">How we use cookies</Link>
         {consent !== 'unset' && <> · You chose {consent === 'yes' ? 'Accept' : 'Reject'}.</>}
       </p>

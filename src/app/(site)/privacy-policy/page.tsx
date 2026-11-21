@@ -542,6 +542,17 @@ const sections: LegalSection[] = [
             </tr>
             <tr>
               <td>
+                <code>_fbp</code>, <code>_fbc</code> (Meta Pixel)
+              </td>
+              <td>
+                Lets Meta, which runs Facebook and Instagram, measure our adverts: it sees that this browser visited our site and, for the solar
+                estimator, when someone asks for a quote. We also send Meta an anonymised (hashed) version of the email address and phone number
+                they gave us for that quote, so it can match it to the advert. Only if you accept
+              </td>
+              <td>Up to 90 days</td>
+            </tr>
+            <tr>
+              <td>
                 <code>hx_attr</code>
               </td>
               <td>
@@ -552,7 +563,7 @@ const sections: LegalSection[] = [
           </tbody>
         </table>
         <p>
-          If you choose Reject, we remove the Google Analytics and <code>hx_attr</code> cookies if they were set before. We also
+          If you choose Reject, we remove the Google Analytics, Meta Pixel and <code>hx_attr</code> cookies if they were set before, and we do not load the Meta Pixel or send Meta anything about you. We also
           use Umami for website statistics, which doesn’t use cookies, and record anonymous click positions to improve page
           layouts. Web fonts are loaded from Google, which receives your IP address when the page loads. Clicking our{' '}
           <strong>WhatsApp us</strong> button opens WhatsApp (Meta), which has its own privacy policy.
