@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { potentialOf, cleanSettings, consumptionFrom, DEFAULT_SETTINGS, estimate, fallbackYield, MONTH_SHARE, type Inputs } from '@/lib/estimator/calc';
 
+const LEGACY = { ...DEFAULT_SETTINGS, homeUsesCostModel: false };
 const base: Inputs = { who: 'home', yieldKwhPerKwp: 950, shade: 'none', usage: { kind: 'bill', value: 120 }, daytime: 'some', battery: false, ev: false, heatpump: false };
 
 describe('solar estimator maths', () => {
@@ -17,8 +18,8 @@ describe('solar estimator maths', () => {
     expect(small.panels * 0.45).toBeCloseTo(small.kwp, 5);
   });
   it('a battery raises how much is used at home and the saving, and costs more', () => {
-    const a = estimate(base);
-    const b = estimate({ ...base, battery: true });
+    const a = estimate(base, LEGACY);
+    const b = estimate({ ...base, battery: true }, LEGACY);
     expect(b.selfPct).toBeGreaterThan(a.selfPct);
     expect(b.saving).toBeGreaterThan(a.saving);
     expect(b.cost).toBeCloseTo(a.cost + 5 * 800, 0);
@@ -64,15 +65,15 @@ describe('solar estimator maths', () => {
     expect(s.homePerKwp).toBe(1500);
   });
   it('a fixed cost makes small systems pay back slower than large ones', () => {
-    const small = estimate({ ...base, usage: { kind: 'kwh', value: 2000 } });
-    const large = estimate({ ...base, usage: { kind: 'kwh', value: 6000 } });
+    const small = estimate({ ...base, usage: { kind: 'kwh', value: 2000 } }, LEGACY);
+    const large = estimate({ ...base, usage: { kind: 'kwh', value: 6000 } }, LEGACY);
     expect(small.cost).toBeCloseTo(DEFAULT_SETTINGS.homeFixed + small.kwp * DEFAULT_SETTINGS.homePerKwp, 0);
     expect(small.paybackYears).toBeGreaterThan(large.paybackYears);
   });
   it('a bigger system on the same use exports more and uses a smaller share', () => {
     const usage = { kind: 'kwh' as const, value: 3000 };
     const a = estimate({ ...base, usage, maxPanels: 8, sizeMode: 'roof' });
-    const b = estimate({ ...base, usage, maxPanels: 20, sizeMode: 'roof' });
+    const b = estimate({ ...base, usage, maxPanels: 20, sizeMode: 'roof', phase: 'three' });
     expect(b.exported).toBeGreaterThan(a.exported);
     expect(b.selfPct).toBeLessThan(a.selfPct);
     expect(b.panels).toBe(20);
@@ -108,7 +109,7 @@ describe('packages and their prices', async () => {
   it('uses the formula with no packages, and the package price list once there is one', () => {
     const f = estimate(base as never, DEFAULT_SETTINGS);
     expect(f.packageName).toBeNull();
-    const s = cleanSettings({ packages: [{ name: 'Solar only', kind: 'solar', bands: [{ panels: 4, price: 4000 }, { panels: 40, price: 22000 }] }, { name: 'Solar and battery', kind: 'solar_battery', batteryKwh: 5, bands: [{ panels: 4, price: 7000 }, { panels: 40, price: 30000 }] }] });
+    const s = cleanSettings({ packages: [{ name: 'Solar only', kind: 'solar', pricing: 'bands', bands: [{ panels: 4, price: 4000 }, { panels: 40, price: 22000 }] }, { name: 'Solar and battery', kind: 'solar_battery', pricing: 'bands', batteryKwh: 5, bands: [{ panels: 4, price: 7000 }, { panels: 40, price: 30000 }] }] });
     const a = estimate(base as never, s);
     expect(a.packageName).toBe('Solar only');
     expect(a.cost).not.toBe(f.cost);

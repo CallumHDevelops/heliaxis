@@ -49,7 +49,7 @@ export const isStopped = (r: PermissionRow) =>
   repliedStop(r) || (r.whatsapp_opt_in === false && !!r.whatsapp_opt_in_source?.startsWith(STAFF_STOP_PREFIX));
 
 /** Agreements typed into a public form (anyone can type any number) only count for that enquiry. */
-const FORM_SOURCES = new Set(['website-form', 'booking-form']);
+const FORM_SOURCES = new Set(['website-form', 'booking-form', 'estimator-marketing']);
 export const isFormSource = (source: string | null | undefined) => FORM_SOURCES.has(source ?? '');
 /** Does r's "agreed" count for enquiry selfId? Its own always; another enquiry's only when a stranger couldn't have typed it in. */
 export const agreedFor = (r: PermissionRow, selfId: string) =>
@@ -307,6 +307,7 @@ export function permissionSourceLabel(source: string | null | undefined): string
   const labels: Record<string, string> = {
     'website-form': 'website form',
     'booking-form': 'booking form',
+    'estimator-marketing': 'solar estimator: ticked WhatsApp offers',
     'meta-lead-form': 'Meta lead form',
     inbound: 'they messaged us',
     import: 'imported chat or lead',

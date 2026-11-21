@@ -1,9 +1,13 @@
 import type { Metadata } from 'next';
 import { withSeoOverride } from '@/lib/seo/overrides';
 import './solar-estimator.css';
+import './estimator-v3.css';
+import './estimator-sections.css';
+import { publicSettings } from '@/lib/estimator/calc';
 import { readEstimatorSettings } from '@/lib/estimator/settings';
 import { SolarEstimatorApp } from './SolarEstimatorApp';
 import { EstimatorExtras } from './EstimatorExtras';
+import { getPublishedLogos } from '@/lib/cms';
 
 export const revalidate = 300;
 
@@ -19,10 +23,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function SolarEstimatorPage() {
+  const [settings, logos] = await Promise.all([readEstimatorSettings(), getPublishedLogos()]);
   return (
     <>
-      <SolarEstimatorApp settings={await readEstimatorSettings()} roofLookup={!!process.env.GOOGLE_SOLAR_API_KEY} addressPicker={!!process.env.IDEAL_POSTCODES_API_KEY} />
-      <EstimatorExtras />
+      <SolarEstimatorApp settings={publicSettings(settings)} roofLookup={!!process.env.GOOGLE_SOLAR_API_KEY} addressPicker={!!process.env.IDEAL_POSTCODES_API_KEY} />
+      <EstimatorExtras settings={settings} logos={logos} />
     </>
   );
 }
