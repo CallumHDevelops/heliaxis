@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { withSeoOverride } from '@/lib/seo/overrides';
 import './solar-estimator.css';
+import './estimator-v3.css';
 import { publicSettings } from '@/lib/estimator/calc';
 import { readEstimatorSettings } from '@/lib/estimator/settings';
 import { SolarEstimatorApp } from './SolarEstimatorApp';

@@ -21,6 +21,10 @@ import {
 import { compassWord, type MapData, type RoofFound } from '@/lib/estimator/roof';
 import { buildEstimateMessage } from '@/lib/estimator/lead';
 import { SurveyModal } from './SurveyModal';
+import { PHONE, PHONE_HREF, QuoteCapture, QuoteModal, StickyBar, TalkLine, useExitIntent, type QuoteDone } from './QuoteParts';
+import { whatsappHref } from '@/components/site/WhatsAppButton';
+import { includedItems } from '@/lib/estimator/included';
+import { track } from '@/lib/estimator/analytics';
 import { panelPolygon, pointsAttr, toPixel, MAP_SIZE } from '@/lib/estimator/overlay';
 
 const gbp = (n: number) => '£' + Math.round(n).toLocaleString('en-GB');
@@ -81,6 +85,9 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
   const [kwh, setKwh] = useState(3800);
   const [daytime, setDaytime] = useState<Daytime>('some');
   const [battery, setBattery] = useState(false);
+  const [batteryKwh, setBatteryKwh] = useState(settings.batteries.find((b) => b.active)?.kwh ?? settings.batteryKwh);
+  // Their supply: single phase unless they say three ('unknown' counts as single).
+  const [phase, setPhase] = useState<'unknown' | 'single' | 'three'>('unknown');
   const [sizeMode, setSizeMode] = useState<'usage' | 'roof'>('usage');
   const [ev, setEv] = useState(false);
   const [heatpump, setHeatpump] = useState(false);
@@ -146,8 +153,10 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
     usage: kind === 'bill' ? { kind: 'bill', value: bill } : { kind: 'kwh', value: kwh },
     daytime,
     battery,
+    batteryKwh: battery ? batteryKwh : undefined,
     ev,
     heatpump,
+    phase,
   };
   const live: EstimatorSettings = { ...settings, importPence: rates.imp, exportPence: rates.exp };
   const r = estimate(inputs, live);
@@ -155,6 +164,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
 
   function go(n: number) {
     setStep(n);
+    track('est_step', { step: n + 1 });
     setTimeout(() => head.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
   }
   const needHouse = roofLookup && !skipLookup;
@@ -205,7 +215,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
         <div className="wrap">
           <span className="eyebrow">South Wales · Free instant estimate</span>
           <h1>{who === 'business' ? 'See what solar could do for your business.' : 'See what solar could do for your home.'}</h1>
-          <p>Six quick questions. Satellite weather data for your postcode, your roof and your electricity use give you a size, a saving and a payback{who === 'business' ? ', based on when your business is open' : ''}.</p>
+          <p>Answer six quick questions. You’ll get a system size, a price range and your savings, and we’ll send you a full quote as a PDF.</p>
         </div>
       </section>
 
@@ -221,6 +231,9 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
                 </span>
               ))}
             </div>
+            <p className="est-stepof" aria-hidden="true">
+              Step {step + 1} of {STEPS.length}
+            </p>
 
             <div className="est-q">
               {step === 0 && (
@@ -451,16 +464,17 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
                 </button>
               )}
             </div>
+            <TalkLine />
           </div>
         ) : (
-          <Result knownAddress={knownAddress} rates={rates} setRates={setRates} roofHit={roofChoice === 'yes' ? roofHit : null} r={r} withBattery={withBattery} inputs={inputs} settings={live} postcode={postcode} town={roofChoice === 'yes' && roofHit ? (roofHit.address.split(',').at(-2)?.trim() ?? '') : (yieldData?.town ?? '')} source={roofChoice === 'yes' && roofHit ? (roofHit.monthly ? 'pvgis' : 'fallback') : (yieldData?.source ?? 'fallback')} note={yieldNote} controls={{ sizeMode, setSizeMode, shade, setShade, daytime, setDaytime, battery, setBattery, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); }} />
+          <Result knownAddress={knownAddress} rates={rates} setRates={setRates} roofHit={roofChoice === 'yes' ? roofHit : null} r={r} withBattery={withBattery} inputs={inputs} settings={live} postcode={postcode} town={roofChoice === 'yes' && roofHit ? (roofHit.address.split(',').at(-2)?.trim() ?? '') : (yieldData?.town ?? '')} source={roofChoice === 'yes' && roofHit ? (roofHit.monthly ? 'pvgis' : 'fallback') : (yieldData?.source ?? 'fallback')} note={yieldNote} controls={{ sizeMode, setSizeMode, shade, setShade, daytime, setDaytime, battery, setBattery, batteryKwh, setBatteryKwh, phase, setPhase, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); }} />
         )}
       </div>
     </>
   );
 }
 
-type Controls = { sizeMode: 'usage' | 'roof'; setSizeMode: (m: 'usage' | 'roof') => void; shade: Shade; setShade: (s: Shade) => void; daytime: Daytime; setDaytime: (d: Daytime) => void; battery: boolean; setBattery: (b: boolean) => void; ev: boolean; setEv: (b: boolean) => void; heatpump: boolean; setHeatpump: (b: boolean) => void };
+type Controls = { batteryKwh: number; setBatteryKwh: (k: number) => void; phase: 'unknown' | 'single' | 'three'; setPhase: (p: 'unknown' | 'single' | 'three') => void; sizeMode: 'usage' | 'roof'; setSizeMode: (m: 'usage' | 'roof') => void; shade: Shade; setShade: (s: Shade) => void; daytime: Daytime; setDaytime: (d: Daytime) => void; battery: boolean; setBattery: (b: boolean) => void; ev: boolean; setEv: (b: boolean) => void; heatpump: boolean; setHeatpump: (b: boolean) => void };
 
 /** The roof from above, with the building outline and the panels of the suggested system drawn on it. */
 function SolarMap({ map, panels, address, plain = false }: { map: RoofMap; panels: number; address: string; plain?: boolean }) {
@@ -516,6 +530,33 @@ function Stepper({ label, value, onChange }: { label: string; value: number; onC
 
 function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs, settings, postcode, town, source, note, controls, onRestart }: { rates: { imp: number; exp: number }; setRates: (r: { imp: number; exp: number }) => void; roofHit: RoofHit | null; r: ReturnType<typeof estimate>; withBattery: ReturnType<typeof estimate> | null; inputs: Inputs; settings: EstimatorSettings; postcode: string; town: string; source: 'pvgis' | 'fallback'; note: string; controls: Controls; onRestart: () => void; knownAddress: string }) {
   const [booking, setBooking] = useState(false);
+  const [quoteDone, setQuoteDone] = useState<QuoteDone | null>(null);
+  const [exitOpen, setExitOpen] = useState(false);
+  const captureRef = useRef<HTMLDivElement>(null);
+  useExitIntent(!quoteDone && !booking, () => setExitOpen(true));
+  useEffect(() => {
+    track('est_results_viewed');
+  }, []);
+  /** The answers (never prices) the server works the quote out from. */
+  const quotePayload = () => ({
+    inputs: { who: inputs.who, yieldKwhPerKwp: inputs.yieldKwhPerKwp, monthlyPerKwp: inputs.monthlyPerKwp, shade: inputs.shade, usage: inputs.usage, daytime: inputs.daytime, battery: inputs.battery, batteryKwh: inputs.batteryKwh, ev: inputs.ev, heatpump: inputs.heatpump, maxPanels: inputs.maxPanels, sizeMode: inputs.sizeMode, phase: inputs.phase },
+    imp: settings.importPence,
+    exp: settings.exportPence,
+    postcode,
+    address: knownAddress || roofHit?.address || '',
+    mapPath: roofHit?.map?.imageUrl ?? null,
+  });
+  const openQuote = () => {
+    track('est_quote_cta');
+    const el = captureRef.current;
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => el?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true }), 400);
+  };
+  const bookSurvey = () => {
+    track('est_survey_clicked');
+    setExitOpen(false);
+    setBooking(true);
+  };
   // Once they have sent the survey form, the buttons say so (remembered on this device for a month, per postcode).
   const [requested, setRequested] = useState(() => {
     try {
@@ -539,6 +580,17 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
   const usedPct = r.generation > 0 ? (r.selfUsed / r.generation) * 100 : 0;
   const placeLine = roofHit ? roofHit.address : [town, postcode].filter(Boolean).join(' · ');
   const hasMap = !!roofHit?.map;
+  // Side-by-side choices for a home: solar on its own, or with each battery on offer. The estimate re-runs for whichever is picked.
+  const choices = home
+    ? [
+        { key: 'none', title: 'Solar only', sub: 'Panels and inverter', battery: false, kwh: 0 },
+        ...settings.batteries.filter((b) => b.active).map((b) => ({ key: String(b.kwh), title: `Solar + ${b.kwh} kWh`, sub: b.name, battery: true, kwh: b.kwh })),
+      ]
+    : [];
+  const batteryName = r.batteryKwh ? (settings.batteries.find((b) => Math.abs(b.kwh - r.batteryKwh) < 0.01)?.name ?? `${r.batteryKwh} kWh battery`) : null;
+  const pkgOf = settings.packages.find((p) => p.active && p.kind === (r.batteryKwh ? 'solar_battery' : 'solar'));
+  const included = includedItems({ panels: r.panels, inverter: r.inverter, batteryName, scaffolding: settings.costs.scaffoldingOn || !home, workmanshipYears: settings.workmanshipYears, packageIncludes: pkgOf?.includes });
+  const upsell = (['ev', 'heatpump'] as const).map((k) => ({ k, label: k === 'ev' ? 'An electric car' : 'A heat pump', on: !!inputs[k], delta: estimate({ ...inputs, [k]: !inputs[k] }, settings).saving - r.saving }));
   return (
     <div className="est-res">
       <div className="est-reporthead">
@@ -561,8 +613,8 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
           </div>
         </div>
         <div className="est-rh-r">
-          <button type="button" className="est-link" onClick={() => window.print()}>
-            Save as PDF
+          <button type="button" className="est-link" onClick={openQuote}>
+            Email me this as a PDF
           </button>
           <button type="button" className="est-link" onClick={onRestart}>
             Start again
@@ -597,32 +649,45 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
           <div className="est-card est-head">
             <div className="glow" />
             <div className="z">
-              <span className="lab">Estimated saving each year</span>
+              <span className="lab">Your estimate</span>
               <div className="big">
-                {gbpRound(r.savingLow)} – {gbpRound(r.savingHigh)}
+                {gbpRound(r.costLow)} – {gbpRound(r.costHigh)} <small>{home ? 'fitted, 0% VAT' : 'fitted, + VAT'}</small>
+              </div>
+              <div className="est-headsave">
+                saving about <b>{gbpRound(r.savingLow)} – {gbpRound(r.savingHigh)}</b> a year
               </div>
               <div className="sub">
-                {r.kwp.toFixed(2)} kWp system · {r.panels} panels{r.batteryKwh ? ` + ${r.batteryKwh} kWh battery` : ''}{r.packageName ? ` · ${r.packageName}` : ''}
+                {r.panels} panels · {r.kwp.toFixed(2)} kWp{r.inverter ? ` · ${r.inverter}` : ''}{r.batteryKwh ? ` · ${r.batteryKwh} kWh battery` : ''}
               </div>
-              {requested ? (
-                <div className="est-headdone" role="status">
-                  <b>✓ Survey request received</b>
-                  <span>We’ll be in touch with you soon!</span>
-                </div>
-              ) : (
-                <button type="button" className="btn btn-solar est-headcta" onClick={() => setBooking(true)}>
-                  Book my free survey
+              <div className="est-headbtns">
+                <button type="button" className="btn btn-solar est-headcta" onClick={openQuote}>
+                  Send me my full quote
                 </button>
-              )}
+                {requested ? (
+                  <span className="est-headdone est-headdone--inline" role="status">
+                    <b>✓ Survey request received</b>
+                  </span>
+                ) : (
+                  <button type="button" className="btn est-btn-ghost est-headcta" onClick={bookSurvey}>
+                    Book my free survey
+                  </button>
+                )}
+              </div>
+              <div className="est-headlinks">
+                <a href={PHONE_HREF} onClick={() => track('est_call_click', { from: 'headline' })}>
+                  Call {PHONE}
+                </a>
+                <a href={whatsappHref('Hi Heliaxis, I have just used your solar estimator.')} target="_blank" rel="noopener noreferrer" onClick={() => track('est_whatsapp_click', { from: 'headline' })}>
+                  WhatsApp us
+                </a>
+              </div>
             </div>
           </div>
           <div className="est-card est-stats">
             <div className="tile">
-              <div className="k">Installed cost</div>
-              <div className="v">
-                {gbpRound(r.costLow)} – {gbpRound(r.costHigh)}
-              </div>
-              <small>fitted{home ? ', 0% VAT' : ', + VAT'}</small>
+              <div className="k">Grid connection</div>
+              <div className="v">We handle it</div>
+              <small>{r.gridRoute === 'G99' ? 'Your network operator approves this size first (G99)' : r.gridRoute === 'G98' ? 'We notify your network operator (G98)' : 'Agreed at survey'}</small>
             </div>
             <div className="tile">
               <div className="k">Pays for itself in</div>
@@ -672,6 +737,61 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
         </div>
       </div>
 
+      {home && choices.length > 1 && (
+        <section className="est-choice" aria-label="Choose your system">
+          <h3 className="est-choice__h">Choose your system</h3>
+          <div className="est-choice__grid">
+            {choices.map((c) => {
+              const e = estimate({ ...inputs, battery: c.battery, batteryKwh: c.battery ? c.kwh : undefined }, settings);
+              const on = c.battery ? inputs.battery && Math.abs(r.batteryKwh - c.kwh) < 0.01 : !inputs.battery;
+              return (
+                <button
+                  key={c.key}
+                  type="button"
+                  className={`est-pick-card${on ? ' on' : ''}`}
+                  aria-pressed={on}
+                  onClick={() => {
+                    track('est_package_changed', { battery_kwh: c.battery ? c.kwh : 0 });
+                    controls.setBattery(c.battery);
+                    if (c.battery) controls.setBatteryKwh(c.kwh);
+                  }}
+                >
+                  <b>{c.title}</b>
+                  <small>{c.sub}</small>
+                  <span className="est-pick-card__price">
+                    {gbpRound(e.costLow)} – {gbpRound(e.costHigh)}
+                  </span>
+                  <span className="est-pick-card__meta">
+                    saves about {gbpRound(e.savingLow)} – {gbpRound(e.savingHigh)} a year
+                  </span>
+                  <span className="est-pick-card__meta">
+                    pays back in {yrs(e.paybackLow)} – {yrs(e.paybackHigh)} years
+                  </span>
+                  {on && <em className="est-pick-card__tag">Your choice</em>}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <div className="est-resgrid two">
+        <div className="est-card est-pad">
+          <h3>What’s included</h3>
+          <ul className="est-ticks est-incl">
+            {included.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ul>
+          <p className="est-fine">{home ? 'Fitted prices, 0% VAT.' : 'Prices are fitted, plus VAT.'} We do all of it, from the free survey to the aftercare.</p>
+        </div>
+        <div className="est-card est-pad est-quotecard" id="est-quote" ref={captureRef}>
+          <h3>Send me my full quote</h3>
+          <p className="est-sub">A PDF of this estimate with what is included and what happens next, by email, WhatsApp or both.</p>
+          <QuoteCapture buildPayload={quotePayload} onDone={setQuoteDone} onBook={bookSurvey} done={quoteDone} />
+        </div>
+      </div>
+
       <div className="est-resgrid two">
         <div className="est-card est-pad">
           <h3>Your bill, before and after</h3>
@@ -705,7 +825,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
               <span>{num(r.exported)} kWh, earning {gbp(r.exported * (settings.exportPence / 100))}</span>
             </div>
           </div>
-          {withBattery && (
+          {withBattery && !home && (
             <div className="est-battery">
               <b>With a {withBattery.batteryKwh} kWh battery</b>
               <span>
@@ -750,6 +870,19 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
               ))}
             </div>
           </div>
+          {home && (r.phaseCapped || r.kwp >= 7 || controls.phase !== 'unknown') && (
+            <div className="est-adj__g">
+              <span className="est-adj__lab">Do you know if you have a three-phase supply?</span>
+              <div className="est-tog3 seg" role="group" aria-label="Electricity supply">
+                {([['unknown', 'Not sure'], ['single', 'Single phase'], ['three', 'Three phase']] as const).map(([k, label]) => (
+                  <button key={k} type="button" className={controls.phase === k ? 'on' : ''} aria-pressed={controls.phase === k} onClick={() => controls.setPhase(k)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {r.phaseCapped && <p className="est-note">On a single-phase supply the biggest system we can fit is about {r.phaseCapKwp.toFixed(1)} kWp, so we have held it there. A three-phase supply allows more.</p>}
+            </div>
+          )}
           <div className="est-adj__g">
             <span className="est-adj__lab">Electricity prices</span>
             <div className="est-steppers">
@@ -762,7 +895,26 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
         </div>
       </div>
 
-      <SurveyCard onBook={() => setBooking(true)} postcode={postcode} requested={requested} />
+      <div className="est-card est-pad est-upsell">
+        <h3>Thinking about an electric car or a heat pump?</h3>
+        <div className="est-chips" role="group" aria-label="Add to your estimate">
+          {upsell.map((u) => (
+            <button key={u.k} type="button" className={u.on ? 'on' : ''} aria-pressed={u.on} onClick={() => (u.k === 'ev' ? controls.setEv(!u.on) : controls.setHeatpump(!u.on))}>
+              {u.label}
+              {Math.abs(u.delta) >= 1 ? <span className="est-opt-tag"> {u.delta > 0 ? 'adds' : 'takes off'} about {gbp(Math.abs(u.delta))} a year to your saving</span> : null}
+            </button>
+          ))}
+        </div>
+        <p className="est-note">We re-run your estimate with it added, so you can see the change in your saving.</p>
+      </div>
+
+      <SurveyCard onBook={bookSurvey} postcode={postcode} requested={requested} />
+      <StickyBar onQuote={openQuote} hidden={!!quoteDone} />
+      <QuoteModal open={exitOpen} onClose={() => setExitOpen(false)}>
+        <h3 className="est-qmodal__h">Want this sent to you?</h3>
+        <p className="est-sub">We’ll email your estimate as a PDF.</p>
+        <QuoteCapture buildPayload={quotePayload} onDone={setQuoteDone} onBook={bookSurvey} done={quoteDone} />
+      </QuoteModal>
       <SurveyModal open={booking} onClose={() => setBooking(false)} who={inputs.who} postcode={postcode} address={knownAddress} picks={['Solar panels', ...(inputs.battery ? ['Battery storage'] : []), ...(inputs.heatpump ? ['Heat pump'] : []), ...(inputs.ev ? ['EV charger'] : [])]} message={estimateMessage(r, inputs, roofHit?.address ?? '')} onSent={sent} />
 
 

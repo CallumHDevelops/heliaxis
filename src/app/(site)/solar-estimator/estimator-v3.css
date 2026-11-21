@@ -1,0 +1,50 @@
+/* ── Solar estimator v3: the results, the choice of system, the quote form, the landing sections ─────────── */
+.est-stepof{margin:6px 22px 0;font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.est-talk{margin:0;padding:0 22px 16px;text-align:center;font-size:.88rem;color:var(--muted)}
+.est-talk a{color:var(--ink);font-weight:600;text-underline-offset:3px}
+.est-head .big small{font-family:var(--mono);font-weight:500;font-size:.8rem;letter-spacing:.02em;color:var(--muted-d);margin-left:6px}
+.est-headsave{color:var(--paper);font-size:1.02rem}
+.est-headsave b{color:var(--solar)}
+.est-headbtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.est-headbtns .est-headcta{margin-top:0}
+.est-btn-ghost{background:transparent;color:var(--paper);border:1.5px solid rgba(247,242,231,.5)}
+.est-btn-ghost:hover{border-color:var(--solar);color:var(--solar)}
+.est-quotecard .est-btn-ghost,.est-modal__body .est-btn-ghost,.est-qdone .est-btn-ghost{color:var(--ink);border-color:var(--ink)}
+.est-qdone .est-btn-ghost:hover,.est-modal__body .est-btn-ghost:hover{background:var(--ink);color:var(--paper)}
+.est-headlinks{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:6px}
+.est-headlinks a{color:var(--paper);font-size:.9rem;text-underline-offset:3px;opacity:.9}
+.est-headlinks a:hover{color:var(--solar)}
+.est-headdone--inline{padding:8px 14px}
+.est-choice{display:grid;gap:10px}
+.est-choice__h{font-family:var(--display);font-weight:800;font-size:1.05rem}
+.est-choice__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px}
+.est-pick-card{font:inherit;text-align:left;position:relative;display:grid;gap:4px;align-content:start;padding:16px 16px 14px;background:var(--card);border:1.5px solid var(--line);border-radius:3px;color:var(--ink);cursor:pointer;transition:.15s;min-width:0}
+.est-pick-card:hover{border-color:var(--ink)}
+.est-pick-card:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.est-pick-card.on{border-color:var(--solar);background:rgba(248,188,30,.12);box-shadow:inset 0 0 0 1px var(--solar)}
+.est-pick-card b{font-family:var(--display);font-size:1.05rem}
+.est-pick-card small{color:var(--muted);font-size:.8rem}
+.est-pick-card__price{font-family:var(--display);font-weight:900;font-size:1.35rem;margin-top:6px;line-height:1.1}
+.est-pick-card__meta{font-size:.84rem;color:var(--muted);line-height:1.4}
+.est-pick-card__tag{font-style:normal;font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;position:absolute;top:10px;right:12px;color:var(--amber-2)}
+.est-incl{margin-top:4px}
+.est-qform{display:grid;gap:6px}
+.est-deliver{border:0;margin:0;padding:0;min-width:0}
+.est-deliver legend{padding:0}
+.est-qform .est-check{align-items:flex-start;font-size:.84rem;line-height:1.45;margin:4px 0}
+.est-qform .est-check input{margin-top:3px;flex:none;width:18px;height:18px}
+.est-qdone{display:grid;gap:10px}
+.est-qdone h3{font-family:var(--display);font-weight:800;font-size:1.2rem;color:#2f7d46}
+.est-qmodal__h{font-family:var(--display);font-weight:800;font-size:1.35rem}
+.est-upsell .est-chips button:not(.est-link){display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:6px;text-align:left;border-radius:8px;padding:10px 14px}
+.est-upsell .est-chips button.on .est-opt-tag{color:var(--paper);opacity:.8}
+.est-sticky{display:none}
+@media(max-width:840px){
+  .est-sticky{display:flex;align-items:center;gap:10px;position:fixed;left:0;right:0;bottom:0;z-index:60;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(20,18,12,.12)}
+  .est-sticky__main{flex:1;min-width:0;padding:.8rem 1rem;font-size:.98rem}
+  .est-sticky__ic{display:grid;place-items:center;flex:none;width:48px;height:48px;border:1.5px solid var(--ink);border-radius:3px;color:var(--ink);background:var(--card)}
+  .est-sticky__wa{background:#25d366;border-color:#1da851;color:#fff}
+  .est-wrap{padding-bottom:96px}
+  .est-headbtns .btn{flex:1 1 100%}
+}
+@media print{.est-sticky,.est-quotecard,.est-choice,.est-upsell{display:none!important}}
