@@ -121,18 +121,6 @@ export async function sendReply(address: string, id: string, html: string, all: 
   await graph(`${box(address)}/messages/${encodeURIComponent(id)}/${all ? 'replyAll' : 'reply'}`, { method: 'POST', headers: { Prefer: IMMUTABLE }, body: JSON.stringify({ comment: html }) });
 }
 
-/** Puts the reply in Outlook's Drafts to finish there. Returns the link that opens it in Outlook on the web. */
-export async function draftReply(address: string, id: string, html: string, all: boolean): Promise<string | null> {
-  const d = await graph<{ id: string; webLink?: string }>(`${box(address)}/messages/${encodeURIComponent(id)}/${all ? 'createReplyAll' : 'createReply'}`, {
-    method: 'POST',
-    headers: { Prefer: IMMUTABLE },
-    body: JSON.stringify({ comment: html }),
-  });
-  if (d.webLink) return d.webLink;
-  const r = await graph<{ webLink?: string }>(`${box(address)}/messages/${encodeURIComponent(d.id)}?$select=webLink`, { headers: { Prefer: IMMUTABLE } });
-  return r.webLink ?? null;
-}
-
 /* ── Highlighting in Outlook ─────────────────────────────────────────────── */
 
 /** The app's own categories. Only these are ever added or taken off; your own categories are left alone. */
@@ -170,4 +158,32 @@ export async function markMessage(address: string, id: string, o: { category: st
   if (o.flag && cur.flag?.flagStatus !== 'flagged') patch.flag = { flagStatus: 'flagged' };
   else if (!o.flag && o.unflag && cur.flag?.flagStatus === 'flagged') patch.flag = { flagStatus: 'notFlagged' };
   await graph(url, { method: 'PATCH', headers: { Prefer: IMMUTABLE }, body: JSON.stringify(patch) });
+}
+
+/* ── Drafts in Outlook ───────────────────────────────────────────────────── */
+
+/** A reply to their email, left in Outlook's Drafts (threaded under their email). */
+export async function createReplyDraft(address: string, id: string, html: string, all = false): Promise<{ id: string; lastModifiedDateTime: string; webLink: string | null }> {
+  const d = await graph<{ id: string; lastModifiedDateTime?: string; webLink?: string }>(`${box(address)}/messages/${encodeURIComponent(id)}/${all ? 'createReplyAll' : 'createReply'}`, {
+    method: 'POST',
+    headers: { Prefer: IMMUTABLE },
+    body: JSON.stringify({ comment: html }),
+  });
+  return { id: d.id, lastModifiedDateTime: d.lastModifiedDateTime ?? new Date().toISOString(), webLink: d.webLink ?? null };
+}
+
+/** A draft as it is now: still a draft, and when it was last changed. Null if it's gone. */
+export async function draftState(address: string, id: string): Promise<{ isDraft: boolean; lastModifiedDateTime: string } | null> {
+  try {
+    const r = await graph<{ isDraft?: boolean; lastModifiedDateTime?: string }>(`${box(address)}/messages/${encodeURIComponent(id)}?$select=isDraft,lastModifiedDateTime`, { headers: { Prefer: IMMUTABLE } });
+    return { isDraft: !!r.isDraft, lastModifiedDateTime: r.lastModifiedDateTime ?? '' };
+  } catch (e) {
+    if (e instanceof GraphError && e.status === 404) return null;
+    throw e;
+  }
+}
+
+/** Removes a draft (Outlook moves it to Deleted Items). Only ever used on the app's own, untouched drafts. */
+export async function deleteDraft(address: string, id: string): Promise<void> {
+  await graph(`${box(address)}/messages/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: IMMUTABLE } });
 }

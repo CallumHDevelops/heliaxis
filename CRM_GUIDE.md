@@ -461,9 +461,9 @@ reply** panel at the top of the dashboard. It doesn't copy your emails into the 
   emails every two minutes. New emails are picked up as they arrive.
 - **Urgent first**: each conversation where you owe a reply is sorted (urgent: a customer ready to sign,
   a fault, a complaint, a deadline today; high: quotes, enquiries, supplier problems, the DNO) with one
-  line on what they want. **In Outlook** the email gets the category **Urgent** (red, flagged) or **Needs
-  reply** (orange; flagged too when it's important), so it stands out in your inbox and on your phone.
-  They come off once you've replied or said no reply needed. Your own categories and flags are left alone.
+  line on what they want. **In Outlook** every one is flagged, with the category **Urgent** (red) or
+  **Needs reply** (orange), so it stands out in your inbox and on your phone. The flag and category come
+  off once you've replied or said no reply needed. Your own categories and flags are left alone.
   Turn it off in Settings › Highlight in Outlook.
   - The colours need one more permission; without it the categories still work, just grey. In PowerShell
     (as in section 4, after `Connect-ExchangeOnline` and the **Set app** line):
@@ -474,10 +474,13 @@ reply** panel at the top of the dashboard. It doesn't copy your emails into the 
   emails as examples. Every draft follows it, and copies most closely the emails you've sent that same
   person before. See and edit it in **Settings › Your writing style** (your edits are kept; otherwise it's
   learnt again every 30 days), or **Learn it again**.
-- **Drafts**: use only what's in the email and the CRM. Anything it doesn't know is left in [square
-  brackets], and Send asks you to fill those in first. **Send** replies from your mailbox (with your
-  signature); **Put in Outlook drafts** to finish there; **Rewrite** with a steer ("say yes to Thursday at
-  10"); **No reply needed**.
+- **Drafts**: each one also waits in **Outlook's Drafts**, as a reply under their email (with your
+  signature), so you can check and send it from Outlook on your phone. Once you've replied (from Outlook
+  or the app) or said no reply needed, the app takes its draft away again; a draft you've changed in
+  Outlook is never replaced or removed. Turn it off in Settings › Put the drafts in Outlook too.
+  Drafts use only what's in the email and the CRM. Anything it doesn't know is left in [square brackets],
+  and Send asks you to fill those in first. In the app: **Send**; **Update the Outlook draft** with your
+  edits; **Rewrite** with a steer ("say yes to Thursday at 10"); **No reply needed**.
 - **Waiting on them**: you sent the last email 3+ days ago and nothing's come back. **New people**:
   someone asking about a job who isn't in the CRM; **Add to the CRM** in one tap.
 - **Folders**: everyone at a company by its domain (goodwe.com → Suppliers/GoodWe, nationalgrid.co.uk →
@@ -489,5 +492,6 @@ reply** panel at the top of the dashboard. It doesn't copy your emails into the 
   Anything older than 30 days is filed anyway. An email you've already moved yourself is left alone.
 - **Marketing** (off until you turn it on): anything with an unsubscribe link goes to a Marketing
   folder, never from customers or anyone you've written to. **Not marketing** brings it back for good.
-- Nothing is ever deleted, and nothing is sent without you pressing Send. The AI costs show under
+- Nothing is ever deleted (except the app's own Outlook drafts you haven't touched, once they're no longer
+  needed; Outlook keeps them in Deleted Items), and nothing is sent without you pressing Send. The AI costs show under
   "Email: …" in the AI costs report. `MAIL_MODEL` changes the model (default Claude Opus 5.5).

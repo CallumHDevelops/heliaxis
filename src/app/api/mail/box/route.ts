@@ -47,7 +47,7 @@ export async function PATCH(req: Request) {
   if (!s.box) return json({ error: 'Connect your mailbox first.' }, 400);
   const b = await req.json().catch(() => ({}));
   const patch: Record<string, unknown> = {};
-  for (const k of ['filing', 'marketing', 'drafts', 'highlight'] as const) if (typeof b[k] === 'boolean') patch[k] = b[k];
+  for (const k of ['filing', 'marketing', 'drafts', 'outlook_drafts', 'highlight'] as const) if (typeof b[k] === 'boolean') patch[k] = b[k];
   if (typeof b.signature === 'string') patch.signature = b.signature.trim().slice(0, 1000) || null;
   // Your edit of your writing style: kept as it is (the monthly re-learn leaves it alone).
   if (typeof b.style === 'string') {

@@ -3,7 +3,8 @@
 --     marks the urgent ones in Outlook itself, learns how you write from your sent emails and drafts each
 --     reply in that style, files emails into a folder per company or customer once they've been dealt
 --     with, and moves marketing into a Marketing folder.
---     Nothing is deleted, and nothing is filed until its owner turns filing on (Email › Settings).
+--     Nothing is filed until its owner turns filing on (Email › Settings), and nothing is deleted except the
+--     app's own Outlook drafts that you haven't touched, once they're no longer needed.
 --     Only the mailbox's owner sees it. Run after crm.sql and organisations.sql. Safe to run twice.
 --     Server-only tables (RLS on, no policies).
 
@@ -14,6 +15,7 @@ create table if not exists public.mail_boxes (
   filing           boolean not null default false,     -- move dealt-with emails into their folders
   marketing        boolean not null default false,     -- move marketing emails into the Marketing folder
   drafts           boolean not null default true,      -- write a reply for each email that needs one
+  outlook_drafts   boolean not null default true,      -- and put it in Outlook's Drafts, as a reply to their email
   signature        text,                               -- added under replies sent from the app
   highlight        boolean not null default true,      -- mark emails needing a reply in Outlook (category, and a flag if important)
   categories_ready boolean not null default false,     -- the coloured Outlook categories have been made
@@ -123,6 +125,8 @@ create table if not exists public.mail_threads (
   draft_error      text,
   mark             text,                               -- what's marked in Outlook: urgent, high, reply (null: nothing)
   mark_id          text,                               -- on which email
+  outlook_draft_id text,                               -- the reply the app put in Outlook's Drafts
+  outlook_draft_at timestamptz,                        -- when (a draft changed after this is yours: never replaced or removed)
   done_at          timestamptz,
   updated_at       timestamptz not null default now(),
   unique (box_id, conversation_id)
@@ -137,6 +141,9 @@ alter table public.mail_boxes   add column if not exists style_examples   jsonb;
 alter table public.mail_boxes   add column if not exists style_from       int;
 alter table public.mail_boxes   add column if not exists style_at         timestamptz;
 alter table public.mail_boxes   add column if not exists style_edited     boolean not null default false;
+alter table public.mail_boxes   add column if not exists outlook_drafts   boolean not null default true;
+alter table public.mail_threads add column if not exists outlook_draft_id text;
+alter table public.mail_threads add column if not exists outlook_draft_at timestamptz;
 alter table public.mail_threads add column if not exists mark             text;
 alter table public.mail_threads add column if not exists mark_id          text;
 

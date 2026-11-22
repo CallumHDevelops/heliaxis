@@ -203,14 +203,14 @@ function Connect({ email, connected, onDone }: { email: string; connected: boole
         <h2>Connect {email}</h2>
         <p>The app reads your inbox every two minutes and:</p>
         <ul>
-          <li>works out which emails need a reply from you and marks them in Outlook: “Urgent” (and flagged) or “Needs reply”, so they stand out on your phone too;</li>
-          <li>learns how you write from your sent emails, and drafts each reply in your style, for you to check and send;</li>
+          <li>works out which emails need a reply from you and flags them in Outlook (“Urgent” or “Needs reply”), so they stand out on your phone too;</li>
+          <li>learns how you write from your sent emails, and drafts each reply in your style, waiting in Outlook’s Drafts and here, for you to check and send;</li>
           <li>works out a folder for every company and customer (GoodWe, National Grid, Customers/Jane Smith);</li>
           <li>once you turn filing on, moves each email into its folder after you’ve replied, and marketing into a Marketing folder, so your inbox only holds what still needs you;</li>
           <li>spots people asking about a job who aren’t in the CRM yet, so you can add them in one tap.</li>
         </ul>
         <p className="crm-muted">
-          Nothing is moved until you’ve checked the folders and turned filing on, and nothing is ever deleted. Only you see your email here.
+          Nothing is moved until you’ve checked the folders and turned filing on, and none of your emails are ever deleted (only the app’s own drafts, once you’ve replied). Only you see your email here.
         </p>
         {!connected && <p className="mx-err">Microsoft 365 isn’t connected to the app yet: see Setup › Connect Microsoft 365 email first.</p>}
         {err && <p className="mx-err">{err}</p>}
@@ -462,12 +462,12 @@ function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: Threa
                 onClick={async () => {
                   const d = await act('outlook', { text, all });
                   if (d) {
-                    setNote('It’s in your Outlook Drafts.');
+                    setNote('Your Outlook draft now says this.');
                     if (d.link) window.open(String(d.link), '_blank', 'noopener');
                   }
                 }}
               >
-                {busy === 'outlook' ? 'Saving…' : 'Put in Outlook drafts'}
+                {busy === 'outlook' ? 'Saving…' : 'Update the Outlook draft'}
               </button>
               <button
                 type="button"
@@ -652,6 +652,7 @@ type BoxInfo = {
     filing: boolean;
     marketing: boolean;
     drafts: boolean;
+    outlook_drafts: boolean;
     highlight: boolean;
     categories_ready: boolean;
     signature: string | null;
@@ -697,13 +698,18 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
     void load();
   }
 
-  const toggles: { k: 'highlight' | 'drafts' | 'filing' | 'marketing'; title: string; body: string }[] = [
+  const toggles: { k: 'highlight' | 'drafts' | 'outlook_drafts' | 'filing' | 'marketing'; title: string; body: string }[] = [
     {
       k: 'highlight',
       title: 'Highlight in Outlook',
-      body: `Emails that need a reply get a “Needs reply” category in Outlook, urgent ones “Urgent” and a flag (important ones are flagged too), so they stand out in your inbox and on your phone. They come off once you’ve replied or said no reply needed. Your own categories and flags are left alone.${b.highlight && !b.categories_ready ? ' (The categories show grey until the app is allowed to colour them: see the CRM guide, My email.)' : ''}`,
+      body: `Every email that needs a reply is flagged in Outlook, with the category “Urgent” or “Needs reply”, so it stands out in your inbox and on your phone. The flag and category come off once you’ve replied or said no reply needed. Your own categories and flags are left alone.${b.highlight && !b.categories_ready ? ' (The categories show grey until the app is allowed to colour them: see the CRM guide, My email.)' : ''}`,
     },
-    { k: 'drafts', title: 'Draft replies', body: 'Writes a reply for each email that needs one, for you to check, change and send. Nothing is ever sent without you pressing Send.' },
+    { k: 'drafts', title: 'Draft replies', body: 'Writes a reply, in your style, for each email that needs one, for you to check, change and send here. Nothing is ever sent without you pressing Send.' },
+    {
+      k: 'outlook_drafts',
+      title: 'Put the drafts in Outlook too',
+      body: 'Each draft also waits in Outlook’s Drafts, as a reply under their email, so you can check and send it from Outlook on your phone or computer. Once you’ve replied (from Outlook or here) or said no reply needed, the app takes its draft away again; one you’ve changed in Outlook is always left alone.',
+    },
     {
       k: 'filing',
       title: 'File emails into folders',

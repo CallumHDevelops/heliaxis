@@ -15,6 +15,7 @@ export type MailBox = {
   drafts: boolean;
   signature: string | null;
   highlight: boolean;
+  outlook_drafts: boolean;
   categories_ready: boolean;
   style: string | null;
   style_examples: { to: string; text: string }[] | null;
@@ -29,7 +30,7 @@ export type MailBox = {
   created_at: string;
 };
 
-const BOX_COLS = 'id, address, filing, marketing, drafts, signature, highlight, categories_ready, style, style_examples, style_from, style_at, style_edited, scan_before, sent_before, scan_done_at, last_run_at, last_error, created_at';
+const BOX_COLS = 'id, address, filing, marketing, drafts, signature, highlight, outlook_drafts, categories_ready, style, style_examples, style_from, style_at, style_edited, scan_before, sent_before, scan_done_at, last_run_at, last_error, created_at';
 
 /** The person's mailbox; null if they haven't connected one; 'missing' before mail-sort.sql has been run. */
 export async function boxFor(userId: string, db: Db = createAdminClient()): Promise<MailBox | null | 'missing'> {

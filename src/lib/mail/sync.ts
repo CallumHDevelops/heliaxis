@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
 import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
-import { CAT_REPLY, CAT_URGENT, ensureCategories, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
+import { CAT_REPLY, CAT_URGENT, createReplyDraft, deleteDraft, draftState, ensureCategories, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
 import {
   addressOf,
   companyDomain,
@@ -17,6 +17,7 @@ import {
   MARKETING_FOLDER,
   markFor,
   readyToFile,
+  textToHtml,
   threadState,
   type ThreadState,
 } from './shared';
@@ -32,7 +33,8 @@ import {
  *     ("Urgent" and flagged, or "Needs reply"); the marks come off once it's dealt with.
  *  4. Learns how the owner writes from their sent emails, and drafts each reply in that style.
  *  5. Once filing is on, moves the emails of dealt-with conversations into their folders, and marketing into
- *     Marketing (once that is on). Nothing is ever deleted, and nothing is copied into the CRM.
+ *     Marketing (once that is on). None of your emails are ever deleted (only the app's own untouched Outlook
+ *     drafts, once they're no longer needed), and nothing is copied into the CRM.
  * Each step stops when the time is up and carries on next run.
  */
 
@@ -47,14 +49,16 @@ type Box = {
   scan_before: string | null;
   sent_before: string | null;
   live_since: string | null;
+  signature: string | null;
   highlight: boolean;
+  outlook_drafts: boolean;
   categories_ready: boolean;
   style: string | null;
   style_examples: { to: string; text: string }[] | null;
   style_at: string | null;
   style_edited: boolean;
 };
-const BOX_COLS = 'id, user_id, address, filing, marketing, drafts, scan_before, sent_before, live_since, highlight, categories_ready, style, style_examples, style_at, style_edited';
+const BOX_COLS = 'id, user_id, address, filing, marketing, drafts, signature, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
 type Rule = {
   id: string;
   kind: 'domain' | 'address';
@@ -79,7 +83,7 @@ const MOVES_PER_RUN = 50;
 
 const RULE_COLS = 'id, kind, match, label, folder, action, status, never_marketing, enquiry_id, organisation_id, contact_id';
 
-export type BoxResult = { address: string; read: number; named: number; styled: boolean; triaged: number; marked: number; drafted: number; filed: number; marketing: number; error?: string };
+export type BoxResult = { address: string; read: number; named: number; styled: boolean; triaged: number; marked: number; outlookDrafts: number; drafted: number; filed: number; marketing: number; error?: string };
 
 export async function runMailSort(o: { until: number }): Promise<BoxResult[]> {
   if (!msConfigured()) return [];
@@ -96,7 +100,7 @@ export async function runMailSort(o: { until: number }): Promise<BoxResult[]> {
 
 /** One mailbox, start to finish. Never throws: the error is saved on the mailbox for Email › Settings. */
 export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult> {
-  const res: BoxResult = { address: box.address, read: 0, named: 0, styled: false, triaged: 0, marked: 0, drafted: 0, filed: 0, marketing: 0 };
+  const res: BoxResult = { address: box.address, read: 0, named: 0, styled: false, triaged: 0, marked: 0, outlookDrafts: 0, drafted: 0, filed: 0, marketing: 0 };
   const started = new Date().toISOString();
   try {
     const ctx = await Context.load(db, box);
@@ -105,6 +109,7 @@ export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult
     if (Date.now() < until) res.triaged = await triage(ctx, until);
     // Marks (and unmarks) in Outlook straight after sorting, so urgent emails show on your phone within minutes.
     if (Date.now() < until) res.marked = await highlight(ctx, until);
+    if (Date.now() < until) res.outlookDrafts = await syncOutlookDrafts(ctx, until);
     // Your style, once six months of sent emails have been read (and again every 30 days, unless you edited it).
     if (styleDue(box) && Date.now() < until - 25_000) res.styled = await learnFromSent(ctx);
     if (box.drafts && Date.now() < until) res.drafted = await draftReplies(ctx, until);
@@ -540,7 +545,80 @@ export async function writeDraft(ctx: Context, t: { id: string; conversation_id:
     .from('mail_threads')
     .update(draft ? { draft, draft_for: t.last_in_at, draft_error: null } : { draft_error: 'The writing assistant couldn’t write this one. Try again, or write it yourself.', draft_for: t.last_in_at })
     .eq('id', t.id);
+  // And in Outlook's Drafts, under their email, ready to send from there.
+  if (draft && ctx.box.outlook_drafts) await putOutlookDraft(ctx.db, ctx.box, t.id, draft).catch(() => null);
   return draft;
+}
+
+/* ── Drafts in Outlook ─────────────────────────────────────────────────── */
+
+const replyHtml = (box: Pick<Box, 'signature'>, text: string) => textToHtml(box.signature?.trim() ? `${text}\n\n${box.signature.trim()}` : text);
+
+/**
+ * Takes the app's Outlook draft for a conversation away, unless you've changed it since (then it's yours and stays)
+ * or it has been sent. Returns 'kept' when yours is left in place.
+ */
+async function clearOutlookDraft(address: string, id: string, at: string | null): Promise<'gone' | 'kept'> {
+  const d = await draftState(address, id);
+  if (!d || !d.isDraft) return 'gone'; // sent, or already deleted
+  const untouched = at && Date.parse(d.lastModifiedDateTime) <= Date.parse(at) + 60_000;
+  if (!untouched) return 'kept';
+  await deleteDraft(address, id);
+  return 'gone';
+}
+
+/**
+ * Puts this text in Outlook's Drafts as the reply to their latest email, in place of the app's earlier draft (one you've
+ * edited in Outlook is never replaced: that one stays and no new one is made). Returns the link to open it.
+ */
+export async function putOutlookDraft(db: Db, box: Pick<Box, 'address' | 'signature'>, threadId: string, text: string, all = false): Promise<{ link: string | null; kept: boolean }> {
+  const { data: t } = await db.from('mail_threads').select('last_in_graph_id, outlook_draft_id, outlook_draft_at').eq('id', threadId).maybeSingle();
+  if (!t?.last_in_graph_id) return { link: null, kept: false };
+  if (t.outlook_draft_id && (await clearOutlookDraft(box.address, t.outlook_draft_id as string, t.outlook_draft_at as string | null)) === 'kept') return { link: null, kept: true };
+  const d = await createReplyDraft(box.address, t.last_in_graph_id as string, replyHtml(box, text), all);
+  await db.from('mail_threads').update({ outlook_draft_id: d.id, outlook_draft_at: d.lastModifiedDateTime }).eq('id', threadId);
+  return { link: d.webLink, kept: false };
+}
+
+/** After you've sent from the app or said no reply needed: the app's untouched Outlook draft goes straight away. */
+export async function dropOutlookDraft(db: Db, address: string, threadId: string): Promise<void> {
+  const { data: t } = await db.from('mail_threads').select('outlook_draft_id, outlook_draft_at').eq('id', threadId).maybeSingle();
+  if (!t?.outlook_draft_id) return;
+  await clearOutlookDraft(address, t.outlook_draft_id as string, t.outlook_draft_at as string | null);
+  await db.from('mail_threads').update({ outlook_draft_id: null, outlook_draft_at: null }).eq('id', threadId);
+}
+
+/**
+ * Keeps Outlook's Drafts in step: a draft for every conversation that needs a reply and has one written (also ones
+ * written before Outlook drafts were on); the app's untouched drafts taken away once you've replied or said no reply
+ * needed, or when Outlook drafts are turned off.
+ */
+async function syncOutlookDrafts(ctx: Context, until: number): Promise<number> {
+  const { db, box } = ctx;
+  const { data } = await db
+    .from('mail_threads')
+    .select('id, state, draft, draft_for, last_in_at, outlook_draft_id, outlook_draft_at')
+    .eq('box_id', box.id)
+    .or('state.eq.reply,outlook_draft_id.not.is.null')
+    .limit(500);
+  let n = 0;
+  for (const t of data ?? []) {
+    if (n >= 20 || Date.now() > until - 5_000) break;
+    const wanted = box.drafts && box.outlook_drafts && t.state === 'reply';
+    try {
+      if (!wanted && t.outlook_draft_id) {
+        await clearOutlookDraft(box.address, t.outlook_draft_id as string, t.outlook_draft_at as string | null);
+        await db.from('mail_threads').update({ outlook_draft_id: null, outlook_draft_at: null }).eq('id', t.id);
+        n++;
+      } else if (wanted && !t.outlook_draft_id && t.draft && t.draft_for && String(t.draft_for) >= String(t.last_in_at)) {
+        await putOutlookDraft(db, box, t.id as string, t.draft as string);
+        n++;
+      }
+    } catch {
+      // Try again next run.
+    }
+  }
+  return n;
 }
 
 /** For the API: the run's context for one mailbox (to rewrite a draft on request). */
@@ -654,12 +732,12 @@ async function highlight(ctx: Context, until: number): Promise<number> {
   for (const t of todo.slice(0, MARKS_PER_RUN)) {
     if (Date.now() > until - 5_000) break;
     const want = markFor(box.highlight, t.state as string, t.priority as string | null);
-    const flaggedByUs = t.mark === 'urgent' || t.mark === 'high';
+    const flaggedByUs = !!t.mark; // every mark the app sets comes with a flag
     try {
       // Off the email it was on, if that's not the one it should be on now.
       if (t.mark_id && (!want || t.mark_id !== t.last_in_graph_id)) await markMessage(box.address, t.mark_id as string, { category: null, flag: false, unflag: flaggedByUs }).catch(() => null);
       if (want && t.last_in_graph_id) {
-        await markMessage(box.address, t.last_in_graph_id as string, { category: want === 'urgent' ? CAT_URGENT : CAT_REPLY, flag: want !== 'reply', unflag: flaggedByUs });
+        await markMessage(box.address, t.last_in_graph_id as string, { category: want === 'urgent' ? CAT_URGENT : CAT_REPLY, flag: true, unflag: flaggedByUs });
       }
       await db.from('mail_threads').update({ mark: want, mark_id: want ? t.last_in_graph_id : null }).eq('id', t.id);
       n++;

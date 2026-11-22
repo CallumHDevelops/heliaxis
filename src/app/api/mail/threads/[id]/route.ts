@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { draftReply, messageText, moveToInbox, sendReply } from '@/lib/mail/graph';
-import { contextFor, writeDraft } from '@/lib/mail/sync';
+import { messageText, moveToInbox, sendReply } from '@/lib/mail/graph';
+import { contextFor, dropOutlookDraft, putOutlookDraft, writeDraft } from '@/lib/mail/sync';
 import { mailSession } from '@/lib/mail/server';
 import { addressOf, folderFor, textToHtml, threadState } from '@/lib/mail/shared';
 import { canAccess } from '@/lib/portals';
@@ -63,11 +63,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       if (action === 'send') {
         await sendReply(box.address, t.last_in_graph_id as string, html, !!b.all);
         await s.db.from('mail_threads').update({ last_out_at: now, state: 'replied', draft: text, updated_at: now }).eq('id', t.id);
+        // The same reply waiting in Outlook's Drafts would be a second copy: it goes (unless you've edited it there).
+        await dropOutlookDraft(s.db, box.address, t.id as string).catch(() => null);
         return json({ ok: true });
       }
-      const link = await draftReply(box.address, t.last_in_graph_id as string, html, !!b.all);
+      // In place of the app's earlier Outlook draft for this conversation.
       await s.db.from('mail_threads').update({ draft: text }).eq('id', t.id);
-      return json({ ok: true, link });
+      const put = await putOutlookDraft(s.db, box, t.id as string, text, !!b.all);
+      if (put.kept) return json({ error: 'There’s already a draft for this in Outlook that you’ve changed there, so it’s been left as it is. Finish it in Outlook.' }, 409);
+      return json({ ok: true, link: put.link });
     } catch (e) {
       return json({ error: e instanceof Error ? e.message : 'Microsoft 365 didn’t take it.' }, 502);
     }
@@ -97,6 +101,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       needsReply: action === 'undone' ? true : ((t.needs_reply as boolean | null) ?? null),
     });
     await s.db.from('mail_threads').update({ done_at: doneAt, state, ...(action === 'undone' ? { needs_reply: true } : {}), updated_at: now }).eq('id', t.id);
+    if (action === 'done') await dropOutlookDraft(s.db, box.address, t.id as string).catch(() => null);
     return json({ ok: true, state });
   }
 
