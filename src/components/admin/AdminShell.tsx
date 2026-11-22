@@ -26,6 +26,7 @@ type Tab =
   | 'eic'
   | 'instruments'
   | 'reviews'
+  | 'hestia'
   | 'content'
   | 'orders'
   | 'surveys'
@@ -415,6 +416,7 @@ export async function AdminShell({
         { href: '/admin/crm/contacts', label: 'Contacts', icon: <svg {...ICON}><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>, show: can('crm'), section: 'Customers' },
         { href: '/admin/enquiries', label: 'Enquiries', icon: icons.enquiries, active: active === 'enquiries', show: can('enquiries'), tab: enquiriesIsTab, section: 'Enquiries and messages' },
         { href: '/admin/reviews', label: 'Reviews', icon: icons.reviews, active: active === 'reviews', show: can('crm'), section: 'Diary and insight' },
+        { href: '/admin/hestia', label: 'Hestia', icon: icons.enquiries, active: active === 'hestia', show: can('crm'), section: 'Diary and insight' },
         { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm'), section: 'Diary and insight' },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },
         { href: '/admin/crm/chats', label: 'WhatsApp chats', icon: icons.whatsapp, show: !can('enquiries') && can('crm'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },

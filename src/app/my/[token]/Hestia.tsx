@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './parts';
 
-type Turn = { role: 'user' | 'assistant'; content: string };
+type Turn = { role: 'user' | 'assistant'; content: string; id?: string | null; rating?: 1 | -1 };
 
 /**
  * Hestia, the portal's helper (api/my/[token]/hestia): quick answers about their own project from what
@@ -29,7 +29,16 @@ export function Hestia({ token, suggestions, onHandoff }: { token: string; sugge
     const r = await fetch(`/api/my/${token}/hestia`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question, history }) }).catch(() => null);
     const d = r ? await r.json().catch(() => ({})) : {};
     setBusy(false);
-    setTurns((t) => [...t, { role: 'assistant', content: d.answer || d.error || 'Sorry, I can’t answer just now. Try Messages instead.' }]);
+    setTurns((t) => [...t, { role: 'assistant', content: d.answer || d.error || 'Sorry, I can’t answer just now. Try Messages instead.', id: typeof d.id === 'string' ? d.id : null }]);
+  }
+  /** Thumbs up or down on one answer. Shown as chosen straight away; put back if it couldn't be saved. */
+  async function rate(i: number, rating: 1 | -1) {
+    const id = turns[i]?.id;
+    if (!id || rating === turns[i].rating) return;
+    const before = turns[i].rating;
+    setTurns((t) => t.map((x, j) => (j === i ? { ...x, rating } : x)));
+    const r = await fetch(`/api/my/${token}/hestia/rate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, rating }) }).catch(() => null);
+    if (!r?.ok) setTurns((t) => t.map((x, j) => (j === i ? { ...x, rating: before } : x)));
   }
   const lastQuestion = [...turns].reverse().find((t) => t.role === 'user')?.content ?? '';
 
@@ -47,9 +56,20 @@ export function Hestia({ token, suggestions, onHandoff }: { token: string; sugge
       {turns.length > 0 && (
         <div className="pt-hestia-log" ref={list} aria-live="polite">
           {turns.map((t, i) => (
-            <p key={i} className={t.role === 'user' ? 'me' : 'her'}>
-              {t.content}
-            </p>
+            <div key={i} className={`pt-turn ${t.role === 'user' ? 'me' : 'her'}`}>
+              <p>{t.content}</p>
+              {t.role === 'assistant' && t.id && (
+                <div className="pt-rate" role="group" aria-label="Was this answer helpful?">
+                  <span className="pt-fine">{t.rating ? 'Thanks, that helps me get better.' : 'Was that helpful?'}</span>
+                  <button type="button" className="pt-rate-btn" aria-pressed={t.rating === 1} aria-label="Helpful answer" title="Helpful" onClick={() => void rate(i, 1)}>
+                    <Icon name="thumbup" size={16} />
+                  </button>
+                  <button type="button" className="pt-rate-btn" aria-pressed={t.rating === -1} aria-label="Not helpful" title="Not helpful" onClick={() => void rate(i, -1)}>
+                    <Icon name="thumbdown" size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
           {busy && <p className="her pt-typing">Hestia is typing…</p>}
         </div>

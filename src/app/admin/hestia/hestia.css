@@ -1,0 +1,25 @@
+.hst-page { max-width: 900px; margin: 0 auto; display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+.hst-page, .hst-page * { box-sizing: border-box; }
+.hst-page h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.hst-page header p { margin: 0; max-width: 70ch; }
+.hst-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.hst-blurb { margin: 0; max-width: 70ch; }
+.hst-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 16px; display: grid; gap: 8px; }
+.hst-card h2 { margin: 0; font-size: 1.05rem; }
+.hst-causes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hst-causes em { display: block; font-size: 0.85rem; color: var(--muted); font-style: normal; }
+.hst-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.hst-item { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 14px; display: grid; gap: 10px; }
+.hst-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); align-items: center; }
+.hst-pill { font-weight: 800; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border-strong, var(--border)); color: var(--text); }
+.hst-pill.is-down { background: rgba(220, 60, 60, 0.12); }
+.hst-pill.is-up { background: rgba(248, 188, 30, 0.25); border-color: #f8bc1e; }
+.hst-qa { display: grid; gap: 8px; }
+.hst-q, .hst-a { margin: 0; padding: 8px 10px; border-radius: 8px; background: rgba(127, 127, 127, 0.08); white-space: pre-wrap; font-size: 0.92rem; }
+.hst-q b, .hst-a b { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 2px; }
+.hst-diag { margin: 0; border-left: 3px solid #f8bc1e; background: rgba(248, 188, 30, 0.1); padding: 8px 12px; font-size: 0.9rem; }
+.hst-used { margin: 6px 0 0; }
+.hst-facts { margin: 6px 0 0; max-height: 260px; overflow: auto; font-size: 0.75rem; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(127, 127, 127, 0.06); white-space: pre-wrap; word-break: break-word; }
+.hst-edit { display: grid; gap: 10px; }
+.hst-edit label { display: grid; gap: 4px; font-weight: 700; font-size: 0.85rem; }
+.hst-btns { display: flex; gap: 8px; flex-wrap: wrap; }
