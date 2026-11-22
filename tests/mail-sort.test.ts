@@ -10,6 +10,7 @@ import {
   looksAutomated,
   looksLikeMarketing,
   markFor,
+  withSignOff,
   cidsIn,
   cleanSignature,
   insertAtTop,
@@ -118,6 +119,8 @@ describe('highlighting in Outlook', () => {
     expect(markFor(true, 'reply', 'high')).toBe('high');
     expect(markFor(true, 'reply', 'normal')).toBe('reply');
     expect(markFor(true, 'reply', null)).toBe('reply');
+    expect(markFor(true, 'reply', 'normal', true)).toBe('action');
+    expect(markFor(true, 'reply', 'urgent', true)).toBe('urgent');
   });
   it('takes the mark off once dealt with, or when highlighting is off', () => {
     expect(markFor(true, 'replied', 'urgent')).toBeNull();
@@ -170,5 +173,14 @@ describe('your signature, copied from your sent emails', () => {
 
   it('puts the reply above the quoted email', () => {
     expect(insertAtTop('<html><body class="x"><hr>quoted</body></html>', '<p>Reply</p>')).toBe('<html><body class="x"><p>Reply</p><hr>quoted</body></html>');
+  });
+});
+
+describe('sign-off', () => {
+  it('ends every reply with Kind regards', () => {
+    expect(withSignOff('Hi Sarah,\n\nYes, Tuesday works.', 'Kind regards,')).toBe('Hi Sarah,\n\nYes, Tuesday works.\n\nKind regards,');
+    expect(withSignOff('Hi Tom,\n\nSplit it please.\n\nCheers,\nCallum', 'Kind regards,')).toBe('Hi Tom,\n\nSplit it please.\n\nKind regards,\nCallum');
+    expect(withSignOff('Hi,\n\nThanks.\n\nKind regards,\nCallum', 'Kind regards,')).toBe('Hi,\n\nThanks.\n\nKind regards,\nCallum');
+    expect(withSignOff('Hi,\n\nThanks.\n\nKind Regards', 'Kind regards,')).toBe('Hi,\n\nThanks.\n\nKind Regards');
   });
 });

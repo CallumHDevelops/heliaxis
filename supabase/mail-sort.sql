@@ -13,9 +13,10 @@ create table if not exists public.mail_boxes (
   user_id          uuid not null unique references public.profiles(id) on delete cascade,
   address          text not null unique,               -- callum@heliaxis.co.uk (always its owner's own sign-in email)
   filing           boolean not null default false,     -- move dealt-with emails into their folders
-  marketing        boolean not null default false,     -- move marketing emails into the Marketing folder
+  marketing        boolean not null default true,      -- move marketing emails into the Marketing folder
   drafts           boolean not null default true,      -- write a reply for each email that needs one
   outlook_drafts   boolean not null default true,      -- and put it in Outlook's Drafts, as a reply to their email
+  sign_off         text not null default 'Kind regards,', -- every reply ends with this, just above the signature
   signature        text,                               -- plain-text signature, only if none could be copied from your sent emails
   signature_html   text,                               -- your Outlook signature, copied from your sent emails (logo, links and all)
   signature_images jsonb,                              -- its pictures (logo), [{contentId, name, contentType, contentBytes}]
@@ -113,13 +114,17 @@ create table if not exists public.mail_threads (
   last_in_graph_id text,
   marketing        boolean not null default false,
   automated        boolean not null default false,
-  -- new: not looked at yet · reply: needs a reply from you · fyi: no reply needed · replied: you sent the last email
+  -- new: not looked at yet · reply: needs you (a reply, or something to do) · fyi: nothing needed · replied: you sent the last email
   -- done: you said no reply needed · marketing
   state            text not null default 'new' check (state in ('new','reply','fyi','replied','done','marketing')),
   needs_reply      boolean,                            -- what the triage said about their last email
   priority         text check (priority in ('urgent','high','normal','low')),
   kind             text,                               -- customer, prospect, supplier, grid, partner, finance, team, personal, other
   summary          text,                               -- one line: what they want
+  tone             text,                               -- how they come across: happy, neutral, anxious, frustrated, angry, formal…
+  opportunity      text,                               -- a chance Hestia spotted (a referral, an add-on, a review, a new lead)
+  action_only      boolean not null default false,     -- needs you to do something, but not a reply (a portal, a payment, a form)
+  alerted_at       timestamptz,                        -- when your phone was told it's urgent
   why              text,                               -- why it matters / why it needs a reply
   due              text,                               -- a deadline they gave, as written
   prospect         jsonb,                              -- {name, phone, postcode} for someone who looks like a new customer
@@ -150,6 +155,12 @@ alter table public.mail_boxes   add column if not exists signature_html   text;
 alter table public.mail_boxes   add column if not exists signature_images jsonb;
 alter table public.mail_boxes   add column if not exists signature_at     timestamptz;
 alter table public.mail_boxes   add column if not exists reply_font       text;
+alter table public.mail_boxes   add column if not exists sign_off         text not null default 'Kind regards,';
+alter table public.mail_boxes   alter column marketing set default true;
+alter table public.mail_threads add column if not exists tone             text;
+alter table public.mail_threads add column if not exists opportunity      text;
+alter table public.mail_threads add column if not exists action_only      boolean not null default false;
+alter table public.mail_threads add column if not exists alerted_at       timestamptz;
 alter table public.mail_threads add column if not exists outlook_draft_id text;
 alter table public.mail_threads add column if not exists outlook_draft_at timestamptz;
 alter table public.mail_threads add column if not exists mark             text;

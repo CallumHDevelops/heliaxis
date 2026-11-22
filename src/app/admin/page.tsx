@@ -339,7 +339,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   ]);
   // Email to reply in the "Needs you" strip, first; the panel offers to connect it to admins who haven't yet.
   if (mail && mail !== 'none' && mail.counts.reply)
-    counts.email = { n: mail.counts.reply, detail: mail.counts.urgent ? `to reply, ${mail.counts.urgent} important` : 'to reply' };
+    counts.email = { n: mail.counts.reply, detail: mail.counts.urgent ? `need you, ${mail.counts.urgent} urgent or important` : 'need you' };
   const firstName = (profile?.full_name || profile?.email || '').split(/[\s@]/)[0];
 
   return (

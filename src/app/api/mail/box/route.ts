@@ -49,6 +49,8 @@ export async function PATCH(req: Request) {
   const patch: Record<string, unknown> = {};
   for (const k of ['filing', 'marketing', 'drafts', 'outlook_drafts', 'highlight'] as const) if (typeof b[k] === 'boolean') patch[k] = b[k];
   if (typeof b.signature === 'string') patch.signature = b.signature.trim().slice(0, 1000) || null;
+  // What every reply ends with, just above the signature ("Kind regards," unless you change it).
+  if (typeof b.sign_off === 'string') patch.sign_off = b.sign_off.trim().slice(0, 60) || 'Kind regards,';
   // Your edit of your writing style: kept as it is (the monthly re-learn leaves it alone).
   if (typeof b.style === 'string') {
     patch.style = b.style.trim().slice(0, 4000) || null;

@@ -435,3 +435,20 @@
   color: #000;
   overflow-x: auto;
 }
+
+/* Hestia's notes: tone and opportunities. */
+.mx-chip.is-hot {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.mx-chip.is-opp {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.mx-why__opp {
+  margin-top: 4px;
+  color: var(--ok);
+}
+.mx-why__opp b {
+  color: var(--text);
+}

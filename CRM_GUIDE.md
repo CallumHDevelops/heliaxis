@@ -449,37 +449,49 @@ merge them into one.
 
 Needs `supabase/merge.sql`.
 
-## 18. My email
+## 18. My email (Hestia)
 
-Your own Microsoft 365 inbox (callum@ to start), kept sorted. **CRM › My email**, and the **Email to
-reply** panel at the top of the dashboard. It doesn't copy your emails into the CRM.
+Hestia, your assistant, keeps your own Microsoft 365 inbox (callum@ to start) sorted. You carry on in **Outlook as
+usual**: the flags, drafts and folders are all there. **CRM › My email** and the dashboard's **Hestia: email that
+needs you** panel are an extra view.
 
-- **Setup**: Microsoft 365 connected (section 4: its mailbox scope already includes callum@), then run
-  `supabase/mail-sort.sql` and switch on its every-two-minutes job (both on the dashboard's setup list).
-  Then **My email → Connect**. It only ever opens your own sign-in address, and only you see it.
-- **First read**: works back through six months of sent emails, then the whole inbox, a few hundred
-  emails every two minutes. New emails are picked up as they arrive.
-- **Urgent first**: each conversation where you owe a reply is sorted (urgent: a customer ready to sign,
-  a fault, a complaint, a deadline today; high: quotes, enquiries, supplier problems, the DNO) with one
-  line on what they want. **In Outlook** every one is flagged, with the category **Urgent** (red) or
-  **Needs reply** (orange), so it stands out in your inbox and on your phone. The flag and category come
-  off once you've replied or said no reply needed. Your own categories and flags are left alone.
-  Turn it off in Settings › Highlight in Outlook.
+- **Setup**: Microsoft 365 connected (section 4: its mailbox scope already includes callum@), `supabase/mail-sort.sql`
+  run and its every-two-minutes job on (both done for the live site). Then **My email → Connect**. It only ever opens
+  your own sign-in address, and only you see it.
+- **First read**: Hestia goes through the **whole inbox** and the whole Sent folder (to know what's been answered),
+  newest first, a few hundred emails every two minutes. New emails are picked up as they arrive.
+- **What needs you**: every conversation in the inbox is reviewed. It needs you when you owe a reply, or there's
+  something to do that isn't a reply (a portal, a payment, a form: **Action needed**). Older emails only if still
+  clearly outstanding ("Unanswered for 3 weeks"). Priority: **urgent** (safety, a fault, a complaint or angry
+  customer, a deadline today or tomorrow, a customer ready to sign or pay, the DNO needing something), **high**
+  (quotes, enquiries, worried customers, supplier problems, money owed, this week's deadlines), normal, low.
+  Each gets one line on what they want, why it matters, any deadline, and their **tone** (happy, formal, worried,
+  confused, frustrated, angry).
+- **Urgent**: a recent urgent email also comes straight to your phone as a notification.
+- **Opportunities**: Hestia notes any chance in an email (a new lead, a friend or neighbour interested, an add-on, a
+  happy customer for a review or referral, a commercial enquiry). They're on the **Opportunities** tab.
+- **In Outlook** every email that needs you is flagged, with the category **Urgent** (red), **Needs reply** (orange) or
+  **Action needed** (yellow). They come off once you've replied or ticked it done. Your own categories and flags are
+  left alone. Turn it off in Settings › Highlight in Outlook.
   - The colours need one more permission; without it the categories still work, just grey. In PowerShell
     (as in section 4, after `Connect-ExchangeOnline` and the **Set app** line):
     `New-ManagementRoleAssignment -App $app -Role "Application MailboxSettings.ReadWrite" -CustomResourceScope "Heliaxis CRM mailboxes"`
-- **Your writing style**: once your sent emails have been read, it studies up to 40 you wrote (to a
-  spread of people) and writes down how you write: greetings, sign-offs, length, tone, the phrases you
-  use and never use, and how that changes for customers, suppliers and the DNO, with a few of your own
-  emails as examples. Every draft follows it, and copies most closely the emails you've sent that same
-  person before. See and edit it in **Settings › Your writing style** (your edits are kept; otherwise it's
-  learnt again every 30 days), or **Learn it again**.
+- **CRM customers**: their emails (and your replies to them) are noted on their record, and an email from them stops
+  their automatic follow-ups, as a reply to hello@ does.
+- **Your writing style**: once six months of your sent emails have been read, Hestia studies up to 40 you wrote (to a
+  spread of people) and writes down how you write: greetings, length, tone, the phrases you use and never use, and
+  how that changes for customers, suppliers and the DNO, with a few of your own emails as examples. Every draft
+  follows it, and copies most closely the emails you've sent that same person before. See and edit it in
+  **Settings › Your writing style** (your edits are kept; otherwise it's learnt again every 30 days).
+- **Sign-off**: every reply ends with **Kind regards,** (change it in Settings › Sign-off), then your signature.
 - **Your signature**: Outlook doesn't let apps read your saved signature, so it's copied from your
   latest sent emails (the one they share, with its formatting, links and logo), and the font you write in
   too. It's checked weekly, so a change you make in Outlook comes through. See it in **Settings › Your
   signature** (**Copy it again** after changing it). Emails sent from your phone don't count; if none can
   be found, a plain one you type there is used instead.
-- **Drafts**: each one also waits in **Outlook's Drafts**, as a reply under their email (with your
+- **Drafts**: professional, right for their tone (a frustrated customer gets a sincere acknowledgement and a clear
+  next step, never an admission of fault; a worried one gets reassurance), answering everything they asked, and taking
+  an opportunity where it fits. None for Action needed or system emails. Each one also waits in **Outlook's Drafts**, as a reply under their email (with your
   signature), so you can check and send it from Outlook on your phone. Once you've replied (from Outlook
   or the app) or said no reply needed, the app takes its draft away again; a draft you've changed in
   Outlook is never replaced or removed. Turn it off in Settings › Put the drafts in Outlook too.
@@ -495,7 +507,7 @@ reply** panel at the top of the dashboard. It doesn't copy your emails into the 
 - **Filing** (off until you turn it on in Settings): once you've replied, or there's nothing to reply
   to, the email moves from the inbox to its folder, so the inbox only holds what still needs you.
   Anything older than 30 days is filed anyway. An email you've already moved yourself is left alone.
-- **Marketing** (off until you turn it on): anything with an unsubscribe link goes to a Marketing
+- **Marketing** (on from the start): anything with an unsubscribe link goes to a Marketing
   folder, never from customers or anyone you've written to. **Not marketing** brings it back for good.
 - Nothing is ever deleted (except the app's own Outlook drafts you haven't touched, once they're no longer
   needed; Outlook keeps them in Deleted Items), and nothing is sent without you pressing Send. The AI costs show under

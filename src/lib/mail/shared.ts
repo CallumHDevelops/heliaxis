@@ -155,10 +155,15 @@ export function textToHtml(text: string): string {
     .join('');
 }
 
-/** What their latest email shows in Outlook: urgent ("Urgent", flagged), high ("Needs reply", flagged), reply ("Needs reply"), or nothing. */
-export function markFor(highlight: boolean, state: string, priority: string | null): 'urgent' | 'high' | 'reply' | null {
+/**
+ * What their latest email shows in Outlook (always flagged): urgent ("Urgent"), something to do that isn't a reply
+ * ("Action needed"), high or any other reply ("Needs reply"), or nothing once it's dealt with.
+ */
+export function markFor(highlight: boolean, state: string, priority: string | null, actionOnly = false): 'urgent' | 'action' | 'high' | 'reply' | null {
   if (!highlight || state !== 'reply') return null;
-  return priority === 'urgent' ? 'urgent' : priority === 'high' ? 'high' : 'reply';
+  if (priority === 'urgent') return 'urgent';
+  if (actionOnly) return 'action';
+  return priority === 'high' ? 'high' : 'reply';
 }
 
 /* ── Your Outlook signature, copied from your sent emails ───────────────── */
@@ -310,4 +315,28 @@ export function pickFont(bodies: string[]): string | null {
   }
   const best = [...counts].sort((a, b) => b[1] - a[1])[0];
   return best && best[1] >= 2 ? best[0] : null;
+}
+
+/** The usual sign-offs, to swap for yours if a draft ends with a different one. */
+const SIGN_OFF = /^(kind regards|best regards|warm regards|regards|many thanks|thanks|thank you|cheers|best wishes|best|all the best|speak soon|ta)\b[,!.]?$/i;
+
+/**
+ * Makes sure a reply ends with your sign-off ("Kind regards,"): left alone if it already does, a different sign-off
+ * swapped for it, or added at the end. A name on the line under the sign-off is kept.
+ */
+export function withSignOff(text: string, signOff: string): string {
+  const want = signOff.trim();
+  if (!want) return text.trim();
+  const lines = text.trim().split('\n');
+  const norm = (x: string) => x.trim().toLowerCase().replace(/[,.!]+$/, '');
+  const tail = lines.slice(-3);
+  if (tail.some((l) => norm(l) === norm(want))) return text.trim();
+  // A different sign-off in the last three lines (then maybe a name): swap it.
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 3); i--) {
+    if (SIGN_OFF.test(lines[i].trim())) {
+      lines[i] = want;
+      return lines.join('\n').trim();
+    }
+  }
+  return `${text.trim()}\n\n${want}`;
 }

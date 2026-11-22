@@ -9,8 +9,17 @@ import '../crm/crm.css';
 import '../sales/quotes/quotes.css';
 import './mail.css';
 
-type Tab = 'reply' | 'waiting' | 'people' | 'fyi' | 'marketing' | 'folders' | 'settings';
-const LIST_TABS: Tab[] = ['reply', 'waiting', 'people', 'fyi', 'marketing'];
+type Tab = 'reply' | 'waiting' | 'opps' | 'people' | 'fyi' | 'marketing' | 'folders' | 'settings';
+const LIST_TABS: Tab[] = ['reply', 'waiting', 'opps', 'people', 'fyi', 'marketing'];
+
+/** How they come across (Hestia's read of their latest email): the ones worth knowing before you reply. */
+const TONE: Record<string, { label: string; cls: string }> = {
+  angry: { label: 'Angry', cls: 'is-urgent' },
+  frustrated: { label: 'Frustrated', cls: 'is-hot' },
+  anxious: { label: 'Worried', cls: 'is-due' },
+  confused: { label: 'Confused', cls: 'is-due' },
+  happy: { label: 'Happy', cls: 'is-draft' },
+};
 
 const PRIORITY: Record<string, string> = { urgent: 'Urgent', high: 'High', normal: '', low: 'Low' };
 const KIND: Record<string, string> = { customer: 'Customer', prospect: 'New customer?', supplier: 'Supplier', grid: 'Grid / DNO', partner: 'Partner', finance: 'Finance', team: 'Team', personal: 'Personal', other: '' };
@@ -52,7 +61,7 @@ export function MailView(p: {
   canCrm: boolean;
 }) {
   const router = useRouter();
-  const [startTab] = useState<Tab>(() => ((['reply', 'waiting', 'people', 'fyi', 'marketing', 'folders', 'settings'] as Tab[]).includes(p.startTab as Tab) ? (p.startTab as Tab) : 'reply'));
+  const [startTab] = useState<Tab>(() => ((['reply', 'waiting', 'opps', 'people', 'fyi', 'marketing', 'folders', 'settings'] as Tab[]).includes(p.startTab as Tab) ? (p.startTab as Tab) : 'reply'));
   // Opened on another list (?tab=waiting from the dashboard): it starts empty and loads.
   const otherList = startTab !== 'reply' && LIST_TABS.includes(startTab);
   const [tab, setTab] = useState<Tab>(startTab);
@@ -116,6 +125,7 @@ export function MailView(p: {
   const tabs: { k: Tab; label: string; n?: number; hot?: boolean }[] = [
     { k: 'reply', label: 'To reply', n: counts?.reply, hot: !!counts?.urgent },
     { k: 'waiting', label: 'Waiting on them', n: counts?.waiting },
+    { k: 'opps', label: 'Opportunities', n: counts?.opps },
     { k: 'people', label: 'New people', n: counts?.people },
     { k: 'fyi', label: 'No reply needed' },
     { k: 'marketing', label: 'Marketing' },
@@ -174,9 +184,9 @@ function Head({ counts }: { counts?: MailCounts | null }) {
         <p className="crm-muted">
           {counts
             ? counts.reply
-              ? `${counts.reply} to reply${counts.urgent ? `, ${counts.urgent} of them urgent or important` : ''}${counts.drafts ? `. ${counts.drafts} draft${counts.drafts === 1 ? '' : 's'} ready to check.` : '.'}`
-              : 'Nothing waiting on a reply from you.'
-            : 'Your own mailbox, sorted: what needs a reply, drafts ready to check, and everything filed.'}
+              ? `Hestia has ${counts.reply} that need you${counts.urgent ? `, ${counts.urgent} urgent or important` : ''}${counts.drafts ? `. ${counts.drafts} draft${counts.drafts === 1 ? '' : 's'} ready to check, also in your Outlook Drafts.` : '.'}`
+              : 'Hestia has nothing waiting on you.'
+            : 'Hestia, your assistant, keeps your inbox sorted: what needs you, urgent first, with replies drafted in your style.'}
         </p>
       </div>
     </header>
@@ -201,16 +211,18 @@ function Connect({ email, connected, onDone }: { email: string; connected: boole
       <Head />
       <section className="mx-card mx-connect">
         <h2>Connect {email}</h2>
-        <p>The app reads your inbox every two minutes and:</p>
+        <p>Hestia, your assistant, goes through your whole inbox first, then every new email within two minutes. She:</p>
         <ul>
-          <li>works out which emails need a reply from you and flags them in Outlook (“Urgent” or “Needs reply”), so they stand out on your phone too;</li>
+          <li>works out which emails need you, urgent first, reading each person’s tone, and flags them in Outlook (“Urgent”, “Needs reply” or “Action needed”), so they stand out on your phone too; anything urgent also comes to your phone straight away;</li>
+          <li>spots every opportunity: new leads, referrals, add-ons, happy customers who’d leave a review;</li>
           <li>learns how you write from your sent emails, and drafts each reply in your style, waiting in Outlook’s Drafts and here, for you to check and send;</li>
           <li>works out a folder for every company and customer (GoodWe, National Grid, Customers/Jane Smith);</li>
-          <li>once you turn filing on, moves each email into its folder after you’ve replied, and marketing into a Marketing folder, so your inbox only holds what still needs you;</li>
+          <li>moves marketing into a Marketing folder from the start, and once you turn filing on, moves each email into its folder after you’ve replied, so your inbox only holds what still needs you;</li>
+          <li>notes emails from CRM customers on their record;</li>
           <li>spots people asking about a job who aren’t in the CRM yet, so you can add them in one tap.</li>
         </ul>
         <p className="crm-muted">
-          Nothing is moved until you’ve checked the folders and turned filing on, and none of your emails are ever deleted (only the app’s own drafts, once you’ve replied). Only you see your email here.
+          You carry on in Outlook as usual: the flags, drafts and folders are all there. Nothing but marketing is moved until you’ve checked the folders and turned filing on, and none of your emails are ever deleted (only Hestia’s own drafts, once you’ve replied). Only you see your email here.
         </p>
         {!connected && <p className="mx-err">Microsoft 365 isn’t connected to the app yet: see Setup › Connect Microsoft 365 email first.</p>}
         {err && <p className="mx-err">{err}</p>}
@@ -225,7 +237,8 @@ function Connect({ email, connected, onDone }: { email: string; connected: boole
 /* ── The lists ───────────────────────────────────────────────────────────── */
 
 const EMPTY: Record<string, string> = {
-  reply: 'Nothing needs a reply from you. New emails are checked every two minutes.',
+  reply: 'Nothing needs you. New emails are checked every two minutes.',
+  opps: 'No opportunities spotted in the last two months.',
   waiting: 'Nobody you’ve emailed in the last six weeks has gone quiet for three days or more.',
   people: 'No one new. When someone not in the CRM asks about a job, they appear here.',
   fyi: 'Nothing in the last two weeks.',
@@ -234,9 +247,10 @@ const EMPTY: Record<string, string> = {
 
 const HINT: Record<string, string> = {
   waiting: 'You sent the last email, three or more days ago, and they haven’t replied. Worth a nudge?',
+  opps: 'Chances Hestia spotted in the last two months: new leads, referrals, add-ons, reviews. Open one to follow it up.',
   people: 'They’ve emailed about a job but aren’t in the CRM. Add them so nothing is missed.',
   fyi: 'The last two weeks’ emails that need nothing from you. If one does, open it and say so.',
-  marketing: 'Newsletters and offers. They go to the Marketing folder once that’s on in Settings. If one isn’t marketing, open it and say so.',
+  marketing: 'Newsletters and offers, moved to your Marketing folder. If one isn’t marketing, open it and say so: it comes back to your inbox.',
 };
 
 function ThreadList({ tab, rows, loading, now, onOpen }: { tab: Tab; rows: ThreadRow[]; loading: boolean; now: number; onOpen: (r: ThreadRow) => void }) {
@@ -264,10 +278,13 @@ function ThreadList({ tab, rows, loading, now, onOpen }: { tab: Tab; rows: Threa
                       <time>{ago(tab === 'waiting' ? r.last_out_at : r.last_in_at, now)}</time>
                     </span>
                     <span className="mx-row__s">{r.subject || '(no subject)'}</span>
-                    {r.summary && <span className="mx-row__p">{r.summary}</span>}
+                    {tab === 'opps' && r.opportunity ? <span className="mx-row__p">{r.opportunity}</span> : r.summary && <span className="mx-row__p">{r.summary}</span>}
                     <span className="mx-chips">
                       {tab === 'reply' && PRIORITY[r.priority ?? ''] && <span className={`mx-chip is-${r.priority}`}>{PRIORITY[r.priority!]}</span>}
+                      {r.action_only && r.state === 'reply' && <span className="mx-chip is-due">Action needed</span>}
+                      {r.tone && TONE[r.tone] && <span className={`mx-chip ${TONE[r.tone].cls}`}>{TONE[r.tone].label}</span>}
                       {r.due && <span className="mx-chip is-due">{r.due}</span>}
+                      {r.opportunity && <span className="mx-chip is-opp">Opportunity</span>}
                       {r.prospect && !r.enquiry_id && <span className="mx-chip is-new">New customer?</span>}
                       {r.enquiry_id && <span className="mx-chip">In the CRM</span>}
                       {tab === 'reply' && draftReady && <span className="mx-chip is-draft">Draft ready</span>}
@@ -300,7 +317,8 @@ function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: Threa
   const [note, setNote] = useState('');
   const [gaps, setGaps] = useState(false);
   const [crm, setCrm] = useState({ name: row.prospect?.name || row.who_name || '', phone: row.prospect?.phone || '', postcode: row.prospect?.postcode || '' });
-  const isReply = row.state === 'reply' || row.state === 'new';
+  const isReply = (row.state === 'reply' || row.state === 'new') && !row.action_only;
+  const isAction = row.state === 'reply' && row.action_only;
 
   useEffect(() => {
     let live = true;
@@ -346,11 +364,17 @@ function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: Threa
             </span>
           )}
         </p>
-        {(row.summary || row.why) && (
+        {(row.summary || row.why || row.opportunity) && (
           <div className={`mx-why is-${row.priority ?? 'normal'}`}>
             {row.summary && <b>{row.summary}</b>}
             {row.why && <span>{row.why}</span>}
             {row.due && <span>Deadline: {row.due}</span>}
+            {row.tone && TONE[row.tone] && <span>Tone: {TONE[row.tone].label.toLowerCase()}</span>}
+            {row.opportunity && (
+              <span className="mx-why__opp">
+                <b>Opportunity:</b> {row.opportunity}
+              </span>
+            )}
           </div>
         )}
 
@@ -409,7 +433,24 @@ function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: Threa
           </section>
         )}
 
-        {tab === 'marketing' ? (
+        {isAction ? (
+          <section className="mx-reply" aria-label="Something to do">
+            <h3>Something to do</h3>
+            <p className="crm-muted">This needs you to do something rather than reply. Once it’s done, tick it off and the flag comes off in Outlook.</p>
+            <div className="mx-actions">
+              <button
+                type="button"
+                className="crm-btn crm-btn--solar"
+                disabled={!!busy}
+                onClick={async () => {
+                  if (await act('done')) onChanged();
+                }}
+              >
+                {busy === 'done' ? 'Saving…' : 'Done'}
+              </button>
+            </div>
+          </section>
+        ) : tab === 'marketing' ? (
           <div className="mx-actions">
             <button
               type="button"
@@ -427,7 +468,7 @@ function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: Threa
             <h3>Your reply</h3>
             <div className="mx-draftbox">
               <textarea className="crm-input" rows={12} value={text} onChange={(e) => setText(e.target.value)} placeholder={row.draft_error || 'No draft yet: write your reply, or ask for one below.'} disabled={busy === 'redraft'} />
-              {busy === 'redraft' && <WritingSpark label="Writing your reply" steps={['Reading the conversation', 'Checking the CRM', 'Writing it your way', 'Reading it back']} />}
+              {busy === 'redraft' && <WritingSpark label="Hestia is writing your reply" steps={['Reading the conversation', 'Checking the CRM', 'Writing it your way', 'Reading it back']} />}
             </div>
             {signature && <p className="crm-muted crm-small">Your signature goes underneath when it’s sent.</p>}
             {/\[[^\]\n]{1,40}\]/.test(text) && <p className="mx-warn">Fill in the parts in [square brackets] before sending.</p>}
@@ -655,6 +696,7 @@ type BoxInfo = {
     outlook_drafts: boolean;
     highlight: boolean;
     categories_ready: boolean;
+    sign_off: string;
     signature: string | null;
     signature_html: string | null;
     signature_images: { contentId: string; contentType: string; contentBytes: string }[] | null;
@@ -707,7 +749,7 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
       title: 'Highlight in Outlook',
       body: `Every email that needs a reply is flagged in Outlook, with the category “Urgent” or “Needs reply”, so it stands out in your inbox and on your phone. The flag and category come off once you’ve replied or said no reply needed. Your own categories and flags are left alone.${b.highlight && !b.categories_ready ? ' (The categories show grey until the app is allowed to colour them: see the CRM guide, My email.)' : ''}`,
     },
-    { k: 'drafts', title: 'Draft replies', body: 'Writes a reply, in your style, for each email that needs one, for you to check, change and send here. Nothing is ever sent without you pressing Send.' },
+    { k: 'drafts', title: 'Draft replies', body: 'Hestia writes a reply, in your style and right for their tone, for each email that needs one, for you to check, change and send. Nothing is ever sent without you pressing Send.' },
     {
       k: 'outlook_drafts',
       title: 'Put the drafts in Outlook too',
@@ -749,6 +791,7 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
           </button>
         </section>
       ))}
+      <SignOffCard value={b.sign_off} busy={busy} onSave={(v) => set({ sign_off: v }, 'signoff')} />
       <StyleCard key={b.style_at ?? 'none'} box={b} busy={busy} onSave={(style) => set({ style }, 'style')} onLearnt={load} />
       <SignatureCard box={b} sig={sig} setSig={setSig} busy={busy} onSave={() => set({ signature: sig }, 'sig')} onCopied={load} />
       {msg && <p className="mx-ok">{msg}</p>}
@@ -895,6 +938,23 @@ function SignatureCard({ box, sig, setSig, busy, onSave, onCopied }: { box: BoxI
           }}
         >
           {copying ? 'Copying…' : 'Copy it again from my sent emails'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** What every reply ends with, just above your signature. */
+function SignOffCard({ value, busy, onSave }: { value: string; busy: string; onSave: (v: string) => void }) {
+  const [v, setV] = useState(value || 'Kind regards,');
+  return (
+    <section className="mx-card">
+      <h3>Sign-off</h3>
+      <p className="crm-muted">Every reply Hestia writes ends with this, just above your signature.</p>
+      <div className="mx-steer">
+        <input className="crm-input" value={v} onChange={(e) => setV(e.target.value)} maxLength={60} aria-label="Sign-off" />
+        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={!!busy || !v.trim() || v.trim() === (value || '').trim()} onClick={() => onSave(v.trim())}>
+          {busy === 'signoff' ? 'Saving…' : 'Save'}
         </button>
       </div>
     </section>

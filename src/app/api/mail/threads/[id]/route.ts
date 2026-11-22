@@ -13,7 +13,7 @@ export const maxDuration = 60;
 const json = (b: unknown, status = 200) => NextResponse.json(b, { status, headers: { 'Cache-Control': 'no-store' } });
 const UUID = /^[0-9a-f-]{36}$/i;
 
-const COLS = 'id, box_id, conversation_id, subject, who_name, who_address, enquiry_id, rule_id, last_in_at, last_out_at, last_in_graph_id, done_at, marketing, needs_reply, triaged_for, draft, prospect';
+const COLS = 'id, box_id, conversation_id, subject, who_name, who_address, enquiry_id, rule_id, last_in_at, last_out_at, last_in_graph_id, done_at, marketing, needs_reply, triaged_for, draft, prospect, priority, tone, opportunity, summary';
 
 async function load(id: string) {
   const s = await mailSession();

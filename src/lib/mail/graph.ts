@@ -121,10 +121,11 @@ export async function moveToInbox(address: string, id: string): Promise<void> {
 /** The app's own categories. Only these are ever added or taken off; your own categories are left alone. */
 export const CAT_URGENT = 'Urgent';
 export const CAT_REPLY = 'Needs reply';
-const OURS = [CAT_URGENT, CAT_REPLY];
+export const CAT_ACTION = 'Action needed';
+const OURS = [CAT_URGENT, CAT_REPLY, CAT_ACTION];
 
 /**
- * Makes the two categories in the mailbox's list with their colours (Urgent red, Needs reply orange). Outlook
+ * Makes the app's categories in the mailbox's list with their colours (Urgent red, Needs reply orange, Action needed yellow). Outlook
  * only lets the app do this with the MailboxSettings permission; without it the categories still work, just grey.
  * Returns whether it managed.
  */
@@ -132,7 +133,7 @@ export async function ensureCategories(address: string): Promise<boolean> {
   try {
     const have = await graph<{ value: { displayName: string }[] }>(`${box(address)}/outlook/masterCategories`);
     const names = new Set((have.value ?? []).map((c) => c.displayName));
-    for (const [name, color] of [[CAT_URGENT, 'preset0'], [CAT_REPLY, 'preset1']] as const) {
+    for (const [name, color] of [[CAT_URGENT, 'preset0'], [CAT_REPLY, 'preset1'], [CAT_ACTION, 'preset3']] as const) {
       if (!names.has(name)) await graph(`${box(address)}/outlook/masterCategories`, { method: 'POST', body: JSON.stringify({ displayName: name, color }) });
     }
     return true;

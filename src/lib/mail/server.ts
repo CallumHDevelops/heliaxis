@@ -13,6 +13,7 @@ export type MailBox = {
   filing: boolean;
   marketing: boolean;
   drafts: boolean;
+  sign_off: string;
   signature: string | null;
   signature_html: string | null;
   signature_images: { contentId: string; name: string; contentType: string; contentBytes: string }[] | null;
@@ -34,7 +35,7 @@ export type MailBox = {
   created_at: string;
 };
 
-const BOX_COLS = 'id, address, filing, marketing, drafts, signature, signature_html, signature_images, signature_at, reply_font, highlight, outlook_drafts, categories_ready, style, style_examples, style_from, style_at, style_edited, scan_before, sent_before, scan_done_at, last_run_at, last_error, created_at';
+const BOX_COLS = 'id, address, filing, marketing, drafts, sign_off, signature, signature_html, signature_images, signature_at, reply_font, highlight, outlook_drafts, categories_ready, style, style_examples, style_from, style_at, style_edited, scan_before, sent_before, scan_done_at, last_run_at, last_error, created_at';
 
 /** The person's mailbox; null if they haven't connected one; 'missing' before mail-sort.sql has been run. */
 export async function boxFor(userId: string, db: Db = createAdminClient()): Promise<MailBox | null | 'missing'> {
@@ -63,6 +64,9 @@ export type ThreadRow = {
   kind: string | null;
   summary: string | null;
   why: string | null;
+  tone: string | null;
+  opportunity: string | null;
+  action_only: boolean;
   due: string | null;
   prospect: { name?: string; phone?: string; postcode?: string } | null;
   enquiry_id: string | null;
@@ -76,9 +80,9 @@ export type ThreadRow = {
 };
 
 export const THREAD_LIST_COLS =
-  'id, subject, who_name, who_address, state, priority, kind, summary, why, due, prospect, enquiry_id, last_in_at, last_out_at, messages, draft, draft_for, draft_error, rule:mail_rules(label, folder, status)';
+  'id, subject, who_name, who_address, state, priority, kind, summary, why, due, tone, opportunity, action_only, prospect, enquiry_id, last_in_at, last_out_at, messages, draft, draft_for, draft_error, rule:mail_rules(label, folder, status)';
 
-export type View = 'reply' | 'waiting' | 'people' | 'fyi' | 'marketing';
+export type View = 'reply' | 'waiting' | 'opps' | 'people' | 'fyi' | 'marketing';
 
 const DAY = 86_400_000;
 
@@ -93,6 +97,8 @@ export async function threadsFor(db: Db, boxId: string, view: View): Promise<Thr
       .lt('last_out_at', new Date(Date.now() - 3 * DAY).toISOString())
       .gt('last_out_at', new Date(Date.now() - 42 * DAY).toISOString());
   else if (view === 'people') q = q.not('prospect', 'is', null).is('enquiry_id', null);
+  // Opportunities Hestia spotted in the last two months.
+  else if (view === 'opps') q = q.not('opportunity', 'is', null).gt('last_in_at', new Date(Date.now() - 60 * DAY).toISOString());
   else if (view === 'fyi') q = q.in('state', ['fyi', 'done']).gt('last_in_at', new Date(Date.now() - 14 * DAY).toISOString());
   else q = q.eq('state', 'marketing');
   const order = view === 'waiting' ? 'last_out_at' : 'last_in_at';
@@ -109,19 +115,20 @@ export function byImportance(a: Pick<ThreadRow, 'priority' | 'last_in_at'>, b: P
   return String(a.last_in_at ?? '').localeCompare(String(b.last_in_at ?? ''));
 }
 
-export type MailCounts = { reply: number; urgent: number; waiting: number; people: number; drafts: number };
+export type MailCounts = { reply: number; urgent: number; waiting: number; people: number; drafts: number; opps: number };
 
 export async function countsFor(db: Db, boxId: string): Promise<MailCounts> {
   const head = { count: 'exact' as const, head: true };
   const since = new Date(Date.now() - 3 * DAY).toISOString();
-  const [reply, urgent, waiting, people, drafts] = await Promise.all([
+  const [reply, urgent, waiting, people, drafts, opps] = await Promise.all([
     db.from('mail_threads').select('id', head).eq('box_id', boxId).eq('state', 'reply'),
     db.from('mail_threads').select('id', head).eq('box_id', boxId).eq('state', 'reply').in('priority', ['urgent', 'high']),
     db.from('mail_threads').select('id', head).eq('box_id', boxId).eq('state', 'replied').lt('last_out_at', since).gt('last_out_at', new Date(Date.now() - 42 * DAY).toISOString()),
     db.from('mail_threads').select('id', head).eq('box_id', boxId).not('prospect', 'is', null).is('enquiry_id', null),
     db.from('mail_threads').select('id', head).eq('box_id', boxId).eq('state', 'reply').not('draft', 'is', null),
+    db.from('mail_threads').select('id', head).eq('box_id', boxId).not('opportunity', 'is', null).gt('last_in_at', new Date(Date.now() - 60 * DAY).toISOString()),
   ]);
-  return { reply: reply.count ?? 0, urgent: urgent.count ?? 0, waiting: waiting.count ?? 0, people: people.count ?? 0, drafts: drafts.count ?? 0 };
+  return { reply: reply.count ?? 0, urgent: urgent.count ?? 0, waiting: waiting.count ?? 0, people: people.count ?? 0, drafts: drafts.count ?? 0, opps: opps.count ?? 0 };
 }
 
 export type HomeMail = { counts: MailCounts; top: ThreadRow[]; reading: boolean };

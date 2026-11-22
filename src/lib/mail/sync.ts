@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
 import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
-import { CAT_REPLY, CAT_URGENT, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
+import { CAT_ACTION, CAT_REPLY, CAT_URGENT, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
 import {
   addressOf,
   companyDomain,
@@ -37,7 +37,7 @@ import {
  *  4. Learns how the owner writes from their sent emails, and drafts each reply in that style.
  *  5. Once filing is on, moves the emails of dealt-with conversations into their folders, and marketing into
  *     Marketing (once that is on). None of your emails are ever deleted (only the app's own untouched Outlook
- *     drafts, once they're no longer needed), and nothing is copied into the CRM.
+ *     drafts, once they're no longer needed). CRM customers' emails are noted on their record.
  * Each step stops when the time is up and carries on next run.
  */
 
@@ -52,6 +52,7 @@ type Box = {
   scan_before: string | null;
   sent_before: string | null;
   live_since: string | null;
+  sign_off: string;
   signature: string | null;
   signature_html: string | null;
   signature_images: InlineImage[] | null;
@@ -65,7 +66,7 @@ type Box = {
   style_at: string | null;
   style_edited: boolean;
 };
-const BOX_COLS = 'id, user_id, address, filing, marketing, drafts, signature, signature_html, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
+const BOX_COLS = 'id, user_id, address, filing, marketing, drafts, sign_off, signature, signature_html, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
 type Rule = {
   id: string;
   kind: 'domain' | 'address';
@@ -81,10 +82,12 @@ type Rule = {
 };
 type Org = { id: string; name: string; type: string | null };
 
-const SENT_HISTORY_DAYS = 180;
-const TRIAGE_DAYS = 21;
+// Your style is learnt once this much of your Sent folder has been read (the whole folder is read, to know what's answered).
+const STYLE_AFTER_DAYS = 180;
+const TRIAGE_AT_ONCE = 4;
+const ALERT_WITHIN_HOURS = 48;
 const PAGES_PER_RUN = 6;
-const TRIAGE_PER_RUN = 8;
+const TRIAGE_PER_RUN = 16;
 const DRAFTS_PER_RUN = 3;
 const MOVES_PER_RUN = 50;
 
@@ -259,18 +262,19 @@ async function readMail(ctx: Context, until: number): Promise<number> {
   }
   await db.from('mail_boxes').update({ live_since: startedAt }).eq('id', box.id);
 
-  // The first read, working back a page at a time: the whole inbox, and six months of sent emails.
+  // The first read, working back a page at a time: the whole inbox and the whole Sent folder.
   let pages = 0;
   let scanBefore = box.scan_before;
   let sentBefore = box.sent_before;
-  const sentFloor = Date.now() - SENT_HISTORY_DAYS * 86_400_000;
   while (pages < PAGES_PER_RUN && Date.now() < until - 15_000 && (scanBefore || sentBefore)) {
     pages++;
-    if (sentBefore) {
+    // Whichever is further behind goes next, so both work back through time together (and recent inbox emails can
+    // be sorted, knowing what you've answered, without waiting for years of sent emails).
+    if (sentBefore && (!scanBefore || sentBefore >= scanBefore)) {
       const page = await listFolder(box.address, 'sentitems', { before: sentBefore });
       read += await ingest(ctx, page, 'out');
       const oldest = page.at(-1)?.sentDateTime;
-      sentBefore = page.length && oldest && Date.parse(oldest) > sentFloor ? oldest : null;
+      sentBefore = page.length && oldest ? oldest : null;
     } else if (scanBefore) {
       const page = await listFolder(box.address, 'inbox', { before: scanBefore });
       read += await ingest(ctx, page, 'in');
@@ -344,7 +348,44 @@ async function ingest(ctx: Context, page: GMessage[], direction: 'in' | 'out'): 
       .eq('id', id);
   }
 
+  await noteOnCrm(ctx, page, direction, new Set((added ?? []).map((a) => a.graph_id as string)));
   return added?.length ?? 0;
+}
+
+/**
+ * A CRM customer's emails go on their record (their timeline), both ways: what they sent you and your replies. Only
+ * customers in the CRM; once each (crm_emails.graph_id is unique). When a customer emails you, their automatic
+ * follow-ups stop, as they do when they reply to hello@.
+ */
+async function noteOnCrm(ctx: Context, page: GMessage[], direction: 'in' | 'out', added: Set<string>) {
+  const { db, box } = ctx;
+  const me = addressOf(box.address);
+  const rows: Record<string, unknown>[] = [];
+  const emailedUs = new Set<string>();
+  for (const m of page) {
+    if (!added.has(m.id) || !m.internetMessageId) continue;
+    const from = addressOf(m.from?.emailAddress?.address);
+    const other = direction === 'in' ? from : [...(m.toRecipients ?? []), ...(m.ccRecipients ?? [])].map((r) => addressOf(r.emailAddress?.address)).find((a) => a && a !== me);
+    if (!other) continue;
+    const rule = ctx.rules.get(`address:${other}`);
+    if (!rule?.enquiry_id) continue;
+    const at = (direction === 'in' ? m.receivedDateTime : m.sentDateTime) || new Date().toISOString();
+    rows.push({
+      enquiry_id: rule.enquiry_id,
+      graph_id: m.internetMessageId,
+      direction,
+      subject: m.subject ?? null,
+      body: (m.bodyPreview ?? '').slice(0, 4000),
+      from_address: direction === 'in' ? other : box.address,
+      to_address: direction === 'in' ? box.address : other,
+      at,
+    });
+    if (direction === 'in' && Date.now() - Date.parse(at) < 86_400_000) emailedUs.add(rule.enquiry_id);
+  }
+  if (rows.length) await db.from('crm_emails').upsert(rows, { onConflict: 'graph_id', ignoreDuplicates: true });
+  for (const id of emailedUs) {
+    await db.from('crm_projects').update({ sequence_stopped_at: new Date().toISOString() }).eq('enquiry_id', id).is('sequence_stopped_at', null);
+  }
 }
 
 /** Brings each touched conversation's row up to date from its emails. */
@@ -483,57 +524,105 @@ async function crmLine(ctx: Context, t: { enquiry_id: string | null; rule_id: st
   return null;
 }
 
-const THREAD_COLS = 'id, conversation_id, subject, who_name, who_address, enquiry_id, rule_id, last_in_at, last_in_graph_id, last_out_at, done_at, marketing, automated';
+const THREAD_COLS = 'id, conversation_id, subject, who_name, who_address, enquiry_id, rule_id, last_in_at, last_in_graph_id, last_out_at, done_at, marketing, automated, alerted_at';
 
 async function triage(ctx: Context, until: number): Promise<number> {
   const { db, box } = ctx;
-  const cutoff = new Date(Date.now() - TRIAGE_DAYS * 86_400_000).toISOString();
-  // Older conversations, and system emails: no reply needed, no assistant needed.
-  await db
-    .from('mail_threads')
-    .update({ needs_reply: false, state: 'fyi', triaged_for: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('box_id', box.id)
-    .eq('state', 'new')
-    .or(`last_in_at.lt.${cutoff},automated.eq.true`);
-  const { data: todo } = await db.from('mail_threads').select(THREAD_COLS).eq('box_id', box.id).eq('state', 'new').order('last_in_at', { ascending: false }).limit(TRIAGE_PER_RUN);
+  // Everything in the inbox, newest first. While your sent emails are still being read, only conversations as recent
+  // as what's been read so far: an older one might look unanswered when the reply just hasn't been read yet.
+  let q = db.from('mail_threads').select(THREAD_COLS).eq('box_id', box.id).eq('state', 'new');
+  if (box.sent_before) q = q.gte('last_in_at', box.sent_before);
+  const { data: todo } = await q.order('last_in_at', { ascending: false }).limit(TRIAGE_PER_RUN);
   let n = 0;
-  for (const t of todo ?? []) {
-    if (Date.now() > until - 8_000) break;
-    const thread = await threadForAi(ctx, t as never);
-    const r = await triageThread(thread, ctx.owner);
-    if (!r) {
-      // The assistant couldn't sort it (or isn't set up): it goes on To reply unsorted, so nothing is missed.
-      await db
-        .from('mail_threads')
-        .update({ needs_reply: true, priority: null, summary: null, why: 'Not sorted automatically: have a look.', triaged_for: t.last_in_at, state: threadState({ marketing: !!t.marketing, lastInAt: t.last_in_at, lastOutAt: t.last_out_at, doneAt: t.done_at, triagedFor: t.last_in_at, needsReply: true }), updated_at: new Date().toISOString() })
-        .eq('id', t.id);
-      continue;
-    }
-    const needsReply = r.needs_reply && !r.injection_suspected;
-    const prospect = r.kind === 'prospect' && !t.enquiry_id ? { name: r.prospect_name || t.who_name || '', phone: r.prospect_phone || '', postcode: r.prospect_postcode || '' } : null;
-    await db
-      .from('mail_threads')
-      .update({
-        needs_reply: needsReply,
-        priority: r.priority,
-        kind: r.kind,
-        summary: r.summary || null,
-        why: r.why || null,
-        due: r.due || null,
-        prospect,
-        triaged_for: t.last_in_at,
-        state: threadState({ marketing: !!t.marketing, lastInAt: t.last_in_at, lastOutAt: t.last_out_at, doneAt: t.done_at, triagedFor: t.last_in_at, needsReply }),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', t.id);
-    n++;
+  const list = (todo ?? []) as unknown as TriageThread[];
+  // A few at once, so a full inbox is through in hours rather than days.
+  for (let i = 0; i < list.length; i += TRIAGE_AT_ONCE) {
+    if (Date.now() > until - 15_000) break;
+    const done = await Promise.all(list.slice(i, i + TRIAGE_AT_ONCE).map((t) => triageOne(ctx, t).catch(() => false)));
+    n += done.filter(Boolean).length;
   }
   return n;
 }
 
+type TriageThread = {
+  id: string;
+  conversation_id: string;
+  subject: string | null;
+  who_name: string | null;
+  who_address: string | null;
+  enquiry_id: string | null;
+  rule_id: string | null;
+  last_in_at: string | null;
+  last_in_graph_id: string | null;
+  last_out_at: string | null;
+  done_at: string | null;
+  marketing: boolean;
+  automated: boolean;
+  alerted_at?: string | null;
+};
+
+async function triageOne(ctx: Context, t: TriageThread): Promise<boolean> {
+  const { db } = ctx;
+  const now = new Date().toISOString();
+  const thread = await threadForAi(ctx, t);
+  const r = await triageThread(thread, ctx.owner);
+  const stateFor = (needsReply: boolean) => threadState({ marketing: !!t.marketing, lastInAt: t.last_in_at, lastOutAt: t.last_out_at, doneAt: t.done_at, triagedFor: t.last_in_at, needsReply });
+  if (!r) {
+    // Hestia couldn't sort it (or isn't set up): it goes on To reply unsorted, so nothing is missed.
+    await db.from('mail_threads').update({ needs_reply: true, priority: null, summary: null, why: 'Not sorted automatically: have a look.', triaged_for: t.last_in_at, state: stateFor(true), updated_at: now }).eq('id', t.id);
+    return false;
+  }
+  const needsReply = r.needs_reply && !r.injection_suspected;
+  // A system address can't be replied to: if it needs anything, it's something to do.
+  const actionOnly = needsReply && (r.action_only || t.automated);
+  const prospect = r.kind === 'prospect' && !t.enquiry_id ? { name: r.prospect_name || t.who_name || '', phone: r.prospect_phone || '', postcode: r.prospect_postcode || '' } : null;
+  await db
+    .from('mail_threads')
+    .update({
+      needs_reply: needsReply,
+      action_only: actionOnly,
+      priority: r.priority,
+      kind: r.kind,
+      tone: r.tone,
+      summary: r.summary || null,
+      why: r.why || null,
+      due: r.due || null,
+      opportunity: r.opportunity || null,
+      prospect,
+      triaged_for: t.last_in_at,
+      state: stateFor(needsReply),
+      updated_at: now,
+    })
+    .eq('id', t.id);
+  // Urgent and recent: straight to your phone (once per email).
+  const recent = t.last_in_at && Date.now() - Date.parse(t.last_in_at) < ALERT_WITHIN_HOURS * 3_600_000;
+  if (needsReply && r.priority === 'urgent' && recent && !(t.alerted_at && t.last_in_at && t.alerted_at >= t.last_in_at)) {
+    const { notify } = await import('@/lib/notify');
+    await notify({
+      userId: ctx.box.user_id,
+      kind: 'email',
+      title: `Urgent email: ${t.who_name || t.who_address || 'someone'}`,
+      body: r.summary || t.subject || '',
+      href: `/admin/mail?t=${t.id}`,
+      tag: `mail-${t.id}`,
+    }).catch(() => null);
+    await db.from('mail_threads').update({ alerted_at: now }).eq('id', t.id);
+  }
+  return true;
+}
+
 async function draftReplies(ctx: Context, until: number): Promise<number> {
   const { db, box } = ctx;
-  const { data: todo } = await db.from('mail_threads').select(`${THREAD_COLS}, draft_for, priority`).eq('box_id', box.id).eq('state', 'reply').order('last_in_at', { ascending: false }).limit(30);
+  // Only ones that need a reply (not something to do), and never to a system address.
+  const { data: todo } = await db
+    .from('mail_threads')
+    .select(`${THREAD_COLS}, draft_for, priority, tone, opportunity, summary`)
+    .eq('box_id', box.id)
+    .eq('state', 'reply')
+    .eq('action_only', false)
+    .eq('automated', false)
+    .order('last_in_at', { ascending: false })
+    .limit(30);
   const need = (todo ?? []).filter((t) => !t.draft_for || String(t.draft_for) < String(t.last_in_at));
   // The most important first.
   need.sort((a, b) => ['urgent', 'high', 'normal', 'low'].indexOf(String(a.priority)) - ['urgent', 'high', 'normal', 'low'].indexOf(String(b.priority)));
@@ -547,9 +636,14 @@ async function draftReplies(ctx: Context, until: number): Promise<number> {
 }
 
 /** Writes (or rewrites, with your steer) one conversation's draft. */
-export async function writeDraft(ctx: Context, t: { id: string; conversation_id: string; subject: string | null; who_name: string | null; who_address: string | null; enquiry_id: string | null; rule_id: string | null; last_in_at: string | null; last_in_graph_id: string | null }, steer?: string): Promise<string | null> {
+export async function writeDraft(
+  ctx: Context,
+  t: { id: string; conversation_id: string; subject: string | null; who_name: string | null; who_address: string | null; enquiry_id: string | null; rule_id: string | null; last_in_at: string | null; last_in_graph_id: string | null; priority?: string | null; tone?: string | null; opportunity?: string | null; summary?: string | null },
+  steer?: string
+): Promise<string | null> {
   const thread = await threadForAi(ctx, t);
-  const draft = await draftForThread(thread, ctx.owner, await voiceFor(ctx, t), steer);
+  const notes = { priority: t.priority ?? null, tone: t.tone ?? null, opportunity: t.opportunity ?? null, summary: t.summary ?? null };
+  const draft = await draftForThread(thread, ctx.owner, await voiceFor(ctx, t), ctx.box.sign_off || 'Kind regards,', notes, steer);
   await ctx.db
     .from('mail_threads')
     .update(draft ? { draft, draft_for: t.last_in_at, draft_error: null } : { draft_error: 'The writing assistant couldn’t write this one. Try again, or write it yourself.', draft_for: t.last_in_at })
@@ -654,7 +748,8 @@ export async function contextFor(db: Db, boxId: string) {
 const STYLE_EVERY_DAYS = 30;
 
 function styleDue(box: Box): boolean {
-  if (box.sent_before) return false; // still reading the sent emails
+  // Still reading the last six months of sent emails.
+  if (box.sent_before && Date.parse(box.sent_before) > Date.now() - STYLE_AFTER_DAYS * 86_400_000) return false;
   if (box.style_edited && box.style) return false; // yours: never overwritten
   return !box.style_at || Date.now() - Date.parse(box.style_at) > STYLE_EVERY_DAYS * 86_400_000;
 }
@@ -765,12 +860,12 @@ async function highlight(ctx: Context, until: number): Promise<number> {
   const { db, box } = ctx;
   const { data } = await db
     .from('mail_threads')
-    .select('id, state, priority, last_in_graph_id, mark, mark_id')
+    .select('id, state, priority, action_only, last_in_graph_id, mark, mark_id')
     .eq('box_id', box.id)
     .or('state.eq.reply,mark.not.is.null')
     .limit(500);
   const todo = (data ?? []).filter((t) => {
-    const want = markFor(box.highlight, t.state as string, t.priority as string | null);
+    const want = markFor(box.highlight, t.state as string, t.priority as string | null, !!t.action_only);
     return want !== (t.mark ?? null) || (want && t.mark_id !== t.last_in_graph_id);
   });
   if (!todo.length) return 0;
@@ -781,13 +876,13 @@ async function highlight(ctx: Context, until: number): Promise<number> {
   let n = 0;
   for (const t of todo.slice(0, MARKS_PER_RUN)) {
     if (Date.now() > until - 5_000) break;
-    const want = markFor(box.highlight, t.state as string, t.priority as string | null);
+    const want = markFor(box.highlight, t.state as string, t.priority as string | null, !!t.action_only);
     const flaggedByUs = !!t.mark; // every mark the app sets comes with a flag
     try {
       // Off the email it was on, if that's not the one it should be on now.
       if (t.mark_id && (!want || t.mark_id !== t.last_in_graph_id)) await markMessage(box.address, t.mark_id as string, { category: null, flag: false, unflag: flaggedByUs }).catch(() => null);
       if (want && t.last_in_graph_id) {
-        await markMessage(box.address, t.last_in_graph_id as string, { category: want === 'urgent' ? CAT_URGENT : CAT_REPLY, flag: true, unflag: flaggedByUs });
+        await markMessage(box.address, t.last_in_graph_id as string, { category: want === 'urgent' ? CAT_URGENT : want === 'action' ? CAT_ACTION : CAT_REPLY, flag: true, unflag: flaggedByUs });
       }
       await db.from('mail_threads').update({ mark: want, mark_id: want ? t.last_in_graph_id : null }).eq('id', t.id);
       n++;

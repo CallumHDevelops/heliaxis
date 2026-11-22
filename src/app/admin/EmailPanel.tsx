@@ -26,12 +26,12 @@ export function EmailPanel({ mail }: { mail: HomeMail }) {
   return (
     <section className="nu hub-mail" aria-labelledby="nu-mail-h">
       <div className="nu-head">
-        <h2 id="nu-mail-h">Email to reply</h2>
+        <h2 id="nu-mail-h">Hestia: email that needs you</h2>
         {counts.reply > 0 && <span className="nu-count">{counts.reply}</span>}
         {counts.urgent > 0 && <span className="nu-today">{counts.urgent} important</span>}
       </div>
       {top.length === 0 ? (
-        <p className="nu-empty">{mail.reading ? 'Reading your mailbox for the first time. Emails that need a reply appear here as it goes.' : 'Nothing waiting on a reply from you.'}</p>
+        <p className="nu-empty">{mail.reading ? 'Hestia is going through your inbox for the first time. Emails that need you appear here as she goes.' : 'Nothing waiting on you.'}</p>
       ) : (
         <ul className="nu-list">
           {top.map((t) => {
@@ -50,9 +50,10 @@ export function EmailPanel({ mail }: { mail: HomeMail }) {
                 </Link>
                 {t.priority && PRIORITY[t.priority] ? <span className={`nu-chip ${t.priority === 'urgent' ? 'is-late' : 'is-today'}`}>{PRIORITY[t.priority]}</span> : null}
                 {t.prospect && !t.enquiry_id && <span className="nu-chip">New customer?</span>}
+                {t.opportunity && !t.prospect && <span className="nu-chip">Opportunity</span>}
                 <span className="nu-actions">
                   <Link className={`nu-btn${draft ? ' is-primary' : ''}`} href={`/admin/mail?t=${t.id}`}>
-                    {draft ? 'Check draft' : 'Reply'}
+                    {t.action_only ? 'Open' : draft ? 'Check draft' : 'Reply'}
                   </Link>
                 </span>
               </li>
@@ -62,11 +63,16 @@ export function EmailPanel({ mail }: { mail: HomeMail }) {
       )}
       <div className="nu-foot">
         <Link href="/admin/mail" className="hub-more">
-          {counts.reply > top.length ? `All ${counts.reply} to reply →` : 'Open email →'}
+          {counts.reply > top.length ? `All ${counts.reply} that need you →` : 'Open email →'}
         </Link>
         {counts.waiting > 0 && (
           <Link href="/admin/mail?tab=waiting" className="hub-more">
             {counts.waiting} waiting on them →
+          </Link>
+        )}
+        {counts.opps > 0 && (
+          <Link href="/admin/mail?tab=opps" className="hub-more">
+            {counts.opps} {counts.opps === 1 ? 'opportunity' : 'opportunities'} →
           </Link>
         )}
         {counts.people > 0 && (
