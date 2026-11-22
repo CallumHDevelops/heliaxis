@@ -10,6 +10,13 @@ import {
   looksAutomated,
   looksLikeMarketing,
   markFor,
+  cidsIn,
+  cleanSignature,
+  insertAtTop,
+  markedSignature,
+  pickFont,
+  pickSignature,
+  sharedEnding,
   readyToFile,
   textToHtml,
   threadState,
@@ -116,5 +123,52 @@ describe('highlighting in Outlook', () => {
     expect(markFor(true, 'replied', 'urgent')).toBeNull();
     expect(markFor(true, 'done', 'high')).toBeNull();
     expect(markFor(false, 'reply', 'urgent')).toBeNull();
+  });
+});
+
+describe('your signature, copied from your sent emails', () => {
+  const SIG = '<div id="Signature"><p style="font-family:Aptos">Callum Hutchings<br>Director, Heliaxis</p><table><tr><td><img src="cid:logo123"></td></tr></table></div>';
+  const web = (words: string) => `<html><body><div style="font-family: Aptos, sans-serif; font-size: 11pt">${words}</div><div><br></div>${SIG}</body></html>`;
+
+  it('finds the signature Outlook marks, with everything inside it', () => {
+    expect(markedSignature(web('Hi Tom, split it please.'))).toBe(SIG);
+    expect(markedSignature('<div>No signature here</div>')).toBeNull();
+  });
+
+  it('picks the one most emails share, never one from the phone', () => {
+    const phone = '<div>On my way</div><div id="ms-outlook-mobile-signature">Get Outlook for iOS</div>';
+    expect(pickSignature([web('One'), phone, web('Two'), web('Three')])).toBe(SIG);
+    expect(pickSignature([web('Only one')])).toBeNull();
+  });
+
+  it('finds the shared ending when Outlook on a computer does not mark it', () => {
+    const sig = '<p class="MsoNormal">Kind regards<br>Callum Hutchings<br>07700 900123</p>';
+    const a = `<div class="WordSection1"><p class="MsoNormal">Hi Sarah, thanks for this.</p>${sig}</div>`;
+    const b = `<div class="WordSection1"><p class="MsoNormal">Morning Tom, all good.</p>${sig}</div>`;
+    const found = sharedEnding(a, b);
+    expect(found).toContain('Callum Hutchings');
+    expect(found).not.toContain('Sarah');
+    expect(pickSignature([a, b])).toContain('07700 900123');
+  });
+
+  it('leaves out a sign-off that only some emails share', () => {
+    const sig = '<p class="MsoNormal">Callum Hutchings<br>Heliaxis<br>07700 900123</p>';
+    const body = (words: string, off: string) => `<div class="WordSection1"><p class="MsoNormal">${words}</p><p class="MsoNormal">${off}</p>${sig}</div>`;
+    const got = pickSignature([body('Hi Sarah, yes.', 'Kind regards,'), body('Hi Jo, no problem.', 'Kind regards,'), body('Morning Tom.', 'Cheers,'), body('Hi Rhys, Tuesday works.', 'Thanks,')]);
+    expect(got).toBe(sig);
+  });
+
+  it('keeps the logo reference and takes out anything that runs', () => {
+    expect(cidsIn(SIG)).toEqual(['logo123']);
+    expect(cleanSignature('<p onclick="x()">Hi<script>alert(1)</script><a href="javascript:evil()">x</a><iframe src="y"></iframe></p>')).toBe('<p>Hi<a href="#">x</a></p>');
+  });
+
+  it('copies the font you write in', () => {
+    expect(pickFont([web('a'), web('b')])).toBe('font-family: Aptos, sans-serif; font-size: 11pt');
+    expect(pickFont([web('a')])).toBeNull();
+  });
+
+  it('puts the reply above the quoted email', () => {
+    expect(insertAtTop('<html><body class="x"><hr>quoted</body></html>', '<p>Reply</p>')).toBe('<html><body class="x"><p>Reply</p><hr>quoted</body></html>');
   });
 });

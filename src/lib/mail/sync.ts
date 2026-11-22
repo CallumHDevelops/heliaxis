@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
 import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
-import { CAT_REPLY, CAT_URGENT, createReplyDraft, deleteDraft, draftState, ensureCategories, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
+import { CAT_REPLY, CAT_URGENT, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
 import {
   addressOf,
   companyDomain,
@@ -18,6 +18,9 @@ import {
   markFor,
   readyToFile,
   textToHtml,
+  cidsIn,
+  pickFont,
+  pickSignature,
   threadState,
   type ThreadState,
 } from './shared';
@@ -50,6 +53,10 @@ type Box = {
   sent_before: string | null;
   live_since: string | null;
   signature: string | null;
+  signature_html: string | null;
+  signature_images: InlineImage[] | null;
+  signature_at: string | null;
+  reply_font: string | null;
   highlight: boolean;
   outlook_drafts: boolean;
   categories_ready: boolean;
@@ -58,7 +65,7 @@ type Box = {
   style_at: string | null;
   style_edited: boolean;
 };
-const BOX_COLS = 'id, user_id, address, filing, marketing, drafts, signature, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
+const BOX_COLS = 'id, user_id, address, filing, marketing, drafts, signature, signature_html, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
 type Rule = {
   id: string;
   kind: 'domain' | 'address';
@@ -108,6 +115,8 @@ export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult
     if (Date.now() < until) res.named = await nameNewCompanies(ctx);
     if (Date.now() < until) res.triaged = await triage(ctx, until);
     // Marks (and unmarks) in Outlook straight after sorting, so urgent emails show on your phone within minutes.
+    // Your signature and font, copied from your latest sent emails (weekly, so a change in Outlook comes through).
+    if (signatureDue(box) && Date.now() < until - 20_000) await learnSignature(db, box).catch(() => null);
     if (Date.now() < until) res.marked = await highlight(ctx, until);
     if (Date.now() < until) res.outlookDrafts = await syncOutlookDrafts(ctx, until);
     // Your style, once six months of sent emails have been read (and again every 30 days, unless you edited it).
@@ -552,7 +561,20 @@ export async function writeDraft(ctx: Context, t: { id: string; conversation_id:
 
 /* ── Drafts in Outlook ─────────────────────────────────────────────────── */
 
-const replyHtml = (box: Pick<Box, 'signature'>, text: string) => textToHtml(box.signature?.trim() ? `${text}\n\n${box.signature.trim()}` : text);
+type ReplyBox = Pick<Box, 'address' | 'signature' | 'signature_html' | 'signature_images' | 'reply_font'>;
+
+/**
+ * Your reply as Outlook would write it: your words in your usual font, then your Outlook signature (copied from your
+ * sent emails), or the plain one from Settings if none could be copied.
+ */
+export function replyHtml(box: Omit<ReplyBox, 'address' | 'signature_images'>, text: string): string {
+  const font = box.reply_font ? ` style="${box.reply_font.replace(/"/g, "'")}"` : '';
+  const sig = box.signature_html ? box.signature_html : box.signature?.trim() ? `<div${font}>${textToHtml(box.signature.trim())}</div>` : '';
+  return `<div${font}>${textToHtml(text)}</div>${sig}`;
+}
+
+/** The pictures the signature needs (its logo), sent with each reply. */
+export const signatureImages = (box: Pick<ReplyBox, 'signature_html' | 'signature_images'>) => (box.signature_html ? (box.signature_images ?? []) : []);
 
 /**
  * Takes the app's Outlook draft for a conversation away, unless you've changed it since (then it's yours and stays)
@@ -571,11 +593,11 @@ async function clearOutlookDraft(address: string, id: string, at: string | null)
  * Puts this text in Outlook's Drafts as the reply to their latest email, in place of the app's earlier draft (one you've
  * edited in Outlook is never replaced: that one stays and no new one is made). Returns the link to open it.
  */
-export async function putOutlookDraft(db: Db, box: Pick<Box, 'address' | 'signature'>, threadId: string, text: string, all = false): Promise<{ link: string | null; kept: boolean }> {
+export async function putOutlookDraft(db: Db, box: ReplyBox, threadId: string, text: string, all = false): Promise<{ link: string | null; kept: boolean }> {
   const { data: t } = await db.from('mail_threads').select('last_in_graph_id, outlook_draft_id, outlook_draft_at').eq('id', threadId).maybeSingle();
   if (!t?.last_in_graph_id) return { link: null, kept: false };
   if (t.outlook_draft_id && (await clearOutlookDraft(box.address, t.outlook_draft_id as string, t.outlook_draft_at as string | null)) === 'kept') return { link: null, kept: true };
-  const d = await createReplyDraft(box.address, t.last_in_graph_id as string, replyHtml(box, text), all);
+  const d = await createReplyDraft(box.address, t.last_in_graph_id as string, replyHtml(box, text), { all, images: signatureImages(box) });
   await db.from('mail_threads').update({ outlook_draft_id: d.id, outlook_draft_at: d.lastModifiedDateTime }).eq('id', threadId);
   return { link: d.webLink, kept: false };
 }
@@ -699,6 +721,34 @@ async function voiceFor(ctx: Context, t: { who_address: string | null; conversat
     }
   }
   return { guide: box.style, examples: box.style_examples ?? [], past };
+}
+
+/* ── Your signature ───────────────────────────────────────────────────── */
+
+const signatureDue = (box: Box) => !box.signature_at || Date.now() - Date.parse(box.signature_at) > 7 * 86_400_000;
+
+/**
+ * Copies your Outlook signature from your latest sent emails (the one they have in common, with its logo), and the
+ * font you write in. Outlook doesn't let apps read the saved signature itself, so this is how it stays the same as
+ * yours. Returns whether a signature was found.
+ */
+export async function learnSignature(db: Db, box: Pick<Box, 'id' | 'address' | 'signature_html' | 'signature_images' | 'signature_at' | 'reply_font'>): Promise<boolean> {
+  const sent = await recentSentHtml(box.address, 20);
+  const html = pickSignature(sent.map((m) => m.html));
+  const font = pickFont(sent.map((m) => m.html));
+  let images: InlineImage[] = [];
+  const cids = html ? cidsIn(html) : [];
+  if (html && cids.length) {
+    // From an email that has this signature in it.
+    const flat = (x: string) => x.replace(/\s+/g, '');
+    const source = sent.find((m) => flat(m.html).includes(flat(html).slice(0, 200)));
+    if (source) images = (await inlineImages(box.address, source.id)).filter((i) => cids.includes(i.contentId));
+  }
+  const now = new Date().toISOString();
+  const patch = html ? { signature_html: html, signature_images: images, signature_at: now, reply_font: font ?? box.reply_font } : { signature_at: now, reply_font: font ?? box.reply_font };
+  await db.from('mail_boxes').update(patch).eq('id', box.id);
+  Object.assign(box, patch);
+  return !!html;
 }
 
 /* ── Highlighting in Outlook ────────────────────────────────────────────── */

@@ -160,3 +160,154 @@ export function markFor(highlight: boolean, state: string, priority: string | nu
   if (!highlight || state !== 'reply') return null;
   return priority === 'urgent' ? 'urgent' : priority === 'high' ? 'high' : 'reply';
 }
+
+/* ── Your Outlook signature, copied from your sent emails ───────────────── */
+
+/** The whole element starting at `start` (an opening tag), with everything inside it, matched by tag name. */
+function elementAt(html: string, start: number): string | null {
+  const open = /^<([a-z0-9]+)\b/i.exec(html.slice(start));
+  if (!open) return null;
+  const tag = open[1].toLowerCase();
+  const re = new RegExp(`<(/?)${tag}\\b[^>]*>`, 'gi');
+  re.lastIndex = start;
+  let depth = 0;
+  for (let m = re.exec(html); m; m = re.exec(html)) {
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) return html.slice(start, m.index + m[0].length);
+  }
+  return null;
+}
+
+/** Sent from Outlook on a phone: its signature ("Get Outlook for iOS") isn't the real one. */
+export const fromPhone = (html: string) => /ms-outlook-mobile-signature|Get Outlook for (iOS|Android)/i.test(html);
+
+const textOf = (html: string) => html.replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+
+/**
+ * The signature in one sent email's own part (Outlook's uniqueBody, HTML): the block Outlook marks as the signature
+ * (id="Signature", as Outlook on the web and the new Outlook do). Null when there isn't one.
+ */
+export function markedSignature(html: string): string | null {
+  const m = /<(div|table|p)\b[^>]*\bid="?(x_)?Signature"?[^>]*>/i.exec(html);
+  if (!m) return null;
+  const el = elementAt(html, m.index);
+  return el && textOf(el).length >= 3 ? el : null;
+}
+
+/** Whether a piece of HTML opens and closes its divs, tables and paragraphs properly (never closing one it didn't open). */
+function balanced(html: string): boolean {
+  for (const tag of ['div', 'table', 'p', 'span', 'a', 'td', 'tr']) {
+    let depth = 0;
+    for (const m of html.matchAll(new RegExp(`<(/?)${tag}\\b[^>]*>`, 'gi'))) {
+      depth += m[1] ? -1 : 1;
+      if (depth < 0) return false;
+    }
+    if (depth !== 0) return false;
+  }
+  return true;
+}
+
+const squash = (html: string) => html.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim();
+
+/**
+ * For emails from Outlook on a computer, which doesn't mark the signature: the end that two emails share, starting at
+ * a whole block (a paragraph, div or table) and holding some words. Null when they share no such ending.
+ */
+export function sharedEnding(a: string, b: string): string | null {
+  const x = squash(a);
+  const y = squash(b);
+  let n = 0;
+  while (n < x.length && n < y.length && x[x.length - 1 - n] === y[y.length - 1 - n]) n++;
+  const tail = x.slice(x.length - n);
+  for (const m of tail.matchAll(/<(div|p|table)\b/gi)) {
+    // The email's own wrappers close after the signature (</div></body></html>): those closing tags aren't part of it.
+    let piece = tail.slice(m.index);
+    for (let i = 0; i < 12 && !balanced(piece); i++) {
+      const end = /<\/[a-z0-9]+>\s*$/i.exec(piece);
+      if (!end) break;
+      piece = piece.slice(0, end.index);
+    }
+    piece = piece.replace(/(<\/(body|html)>\s*)+$/i, '');
+    if (balanced(piece) && textOf(piece).length >= 10) return piece;
+  }
+  return null;
+}
+
+/**
+ * Your signature from several of your sent emails: the one that turns up most, Outlook's marked signature (in at
+ * least two emails) first, otherwise the ending your emails share. Emails sent from your phone are left out.
+ */
+export function pickSignature(bodies: string[]): string | null {
+  const desk = bodies.filter((b) => b && !fromPhone(b));
+  const found: string[] = [];
+  for (const b of desk) {
+    const s = markedSignature(b);
+    if (s) found.push(s);
+  }
+  // A shared ending already comes from two emails, so one is enough; a marked one must turn up in two.
+  let need = 2;
+  if (found.length < 2) {
+    found.length = 0;
+    need = 1;
+    for (let i = 0; i + 1 < desk.length; i++) {
+      for (let j = i + 1; j < desk.length && j < i + 4; j++) {
+        const s = sharedEnding(desk[i], desk[j]);
+        if (s) found.push(s);
+      }
+    }
+  }
+  const counts = new Map<string, { n: number; html: string }>();
+  for (const s of found) {
+    const k = squash(s);
+    const c = counts.get(k) ?? { n: 0, html: s };
+    c.n++;
+    counts.set(k, c);
+  }
+  // The one in the most emails (a sign-off two emails happen to share makes a longer, rarer ending), then the shortest.
+  const flatDesk = desk.map(squash);
+  const scored = [...counts.entries()].map(([k, c]) => ({ ...c, k, in: flatDesk.filter((d) => d.includes(k)).length }));
+  const best = scored.sort((p, q) => q.in - p.in || q.n - p.n || p.k.length - q.k.length)[0];
+  return best && best.n >= need ? cleanSignature(best.html) : null;
+}
+
+/** Takes out anything that runs code or loads a page (scripts, frames, forms, on… handlers, javascript: links). The rest is kept as it is. */
+export function cleanSignature(html: string): string {
+  return html
+    .replace(/<(script|iframe|object|embed|form)\b[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(script|iframe|object|embed|form|link|meta|base)\b[^>]*\/?>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
+}
+
+/** The pictures a signature uses from the email itself (src="cid:…"), by content id. */
+export function cidsIn(html: string): string[] {
+  return [...new Set([...html.matchAll(/src\s*=\s*["']cid:([^"']+)["']/gi)].map((m) => m[1]))];
+}
+
+/** Puts your reply at the top of the draft Outlook made (above the quoted email), the way Outlook does. */
+export function insertAtTop(bodyHtml: string, html: string): string {
+  const m = /<body\b[^>]*>/i.exec(bodyHtml);
+  if (!m) return `${html}${bodyHtml}`;
+  const at = m.index + m[0].length;
+  return `${bodyHtml.slice(0, at)}${html}${bodyHtml.slice(at)}`;
+}
+
+/**
+ * The font you write in (Outlook puts it on the first block of each email): the most common font-family and size
+ * across your sent emails, as a style to put on replies. Null when there's nothing to go on.
+ */
+export function pickFont(bodies: string[]): string | null {
+  const counts = new Map<string, number>();
+  for (const b of bodies) {
+    if (!b || fromPhone(b)) continue;
+    const inner = b.replace(/^[\s\S]*?<body\b[^>]*>/i, '');
+    const style = /<(?:div|p|span)\b[^>]*style="([^"]*font-family[^"]*)"/i.exec(inner)?.[1] ?? '';
+    const family = /font-family:\s*([^;]+)/i.exec(style)?.[1]?.trim();
+    const size = /font-size:\s*([^;]+)/i.exec(style)?.[1]?.trim();
+    if (!family) continue;
+    const k = `font-family: ${family.replace(/&quot;/g, "'")}${size ? `; font-size: ${size}` : ''}`;
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  const best = [...counts].sort((a, b) => b[1] - a[1])[0];
+  return best && best[1] >= 2 ? best[0] : null;
+}

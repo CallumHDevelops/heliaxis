@@ -474,6 +474,11 @@ reply** panel at the top of the dashboard. It doesn't copy your emails into the 
   emails as examples. Every draft follows it, and copies most closely the emails you've sent that same
   person before. See and edit it in **Settings › Your writing style** (your edits are kept; otherwise it's
   learnt again every 30 days), or **Learn it again**.
+- **Your signature**: Outlook doesn't let apps read your saved signature, so it's copied from your
+  latest sent emails (the one they share, with its formatting, links and logo), and the font you write in
+  too. It's checked weekly, so a change you make in Outlook comes through. See it in **Settings › Your
+  signature** (**Copy it again** after changing it). Emails sent from your phone don't count; if none can
+  be found, a plain one you type there is used instead.
 - **Drafts**: each one also waits in **Outlook's Drafts**, as a reply under their email (with your
   signature), so you can check and send it from Outlook on your phone. Once you've replied (from Outlook
   or the app) or said no reply needed, the app takes its draft away again; a draft you've changed in

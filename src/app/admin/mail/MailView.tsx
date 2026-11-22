@@ -656,6 +656,9 @@ type BoxInfo = {
     highlight: boolean;
     categories_ready: boolean;
     signature: string | null;
+    signature_html: string | null;
+    signature_images: { contentId: string; contentType: string; contentBytes: string }[] | null;
+    signature_at: string | null;
     style: string | null;
     style_examples: { to: string; text: string }[] | null;
     style_from: number | null;
@@ -747,14 +750,7 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
         </section>
       ))}
       <StyleCard key={b.style_at ?? 'none'} box={b} busy={busy} onSave={(style) => set({ style }, 'style')} onLearnt={load} />
-      <section className="mx-card">
-        <h3>Signature</h3>
-        <p className="crm-muted">Added under replies you send from here (Outlook doesn’t add its own to these).</p>
-        <textarea className="crm-input" rows={4} value={sig} onChange={(e) => setSig(e.target.value)} placeholder={'Your name\nHeliaxis\nYour mobile'} />
-        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={!!busy} onClick={() => set({ signature: sig }, 'sig')}>
-          {busy === 'sig' ? 'Saving…' : 'Save signature'}
-        </button>
-      </section>
+      <SignatureCard box={b} sig={sig} setSig={setSig} busy={busy} onSave={() => set({ signature: sig }, 'sig')} onCopied={load} />
       {msg && <p className="mx-ok">{msg}</p>}
       <section className="mx-card">
         <h3>Disconnect</h3>
@@ -839,6 +835,66 @@ function StyleCard({ box, busy, onSave, onLearnt }: { box: BoxInfo['box']; busy:
           }}
         >
           {learning ? 'Learning…' : box.style ? 'Learn it again' : 'Learn it now'}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** Your signature: the one on your emails now, copied from your sent emails, shown as it will look. */
+function SignatureCard({ box, sig, setSig, busy, onSave, onCopied }: { box: BoxInfo['box']; sig: string; setSig: (s: string) => void; busy: string; onSave: () => void; onCopied: () => void }) {
+  const [copying, setCopying] = useState(false);
+  const [note, setNote] = useState('');
+  // Its pictures (your logo) are inside the emails: shown here from the copies kept with it. No <style> blocks on this page.
+  const preview = useMemo(() => {
+    if (!box.signature_html) return '';
+    let html = box.signature_html.replace(/<style[\s\S]*?<\/style>/gi, '');
+    for (const img of box.signature_images ?? []) html = html.split(`cid:${img.contentId}`).join(`data:${img.contentType};base64,${img.contentBytes}`);
+    return html;
+  }, [box.signature_html, box.signature_images]);
+  const when = box.signature_at ? new Date(box.signature_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+  return (
+    <section className="mx-card">
+      <h3>Your signature</h3>
+      {box.signature_html ? (
+        <>
+          <p className="crm-muted">
+            The signature on your emails now, copied from your sent emails{when ? ` (checked ${when}, and again every week, so a change you make in Outlook comes through)` : ''}. Every reply ends with it, in Outlook’s Drafts and when you send from here.
+          </p>
+          <div className="mx-sigpreview" dangerouslySetInnerHTML={{ __html: preview }} />
+        </>
+      ) : (
+        <>
+          <p className="crm-muted">
+            {box.signature_at
+              ? 'Your signature couldn’t be found in your latest sent emails. It’s copied from emails sent from Outlook on your computer or the web (not your phone), so send a couple from there, then tap Copy it again. Until then, replies end with this:'
+              : 'Your signature is copied from your latest sent emails on the next run. Until then, replies end with this:'}
+          </p>
+          <textarea className="crm-input" rows={4} value={sig} onChange={(e) => setSig(e.target.value)} placeholder={'Your name\nHeliaxis\nYour mobile'} />
+        </>
+      )}
+      {note && <p className="mx-warn">{note}</p>}
+      <div className="mx-actions">
+        {!box.signature_html && (
+          <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={!!busy || copying} onClick={onSave}>
+            {busy === 'sig' ? 'Saving…' : 'Save'}
+          </button>
+        )}
+        <button
+          type="button"
+          className="crm-btn crm-btn--ghost crm-btn--small"
+          disabled={!!busy || copying}
+          onClick={async () => {
+            setCopying(true);
+            setNote('');
+            const r = await call('/api/mail/box/signature', { method: 'POST' });
+            setCopying(false);
+            if (!r.ok) return setNote(String(r.data.error || 'Couldn’t copy it.'));
+            if (!r.data.found) setNote('No signature found in your latest sent emails.');
+            onCopied();
+          }}
+        >
+          {copying ? 'Copying…' : 'Copy it again from my sent emails'}
         </button>
       </div>
     </section>

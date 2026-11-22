@@ -16,7 +16,11 @@ create table if not exists public.mail_boxes (
   marketing        boolean not null default false,     -- move marketing emails into the Marketing folder
   drafts           boolean not null default true,      -- write a reply for each email that needs one
   outlook_drafts   boolean not null default true,      -- and put it in Outlook's Drafts, as a reply to their email
-  signature        text,                               -- added under replies sent from the app
+  signature        text,                               -- plain-text signature, only if none could be copied from your sent emails
+  signature_html   text,                               -- your Outlook signature, copied from your sent emails (logo, links and all)
+  signature_images jsonb,                              -- its pictures (logo), [{contentId, name, contentType, contentBytes}]
+  signature_at     timestamptz,                        -- when it was last looked for (weekly)
+  reply_font       text,                               -- the font you write in, copied the same way
   highlight        boolean not null default true,      -- mark emails needing a reply in Outlook (category, and a flag if important)
   categories_ready boolean not null default false,     -- the coloured Outlook categories have been made
   style            text,                               -- how you write, learnt from your sent emails (yours to edit)
@@ -142,6 +146,10 @@ alter table public.mail_boxes   add column if not exists style_from       int;
 alter table public.mail_boxes   add column if not exists style_at         timestamptz;
 alter table public.mail_boxes   add column if not exists style_edited     boolean not null default false;
 alter table public.mail_boxes   add column if not exists outlook_drafts   boolean not null default true;
+alter table public.mail_boxes   add column if not exists signature_html   text;
+alter table public.mail_boxes   add column if not exists signature_images jsonb;
+alter table public.mail_boxes   add column if not exists signature_at     timestamptz;
+alter table public.mail_boxes   add column if not exists reply_font       text;
 alter table public.mail_threads add column if not exists outlook_draft_id text;
 alter table public.mail_threads add column if not exists outlook_draft_at timestamptz;
 alter table public.mail_threads add column if not exists mark             text;

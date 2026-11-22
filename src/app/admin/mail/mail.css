@@ -424,3 +424,14 @@
 .mx-examples .mx-msg.is-out {
   margin-left: 0;
 }
+
+/* Settings › Your signature: shown as it is in Outlook (on white, as in an email). */
+.mx-sigpreview {
+  margin: 0 0 0.4rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #000;
+  overflow-x: auto;
+}

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { messageText, moveToInbox, sendReply } from '@/lib/mail/graph';
-import { contextFor, dropOutlookDraft, putOutlookDraft, writeDraft } from '@/lib/mail/sync';
+import { createReplyDraft, messageText, moveToInbox, sendDraft } from '@/lib/mail/graph';
+import { contextFor, dropOutlookDraft, putOutlookDraft, replyHtml, signatureImages, writeDraft } from '@/lib/mail/sync';
 import { mailSession } from '@/lib/mail/server';
-import { addressOf, folderFor, textToHtml, threadState } from '@/lib/mail/shared';
+import { addressOf, folderFor, threadState } from '@/lib/mail/shared';
 import { canAccess } from '@/lib/portals';
 import { requireApproved } from '@/lib/auth';
 import { toWaId } from '@/lib/whatsapp/shared';
@@ -57,11 +57,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!text) return json({ error: 'Write the reply first.' }, 400);
     if (/\[[^\]\n]{1,40}\]/.test(text) && action === 'send' && !b.force) return json({ error: 'There’s still a [gap] to fill in.', gaps: true }, 400);
     if (!t.last_in_graph_id) return json({ error: 'There’s no email from them to reply to.' }, 400);
-    const sig = box.signature?.trim();
-    const html = textToHtml(sig ? `${text}\n\n${sig}` : text);
     try {
       if (action === 'send') {
-        await sendReply(box.address, t.last_in_graph_id as string, html, !!b.all);
+        // Built as Outlook's own reply (quoted history, your signature and logo), then sent.
+        const d = await createReplyDraft(box.address, t.last_in_graph_id as string, replyHtml(box, text), { all: !!b.all, images: signatureImages(box) });
+        await sendDraft(box.address, d.id);
         await s.db.from('mail_threads').update({ last_out_at: now, state: 'replied', draft: text, updated_at: now }).eq('id', t.id);
         // The same reply waiting in Outlook's Drafts would be a second copy: it goes (unless you've edited it there).
         await dropOutlookDraft(s.db, box.address, t.id as string).catch(() => null);

@@ -188,7 +188,8 @@ const STYLE_SYSTEM = `${ABOUT}
 
 You study emails Callum wrote and describe exactly how Callum writes, so replies drafted later sound like Callum
 wrote them. Write the guide as short bullet lines ("- ...") under these headings, each on its own line:
-Greetings · Sign-offs · Length and structure · Tone · Words and phrases Callum uses · Words and phrases Callum never
+Greetings · Sign-offs (exactly what Callum types just above the signature block: just "Kind regards,", or the name too) ·
+Length and structure · Tone · Words and phrases Callum uses · Words and phrases Callum never
 uses · Punctuation and spelling · How it changes with who it's to (customers, suppliers, the grid/DNO, the team).
 Be concrete and quote Callum's real habits: "Opens with 'Hi Sarah,' (first name, comma); with suppliers often just
 'Hi,'", "Signs off 'Cheers, Callum' to suppliers and 'Kind regards, Callum' to new customers", "Rarely more than
@@ -221,7 +222,9 @@ You draft Callum's reply to the latest email in a conversation, for Callum to ch
   the greeting, sign-off, length, tone, phrases and spelling. It should read as if Callum typed it. Where there are
   emails Callum has sent this same person before, match those most closely.
 - Where the guide says nothing: plain, friendly UK English, short sentences, no padding.
-- End with Callum's usual sign-off and name, but no signature block: the app adds that.
+- End exactly as Callum ends emails just above the signature ("Kind regards," alone, or "Cheers, Callum": whichever
+  the guide and examples show). Never write a signature block (name and title, phone, company): Callum's own is added
+  underneath.
 - Answer everything they asked, in their order. Keep it as short as the answer allows.
 - Use only facts in the conversation and the CRM notes you're given. The example emails show style only: never
   take facts, prices, dates or promises from them. Never make up prices, dates, times, product details,

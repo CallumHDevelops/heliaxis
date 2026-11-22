@@ -1,6 +1,6 @@
 import 'server-only';
 import { graph, GraphError } from '@/lib/ms365';
-import type { Header } from './shared';
+import { insertAtTop, type Header } from './shared';
 
 /**
  * My email: the Microsoft Graph calls for one person's own mailbox (src/lib/mail/sync.ts). It uses the app's own
@@ -116,11 +116,6 @@ export async function moveToInbox(address: string, id: string): Promise<void> {
   await moveMessage(address, id, 'inbox');
 }
 
-/** Replies to their email (above the quoted history, the way Outlook does), from their mailbox. */
-export async function sendReply(address: string, id: string, html: string, all: boolean): Promise<void> {
-  await graph(`${box(address)}/messages/${encodeURIComponent(id)}/${all ? 'replyAll' : 'reply'}`, { method: 'POST', headers: { Prefer: IMMUTABLE }, body: JSON.stringify({ comment: html }) });
-}
-
 /* ── Highlighting in Outlook ─────────────────────────────────────────────── */
 
 /** The app's own categories. Only these are ever added or taken off; your own categories are left alone. */
@@ -162,14 +157,60 @@ export async function markMessage(address: string, id: string, o: { category: st
 
 /* ── Drafts in Outlook ───────────────────────────────────────────────────── */
 
-/** A reply to their email, left in Outlook's Drafts (threaded under their email). */
-export async function createReplyDraft(address: string, id: string, html: string, all = false): Promise<{ id: string; lastModifiedDateTime: string; webLink: string | null }> {
-  const d = await graph<{ id: string; lastModifiedDateTime?: string; webLink?: string }>(`${box(address)}/messages/${encodeURIComponent(id)}/${all ? 'createReplyAll' : 'createReply'}`, {
+export type InlineImage = { contentId: string; name: string; contentType: string; contentBytes: string };
+
+const HTML_PREFER = `${IMMUTABLE}, outlook.body-content-type="html"`;
+
+/**
+ * A reply to their email, left in Outlook's Drafts (threaded under their email, with the quoted history below):
+ * Outlook makes the reply, then your words and signature go at the top, and the signature's pictures (your logo)
+ * are attached to it the way Outlook does.
+ */
+export async function createReplyDraft(
+  address: string,
+  id: string,
+  html: string,
+  o: { all?: boolean; images?: InlineImage[] } = {}
+): Promise<{ id: string; lastModifiedDateTime: string; webLink: string | null }> {
+  const made = await graph<{ id: string; body?: { content?: string } }>(`${box(address)}/messages/${encodeURIComponent(id)}/${o.all ? 'createReplyAll' : 'createReply'}`, {
     method: 'POST',
-    headers: { Prefer: IMMUTABLE },
-    body: JSON.stringify({ comment: html }),
+    headers: { Prefer: HTML_PREFER },
+    body: JSON.stringify({}),
   });
-  return { id: d.id, lastModifiedDateTime: d.lastModifiedDateTime ?? new Date().toISOString(), webLink: d.webLink ?? null };
+  const url = `${box(address)}/messages/${encodeURIComponent(made.id)}`;
+  await graph(url, { method: 'PATCH', headers: { Prefer: IMMUTABLE }, body: JSON.stringify({ body: { contentType: 'HTML', content: insertAtTop(made.body?.content ?? '', html) } }) });
+  for (const img of o.images ?? []) {
+    await graph(`${url}/attachments`, {
+      method: 'POST',
+      headers: { Prefer: IMMUTABLE },
+      body: JSON.stringify({ '@odata.type': '#microsoft.graph.fileAttachment', name: img.name, contentType: img.contentType, contentBytes: img.contentBytes, contentId: img.contentId, isInline: true }),
+    });
+  }
+  const r = await graph<{ lastModifiedDateTime?: string; webLink?: string }>(`${url}?$select=lastModifiedDateTime,webLink`, { headers: { Prefer: IMMUTABLE } });
+  return { id: made.id, lastModifiedDateTime: r.lastModifiedDateTime ?? new Date().toISOString(), webLink: r.webLink ?? null };
+}
+
+/** Sends a draft. */
+export async function sendDraft(address: string, id: string): Promise<void> {
+  await graph(`${box(address)}/messages/${encodeURIComponent(id)}/send`, { method: 'POST', headers: { Prefer: IMMUTABLE } });
+}
+
+/** Your latest sent emails' own words (not the quoted history), as HTML: where your signature is copied from. */
+export async function recentSentHtml(address: string, top = 20): Promise<{ id: string; html: string }[]> {
+  const q = new URLSearchParams({ $select: 'id,uniqueBody,isDraft', $top: String(top), $orderby: 'sentDateTime desc' });
+  const r = await graph<{ value: { id: string; uniqueBody?: { content?: string } }[] }>(`${box(address)}/mailFolders/sentitems/messages?${q}`, { headers: { Prefer: HTML_PREFER } });
+  return (r.value ?? []).map((m) => ({ id: m.id, html: m.uniqueBody?.content ?? '' }));
+}
+
+/** The pictures an email carries inside it (a signature's logo), up to 300 KB each. */
+export async function inlineImages(address: string, id: string): Promise<InlineImage[]> {
+  const r = await graph<{ value: { '@odata.type'?: string; name?: string; contentType?: string; contentBytes?: string; contentId?: string; isInline?: boolean; size?: number }[] }>(
+    `${box(address)}/messages/${encodeURIComponent(id)}/attachments`,
+    { headers: { Prefer: IMMUTABLE } }
+  );
+  return (r.value ?? [])
+    .filter((a) => a.isInline && a.contentId && a.contentBytes && (a.size ?? 0) <= 300_000 && a['@odata.type'] === '#microsoft.graph.fileAttachment')
+    .map((a) => ({ contentId: a.contentId!.replace(/^<|>$/g, ''), name: a.name || 'image', contentType: a.contentType || 'image/png', contentBytes: a.contentBytes! }));
 }
 
 /** A draft as it is now: still a draft, and when it was last changed. Null if it's gone. */
