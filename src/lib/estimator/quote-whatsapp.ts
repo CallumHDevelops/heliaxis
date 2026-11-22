@@ -24,6 +24,8 @@ export const ESTIMATE_TEMPLATE = {
   body: 'Hi {{1}}, here is your solar estimate from Heliaxis (ref {{2}}). Reply here with any questions or to book your free survey.',
   examples: ['Sam', 'HX-EST-ABC234'],
 } as const;
+/** The language the template was created in (WHATSAPP_ESTIMATE_LANG, e.g. en_US if it shows as plain "English" in WhatsApp Manager); else the account's usual one. */
+export const estimateTemplateLang = () => process.env.WHATSAPP_ESTIMATE_LANG || defaultTemplate().lang || ESTIMATE_TEMPLATE.language;
 const fillBody = (name: string, ref: string) => ESTIMATE_TEMPLATE.body.replace('{{1}}', name).replace('{{2}}', ref);
 
 const windowOpen = (lastInbound: string | null) => !!lastInbound && Date.now() - new Date(lastInbound).getTime() < 24 * 3600_000;
@@ -50,7 +52,7 @@ export async function sendQuoteOnWhatsApp(a: { enquiryId: string; to: string; na
     await db.from('enquiries').update({ wa_id: a.to }).eq('id', a.enquiryId).is('wa_id', null).then(() => null, () => null);
     const first = greetingName(a.name) || 'there';
     const name = estimateTemplateName();
-    const r = await sendTemplate(a.to, name, defaultTemplate().lang || ESTIMATE_TEMPLATE.language, [first, a.reference], { link: a.pdfUrl, filename: fileName(a.reference) });
+    const r = await sendTemplate(a.to, name, estimateTemplateLang(), [first, a.reference], { link: a.pdfUrl, filename: fileName(a.reference) });
     if (!r.ok) {
       const { notifyEnquiryTeam } = await import('@/lib/whatsapp/inbox');
       await notifyEnquiryTeam('Estimate not sent on WhatsApp', `${a.reference}: ${r.error}`, `/admin/enquiries?enquiry=${a.enquiryId}`).catch(() => null);
