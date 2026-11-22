@@ -10,6 +10,8 @@ import { installDayList, ukBankHolidays, ukDay } from '@/lib/bank-holidays';
 import { DEFAULT_SURVEY_MINUTES, isSurveyType, noSurveyNeeded, SURVEY_TYPES, surveyTypeFor, type SurveyTypeKey } from '@/lib/crm/stages';
 import { HubView, type HubTask, type HubFollowUp, type HubToday, type HubTodayItem, type HubWeekDay } from './HubView';
 import { newMetaLeads } from './meta-leads';
+import { mailForHome } from '@/lib/mail/server';
+import { msConfigured } from '@/lib/ms365';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +26,7 @@ export type NeedCount = { n: number; detail: string };
 /** How many things need someone, per area (shown as big numbers on the dashboard). */
 async function badges(keys: PortalKey[], isAdmin: boolean) {
   const admin = createAdminClient();
-  const out: Partial<Record<PortalKey | 'users' | 'whatsapp' | 'drafts', NeedCount>> = {};
+  const out: Partial<Record<PortalKey | 'users' | 'whatsapp' | 'drafts' | 'email', NeedCount>> = {};
   const count = async (q: PromiseLike<{ count: number | null }>) => {
     try {
       return (await q).count ?? 0;
@@ -322,7 +324,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const isAdmin = profile?.role === 'admin';
   const keys = portalsFor(profile);
   const portals = PORTALS.filter((p) => keys.includes(p.key));
-  const [counts, day, today, setup, people, metaLeads, week] = await Promise.all([
+  const [counts, day, today, setup, people, metaLeads, week, mail] = await Promise.all([
     badges(keys, isAdmin),
     user ? myDay(user.id, keys) : null,
     user ? todayList(profile?.email || user.email || null, keys).catch(() => null) : null,
@@ -332,7 +334,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     // New Meta leads (Enquiries and CRM staff): a failure just hides the panel.
     user ? newMetaLeads(keys).catch(() => null) : null,
     user ? weekAhead(keys).catch(() => null) : null,
+    // My email (src/lib/mail): only CRM staff, only their own mailbox. A failure just hides the panel.
+    user && keys.includes('crm') ? mailForHome(user.id).catch(() => null) : null,
   ]);
+  // Email to reply in the "Needs you" strip, first; the panel offers to connect it to admins who haven't yet.
+  if (mail && mail !== 'none' && mail.counts.reply)
+    counts.email = { n: mail.counts.reply, detail: mail.counts.urgent ? `to reply, ${mail.counts.urgent} important` : 'to reply' };
   const firstName = (profile?.full_name || profile?.email || '').split(/[\s@]/)[0];
 
   return (
@@ -355,6 +362,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         assistant={keys.includes('crm')}
         metaLeads={metaLeads}
         search={keys.includes('enquiries') || keys.includes('crm')}
+        mail={mail === 'none' ? (isAdmin && msConfigured() ? 'connect' : null) : mail}
       />
     </AdminShell>
   );

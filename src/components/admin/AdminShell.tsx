@@ -19,6 +19,7 @@ import './admin-shell.css';
 
 type Tab =
   | 'dashboard'
+  | 'mail'
   | 'enquiries'
   | 'crm'
   | 'sales'
@@ -418,6 +419,8 @@ export async function AdminShell({
         { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm'), section: 'Diary and insight' },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },
         { href: '/admin/crm/chats', label: 'WhatsApp chats', icon: icons.whatsapp, show: !can('enquiries') && can('crm'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },
+        // My email: your own mailbox, sorted (src/lib/mail). Each person only ever sees their own.
+        { href: '/admin/mail', label: 'My email', icon: icons.enquiries, active: active === 'mail', show: can('crm'), section: 'Enquiries and messages' },
         { href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', short: 'Smart replies', icon: icons.replies, show: can('enquiries'), section: 'Enquiries and messages' },
         { href: '/admin/enquiries/templates', label: 'WhatsApp templates', short: 'Templates', icon: icons.templates, show: can('enquiries'), section: 'Enquiries and messages' },
         { href: '/admin/crm/reports', label: 'CRM reports', icon: icons.reports, show: can('crm'), section: 'Diary and insight' },

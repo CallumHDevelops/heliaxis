@@ -51,7 +51,7 @@ export class GraphError extends Error {
  * One Graph call. A caller's Prefer replaces the default; 429 waits (up to 5 s) and tries once more;
  * absolute @odata.nextLink URLs are accepted as the path.
  */
-async function graph<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
+export async function graph<T>(path: string, init: RequestInit = {}, retried = false): Promise<T> {
   const headers = new Headers({ Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' });
   new Headers(init.headers).forEach((v, k) => headers.set(k, v));
   if (!headers.has('Prefer')) headers.set('Prefer', 'outlook.body-content-type="text"');

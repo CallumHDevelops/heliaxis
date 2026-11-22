@@ -777,6 +777,12 @@ a.hub-meta-main:hover b {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   }
 }
+.hub-work-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
 .hub-work-side {
   display: flex;
   flex-direction: column;
