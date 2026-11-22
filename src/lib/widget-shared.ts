@@ -6,7 +6,7 @@
 
 export type WidgetData = {
   at: number;
-  day: string; // "Saturday 22 November"
+  day: string; // "Sat 22 Nov"
   /** Null when your Outlook calendar can't be read. */
   calendar: { today: WidgetEvent[]; tomorrow: WidgetEvent[] } | null;
   tasks: { title: string; due: string; late: boolean; sub: string; href: string }[];

@@ -77,7 +77,7 @@ public class HestiaWidget extends AppWidgetProvider {
 
         // Header: the day, and how many emails need you (urgent ones called out).
         String day = w != null ? w.optString("d", "") : "";
-        if (day.isEmpty()) day = new SimpleDateFormat("EEEE d MMMM", Locale.UK).format(new Date());
+        if (day.isEmpty()) day = new SimpleDateFormat("EEE d MMM", Locale.UK).format(new Date());
         v.setTextViewText(R.id.widget_day, day);
 
         JSONObject email = w != null ? w.optJSONObject("e") : null;

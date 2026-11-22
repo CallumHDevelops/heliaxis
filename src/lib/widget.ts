@@ -22,7 +22,8 @@ type Db = ReturnType<typeof createAdminClient>;
 
 const hhmm = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const ukDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' });
-const longDay = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'long', day: 'numeric', month: 'long' });
+// Short, so it fits beside the "4 need you · 1 urgent" badge on one line: "Mon 24 Nov".
+const longDay = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short' });
 const shortDay = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short' });
 
 /** Everything the widget shows for one person, as plain data (made small by widgetPayload). */
