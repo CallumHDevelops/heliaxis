@@ -1,0 +1,158 @@
+/* The "?" help button and its panel (AdminHelp.tsx). Bottom left: the WhatsApp and + buttons and the dock are bottom right.
+ * Colours: the theme's tokens (src/app/theme.css). The crm-btn classes come from crm.css where it is loaded; the rules
+ * below make them look the same on pages that do not load it. */
+.ah {
+  --solar: var(--accent);
+  --card: var(--surface);
+  --line: var(--border);
+  --ink: var(--text);
+  --amber-2: var(--accent-text);
+  --ah-gap: 16px;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.ah .crm-btn {
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  border-radius: 6px;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--inverse);
+  background: var(--inverse);
+  color: var(--inverse-accent);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+.ah .crm-btn--solar {
+  background: var(--solar);
+  border-color: var(--solar);
+  color: var(--accent-ink);
+}
+.ah .crm-btn--ghost {
+  background: var(--card);
+  border-color: var(--line);
+  color: var(--ink);
+}
+.ah .crm-btn--small {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+}
+.ah .crm-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--amber-2);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ah :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.ah .ah-fab {
+  position: fixed;
+  left: max(var(--ah-gap), env(safe-area-inset-left));
+  bottom: calc(var(--ah-lift, 0px) + var(--ah-gap) + env(safe-area-inset-bottom));
+  z-index: 30;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: 0 6px 18px -6px rgba(33, 31, 24, 0.45);
+}
+.ah .ah-fab[aria-expanded='true'] {
+  box-shadow: 0 0 0 3px rgb(var(--accent-rgb) / 0.35);
+}
+
+.ah-panel {
+  position: fixed;
+  left: max(var(--ah-gap), env(safe-area-inset-left));
+  bottom: calc(var(--ah-lift, 0px) + var(--ah-gap) + env(safe-area-inset-bottom) + 54px);
+  z-index: 40;
+  box-sizing: border-box;
+  width: min(400px, calc(100vw - 2 * var(--ah-gap)));
+  max-height: min(70vh, calc(100dvh - var(--ah-lift, 0px) - 120px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 16px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 18px 44px -14px rgba(33, 31, 24, 0.45);
+  animation: ah-in 0.16s ease-out;
+}
+@keyframes ah-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.ah-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ah-title {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+.ah-about {
+  margin: 6px 0 0;
+}
+.ah-h {
+  margin: 14px 0 4px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.ah-steps,
+.ah-watch {
+  margin: 0;
+  padding-left: 1.3rem;
+}
+.ah-steps {
+  list-style: decimal;
+}
+.ah-watch {
+  list-style: disc;
+}
+.ah-fab svg {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.ah-steps li,
+.ah-watch li {
+  margin: 0 0 6px;
+}
+.ah-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ah-panel {
+    animation: none;
+  }
+}
+@media print {
+  .ah {
+    display: none !important;
+  }
+}
