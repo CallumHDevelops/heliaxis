@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { requireApproved } from '@/lib/auth';
 import { fcmConfigured } from '@/lib/fcm';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { pushWidget } from '@/lib/widget';
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -32,6 +33,9 @@ export async function POST(req: NextRequest) {
       { onConflict: 'token' }
     );
   if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: NO_STORE });
+  // The app was just opened: bring its Hestia widget up to date (after the response; builds without one get nothing).
+  const userId = session.user.id;
+  after(() => pushWidget(userId).catch(() => null));
   // native: false = Firebase isn't set up in Vercel yet, so the phone should keep its Web Push.
   return NextResponse.json({ ok: true, native: fcmConfigured() }, { headers: NO_STORE });
 }

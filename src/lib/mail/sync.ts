@@ -93,7 +93,7 @@ const MOVES_PER_RUN = 50;
 
 const RULE_COLS = 'id, kind, match, label, folder, action, status, never_marketing, enquiry_id, organisation_id, contact_id';
 
-export type BoxResult = { address: string; read: number; named: number; styled: boolean; triaged: number; marked: number; outlookDrafts: number; drafted: number; filed: number; marketing: number; error?: string };
+export type BoxResult = { userId: string; address: string; read: number; named: number; styled: boolean; triaged: number; marked: number; outlookDrafts: number; drafted: number; filed: number; marketing: number; error?: string };
 
 export async function runMailSort(o: { until: number }): Promise<BoxResult[]> {
   if (!msConfigured()) return [];
@@ -110,7 +110,7 @@ export async function runMailSort(o: { until: number }): Promise<BoxResult[]> {
 
 /** One mailbox, start to finish. Never throws: the error is saved on the mailbox for Email › Settings. */
 export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult> {
-  const res: BoxResult = { address: box.address, read: 0, named: 0, styled: false, triaged: 0, marked: 0, outlookDrafts: 0, drafted: 0, filed: 0, marketing: 0 };
+  const res: BoxResult = { userId: box.user_id, address: box.address, read: 0, named: 0, styled: false, triaged: 0, marked: 0, outlookDrafts: 0, drafted: 0, filed: 0, marketing: 0 };
   const started = new Date().toISOString();
   try {
     const ctx = await Context.load(db, box);

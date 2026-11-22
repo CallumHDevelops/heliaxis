@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Hestia widget when the phone is in dark mode. -->
+<resources>
+    <color name="widgetBackground">#211F18</color>
+    <color name="widgetInk">#F4EFE4</color>
+    <color name="widgetMuted">#A8A08E</color>
+    <color name="widgetGold">#F8BC1E</color>
+    <color name="widgetGoldSoft">#40F8BC1E</color>
+    <color name="widgetUrgent">#F2B8B5</color>
+    <color name="widgetOnUrgent">#601410</color>
+</resources>

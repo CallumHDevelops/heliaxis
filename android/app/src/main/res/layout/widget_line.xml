@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One line in the Hestia widget: a coloured mark (urgent, important), a time or due date, a title and a second line. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_line"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="40dp"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="5dp"
+    android:paddingBottom="5dp">
+
+    <FrameLayout
+        android:id="@+id/widget_line_mark"
+        android:layout_width="3dp"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="8dp" />
+
+    <TextView
+        android:id="@+id/widget_line_left"
+        android:layout_width="58dp"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:textColor="@color/widgetMuted"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/widget_line_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/widgetInk"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/widget_line_sub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/widgetMuted"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

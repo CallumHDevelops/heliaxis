@@ -32,7 +32,7 @@ import java.util.Map;
  */
 final class Notifications {
     static final String GENERAL = "general";
-    private static final List<String> CHANNELS = Arrays.asList("whatsapp", "leads", "tasks", "jobs", GENERAL);
+    private static final List<String> CHANNELS = Arrays.asList("whatsapp", "leads", "email", "tasks", "jobs", GENERAL);
     private static final int ID = 1; // one notification per tag; the tag says which
     /** The site's id for a notification (notifications.id), kept on it for dismiss(). */
     private static final String EXTRA_ID = "uk.co.heliaxis.app.NOTIFICATION_ID";
@@ -44,6 +44,7 @@ final class Notifications {
         nm.createNotificationChannelsCompat(Arrays.asList(
                 channel("whatsapp", "WhatsApp messages", "Messages from customers and new WhatsApp leads", true),
                 channel("leads", "New leads", "New enquiries from the website, Meta ads and elsewhere", true),
+                channel("email", "Urgent emails", "Emails Hestia has spotted that need you straight away", true),
                 channel("tasks", "Tasks", "Tasks given to you, and tasks you set being done", false),
                 channel("jobs", "Customers & jobs", "Surveys booked, quotes accepted, deposits paid and next steps", false),
                 channel(GENERAL, "Other", "Everything else", false)));
@@ -66,7 +67,7 @@ final class Notifications {
         String tag = value(data, "tag", "");
         if (tag.isEmpty()) tag = id.isEmpty() ? "n-" + System.currentTimeMillis() : "n-" + id;
         String channel = CHANNELS.contains(value(data, "channel", "")) ? data.get("channel") : GENERAL;
-        boolean urgent = channel.equals("whatsapp") || channel.equals("leads");
+        boolean urgent = channel.equals("whatsapp") || channel.equals("leads") || channel.equals("email");
 
         Uri page = pageUrl(value(data, "href", "/admin"));
         Uri open = id.isEmpty() ? page : Push.withFragmentParam(page, "hx-n", id);

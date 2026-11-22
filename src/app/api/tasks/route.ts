@@ -7,6 +7,12 @@ import { rearmDueReminder } from '@/lib/tasks-server';
 import { removeTaskCalendar, syncTaskCalendar } from '@/lib/tasks-timed';
 import { defaultOwnerId } from '@/lib/crm/default-owner';
 import { canAccess } from '@/lib/portals';
+import { pushWidget } from '@/lib/widget';
+
+/** A task added, changed or removed: the Hestia widget on the assignees' phones shows it now, not in 15 minutes. */
+async function refreshWidgets(userIds: (string | null | undefined)[]) {
+  for (const u of new Set(userIds.filter((x): x is string => !!x))) await pushWidget(u).catch(() => null);
+}
 
 export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -115,6 +121,7 @@ export async function POST(req: NextRequest) {
   if (error) return fail(error.message);
   after(() => notifyTaskChange(null, data as Task, actorOf(session)));
   after(() => syncTaskCalendar((data as Task).id));
+  after(() => refreshWidgets([(data as Task).assignee_id]));
   return NextResponse.json({ task: data }, { headers: NO_STORE });
 }
 
@@ -146,6 +153,7 @@ export async function PATCH(req: NextRequest) {
   after(() => notifyTaskChange(before as Task | null, data as Task, actorOf(session)));
   // The Outlook copy follows any change (done removes it).
   after(() => syncTaskCalendar(id));
+  after(() => refreshWidgets([b?.assignee_id, (data as Task).assignee_id]));
   return NextResponse.json({ task: data }, { headers: NO_STORE });
 }
 
@@ -154,7 +162,9 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id');
   if (!id) return fail('id required', 400);
   await removeTaskCalendar(id);
+  const { data: gone } = await createAdminClient().from('tasks').select('assignee_id').eq('id', id).maybeSingle();
   const { error } = await createAdminClient().from('tasks').delete().eq('id', id);
   if (error) return fail(error.message);
+  after(() => refreshWidgets([gone?.assignee_id as string | null | undefined]));
   return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

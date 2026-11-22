@@ -13,4 +13,21 @@
         <item>https://social.heliaxis.co.uk</item>
         <item>https://rams.heliaxis.co.uk</item>
     </string-array>
+
+    <!-- The Hestia widget (HestiaWidget.java). -->
+    <string name="widgetName">Hestia</string>
+    <string name="widgetDescription">Your day at a glance: today\'s calendar, the emails that need you and your tasks</string>
+    <string name="widgetToday">Today</string>
+    <string name="widgetTomorrow">Tomorrow</string>
+    <string name="widgetTasks">Tasks</string>
+    <string name="widgetNeedsYou">Needs you (%1$d)</string>
+    <string name="widgetUrgent">Urgent</string>
+    <string name="widgetNothingToday">Nothing else today</string>
+    <string name="widgetNoCalendar">Calendar not connected</string>
+    <string name="widgetFirstRun">Open the Heliaxis app once and Hestia fills this in.</string>
+    <string name="widgetNothing">All clear: nothing needs you.</string>
+    <string name="widgetUpdated">Updated %1$s</string>
+    <string name="widgetPreviewBadge">3 need you</string>
+    <string name="widgetPreviewEvent">09:00  Survey: Sarah Davies</string>
+    <string name="widgetPreviewTask">Call GoodWe about the inverter</string>
 </resources>
