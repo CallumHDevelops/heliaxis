@@ -16,6 +16,7 @@ export const FEATURE_LABEL: Record<string, string> = {
   social_geo: 'Social: AI-answer checks',
   mail_triage: 'Email: sorting and spotting what needs a reply',
   mail_draft: 'Email: drafting replies',
+  mail_style: 'Email: learning your writing style',
 };
 
 export type FeatureTotal = { feature: string; label: string; calls: number; costUsd: number; inputTokens: number; outputTokens: number };

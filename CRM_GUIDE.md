@@ -451,30 +451,42 @@ Needs `supabase/merge.sql`.
 
 ## 18. My email
 
-Your own Microsoft 365 mailbox (callum@ to start), sorted for you. **CRM › My email**, and the
-**Email to reply** panel at the top of the dashboard.
+Your own Microsoft 365 inbox (callum@ to start), kept sorted. **CRM › My email**, and the **Email to
+reply** panel at the top of the dashboard. It doesn't copy your emails into the CRM.
 
 - **Setup**: Microsoft 365 connected (section 4: its mailbox scope already includes callum@), then run
   `supabase/mail-sort.sql` and switch on its every-two-minutes job (both on the dashboard's setup list).
   Then **My email → Connect**. It only ever opens your own sign-in address, and only you see it.
 - **First read**: works back through six months of sent emails, then the whole inbox, a few hundred
   emails every two minutes. New emails are picked up as they arrive.
-- **To reply**: each conversation where you owe a reply, most important first (urgent: a customer ready
-  to sign, a fault, a complaint, a deadline today; high: quotes, enquiries, supplier problems, the DNO),
-  with one line on what they want and a draft written in your voice. The draft uses only what's in the
-  email and the CRM: anything it doesn't know is left in [square brackets] for you, and Send asks you to
-  fill those in first. **Send** replies from your mailbox (with your signature); **Put in Outlook drafts**
-  to finish there; **Rewrite** with a steer ("say yes to Thursday at 10"); **No reply needed**.
+- **Urgent first**: each conversation where you owe a reply is sorted (urgent: a customer ready to sign,
+  a fault, a complaint, a deadline today; high: quotes, enquiries, supplier problems, the DNO) with one
+  line on what they want. **In Outlook** the email gets the category **Urgent** (red, flagged) or **Needs
+  reply** (orange; flagged too when it's important), so it stands out in your inbox and on your phone.
+  They come off once you've replied or said no reply needed. Your own categories and flags are left alone.
+  Turn it off in Settings › Highlight in Outlook.
+  - The colours need one more permission; without it the categories still work, just grey. In PowerShell
+    (as in section 4, after `Connect-ExchangeOnline` and the **Set app** line):
+    `New-ManagementRoleAssignment -App $app -Role "Application MailboxSettings.ReadWrite" -CustomResourceScope "Heliaxis CRM mailboxes"`
+- **Your writing style**: once your sent emails have been read, it studies up to 40 you wrote (to a
+  spread of people) and writes down how you write: greetings, sign-offs, length, tone, the phrases you
+  use and never use, and how that changes for customers, suppliers and the DNO, with a few of your own
+  emails as examples. Every draft follows it, and copies most closely the emails you've sent that same
+  person before. See and edit it in **Settings › Your writing style** (your edits are kept; otherwise it's
+  learnt again every 30 days), or **Learn it again**.
+- **Drafts**: use only what's in the email and the CRM. Anything it doesn't know is left in [square
+  brackets], and Send asks you to fill those in first. **Send** replies from your mailbox (with your
+  signature); **Put in Outlook drafts** to finish there; **Rewrite** with a steer ("say yes to Thursday at
+  10"); **No reply needed**.
 - **Waiting on them**: you sent the last email 3+ days ago and nothing's come back. **New people**:
-  someone asking about a job who isn't in the CRM; **Add to the CRM** in one tap (name, mobile and
-  postcode filled in from the email). Customers' emails also go on their CRM timeline.
+  someone asking about a job who isn't in the CRM; **Add to the CRM** in one tap.
 - **Folders**: everyone at a company by its domain (goodwe.com → Suppliers/GoodWe, nationalgrid.co.uk →
   Grid and DNO/National Grid), customers by their own address (Customers/Jane Smith). CRM customers,
   contacts and organisations are approved straight away; other companies are named by the assistant and
   wait for you to check them (**Approve all**). Rename any folder; a / makes a folder inside a folder.
 - **Filing** (off until you turn it on in Settings): once you've replied, or there's nothing to reply
-  to, the email moves from the inbox to its folder. Emails still waiting on you stay in the inbox;
-  anything older than 30 days is filed anyway. An email you've already moved yourself is left alone.
+  to, the email moves from the inbox to its folder, so the inbox only holds what still needs you.
+  Anything older than 30 days is filed anyway. An email you've already moved yourself is left alone.
 - **Marketing** (off until you turn it on): anything with an unsubscribe link goes to a Marketing
   folder, never from customers or anyone you've written to. **Not marketing** brings it back for good.
 - Nothing is ever deleted, and nothing is sent without you pressing Send. The AI costs show under

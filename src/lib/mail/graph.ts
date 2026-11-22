@@ -132,3 +132,42 @@ export async function draftReply(address: string, id: string, html: string, all:
   const r = await graph<{ webLink?: string }>(`${box(address)}/messages/${encodeURIComponent(d.id)}?$select=webLink`, { headers: { Prefer: IMMUTABLE } });
   return r.webLink ?? null;
 }
+
+/* ── Highlighting in Outlook ─────────────────────────────────────────────── */
+
+/** The app's own categories. Only these are ever added or taken off; your own categories are left alone. */
+export const CAT_URGENT = 'Urgent';
+export const CAT_REPLY = 'Needs reply';
+const OURS = [CAT_URGENT, CAT_REPLY];
+
+/**
+ * Makes the two categories in the mailbox's list with their colours (Urgent red, Needs reply orange). Outlook
+ * only lets the app do this with the MailboxSettings permission; without it the categories still work, just grey.
+ * Returns whether it managed.
+ */
+export async function ensureCategories(address: string): Promise<boolean> {
+  try {
+    const have = await graph<{ value: { displayName: string }[] }>(`${box(address)}/outlook/masterCategories`);
+    const names = new Set((have.value ?? []).map((c) => c.displayName));
+    for (const [name, color] of [[CAT_URGENT, 'preset0'], [CAT_REPLY, 'preset1']] as const) {
+      if (!names.has(name)) await graph(`${box(address)}/outlook/masterCategories`, { method: 'POST', body: JSON.stringify({ displayName: name, color }) });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Marks one email: `category` is added (the app's other one taken off), and it's flagged when `flag`. With no
+ * category, the app's categories come off and, if the app flagged it (`unflag`), the flag too.
+ */
+export async function markMessage(address: string, id: string, o: { category: string | null; flag: boolean; unflag: boolean }): Promise<void> {
+  const url = `${box(address)}/messages/${encodeURIComponent(id)}`;
+  const cur = await graph<{ categories?: string[]; flag?: { flagStatus?: string } }>(`${url}?$select=categories,flag`, { headers: { Prefer: IMMUTABLE } });
+  const categories = [...(cur.categories ?? []).filter((c) => !OURS.includes(c)), ...(o.category ? [o.category] : [])];
+  const patch: Record<string, unknown> = { categories };
+  if (o.flag && cur.flag?.flagStatus !== 'flagged') patch.flag = { flagStatus: 'flagged' };
+  else if (!o.flag && o.unflag && cur.flag?.flagStatus === 'flagged') patch.flag = { flagStatus: 'notFlagged' };
+  await graph(url, { method: 'PATCH', headers: { Prefer: IMMUTABLE }, body: JSON.stringify(patch) });
+}

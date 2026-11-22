@@ -411,3 +411,16 @@
     margin-left: 0;
   }
 }
+
+/* Settings › Your writing style. */
+.mx-style textarea {
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+}
+.mx-examples {
+  margin-top: 0.6rem;
+  max-height: 22rem;
+}
+.mx-examples .mx-msg.is-out {
+  margin-left: 0;
+}

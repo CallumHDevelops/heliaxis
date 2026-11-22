@@ -1,7 +1,8 @@
--- 80. My email: a person's own Microsoft 365 mailbox (callum@ to start), sorted for them.
---     The app reads the mailbox every two minutes (/api/cron/mail), works out which emails need a reply,
---     writes a draft for each one to check and send from the app, files emails into a folder per
---     organisation or customer once they've been dealt with, and moves marketing into a Marketing folder.
+-- 80. My email: a person's own Microsoft 365 mailbox (callum@ to start), kept sorted for them.
+--     The app reads the mailbox every two minutes (/api/cron/mail), works out which emails need a reply and
+--     marks the urgent ones in Outlook itself, learns how you write from your sent emails and drafts each
+--     reply in that style, files emails into a folder per company or customer once they've been dealt
+--     with, and moves marketing into a Marketing folder.
 --     Nothing is deleted, and nothing is filed until its owner turns filing on (Email › Settings).
 --     Only the mailbox's owner sees it. Run after crm.sql and organisations.sql. Safe to run twice.
 --     Server-only tables (RLS on, no policies).
@@ -14,6 +15,13 @@ create table if not exists public.mail_boxes (
   marketing        boolean not null default false,     -- move marketing emails into the Marketing folder
   drafts           boolean not null default true,      -- write a reply for each email that needs one
   signature        text,                               -- added under replies sent from the app
+  highlight        boolean not null default true,      -- mark emails needing a reply in Outlook (category, and a flag if important)
+  categories_ready boolean not null default false,     -- the coloured Outlook categories have been made
+  style            text,                               -- how you write, learnt from your sent emails (yours to edit)
+  style_examples   jsonb,                              -- a few of your own emails, as examples of the style
+  style_from       int,                                -- how many sent emails it was learnt from
+  style_at         timestamptz,                        -- when (learnt again every 30 days, unless you've edited it)
+  style_edited     boolean not null default false,
   scan_before      timestamptz,                        -- first read: inbox emails older than this are still to read (null: done)
   sent_before      timestamptz,                        -- first read: sent emails older than this are still to read (null: done)
   scan_done_at     timestamptz,
@@ -113,11 +121,24 @@ create table if not exists public.mail_threads (
   draft            text,
   draft_for        timestamptz,                        -- the last_in_at the draft answers
   draft_error      text,
+  mark             text,                               -- what's marked in Outlook: urgent, high, reply (null: nothing)
+  mark_id          text,                               -- on which email
   done_at          timestamptz,
   updated_at       timestamptz not null default now(),
   unique (box_id, conversation_id)
 );
 create index if not exists mail_threads_state_idx on public.mail_threads (box_id, state, last_in_at desc);
+
+-- (For anyone who ran an earlier copy of this file.)
+alter table public.mail_boxes   add column if not exists highlight        boolean not null default true;
+alter table public.mail_boxes   add column if not exists categories_ready boolean not null default false;
+alter table public.mail_boxes   add column if not exists style            text;
+alter table public.mail_boxes   add column if not exists style_examples   jsonb;
+alter table public.mail_boxes   add column if not exists style_from       int;
+alter table public.mail_boxes   add column if not exists style_at         timestamptz;
+alter table public.mail_boxes   add column if not exists style_edited     boolean not null default false;
+alter table public.mail_threads add column if not exists mark             text;
+alter table public.mail_threads add column if not exists mark_id          text;
 
 alter table public.mail_boxes    enable row level security;
 alter table public.mail_rules    enable row level security;

@@ -9,6 +9,7 @@ import {
   isPersonalDomain,
   looksAutomated,
   looksLikeMarketing,
+  markFor,
   readyToFile,
   textToHtml,
   threadState,
@@ -101,5 +102,19 @@ describe('where a conversation stands', () => {
 describe('replies', () => {
   it('escapes and keeps paragraphs', () => {
     expect(textToHtml('Hi Jane,\n\nYes <ok> & thanks\nCallum')).toBe('<p>Hi Jane,</p><p>Yes &lt;ok&gt; &amp; thanks<br>Callum</p>');
+  });
+});
+
+describe('highlighting in Outlook', () => {
+  it('marks only conversations that need a reply, by importance', () => {
+    expect(markFor(true, 'reply', 'urgent')).toBe('urgent');
+    expect(markFor(true, 'reply', 'high')).toBe('high');
+    expect(markFor(true, 'reply', 'normal')).toBe('reply');
+    expect(markFor(true, 'reply', null)).toBe('reply');
+  });
+  it('takes the mark off once dealt with, or when highlighting is off', () => {
+    expect(markFor(true, 'replied', 'urgent')).toBeNull();
+    expect(markFor(true, 'done', 'high')).toBeNull();
+    expect(markFor(false, 'reply', 'urgent')).toBeNull();
   });
 });

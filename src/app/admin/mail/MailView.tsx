@@ -203,10 +203,11 @@ function Connect({ email, connected, onDone }: { email: string; connected: boole
         <h2>Connect {email}</h2>
         <p>The app reads your inbox every two minutes and:</p>
         <ul>
-          <li>shows the emails that need a reply from you, the most important first, each with a draft reply to check and send;</li>
-          <li>spots people asking about solar, batteries or heat pumps who aren’t in the CRM yet, so you can add them in one tap;</li>
+          <li>works out which emails need a reply from you and marks them in Outlook: “Urgent” (and flagged) or “Needs reply”, so they stand out on your phone too;</li>
+          <li>learns how you write from your sent emails, and drafts each reply in your style, for you to check and send;</li>
           <li>works out a folder for every company and customer (GoodWe, National Grid, Customers/Jane Smith);</li>
-          <li>once you turn filing on, moves each email into its folder after you’ve replied, and marketing into a Marketing folder.</li>
+          <li>once you turn filing on, moves each email into its folder after you’ve replied, and marketing into a Marketing folder, so your inbox only holds what still needs you;</li>
+          <li>spots people asking about a job who aren’t in the CRM yet, so you can add them in one tap.</li>
         </ul>
         <p className="crm-muted">
           Nothing is moved until you’ve checked the folders and turned filing on, and nothing is ever deleted. Only you see your email here.
@@ -379,7 +380,7 @@ function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: Threa
         {row.prospect && !row.enquiry_id && canCrm && (
           <section className="mx-card mx-crm">
             <h3>Not in the CRM yet</h3>
-            <p className="crm-muted">They look like a new customer. Add them so their emails go on their record and into their own folder.</p>
+            <p className="crm-muted">They look like a new customer. Add them so they’re followed up in the CRM, and their emails get their own folder.</p>
             <div className="mx-grid3">
               <label>
                 Name
@@ -646,7 +647,25 @@ function Folders() {
 /* ── Settings ────────────────────────────────────────────────────────────── */
 
 type BoxInfo = {
-  box: { address: string; filing: boolean; marketing: boolean; drafts: boolean; signature: string | null; scan_before: string | null; sent_before: string | null; scan_done_at: string | null; last_run_at: string | null; last_error: string | null };
+  box: {
+    address: string;
+    filing: boolean;
+    marketing: boolean;
+    drafts: boolean;
+    highlight: boolean;
+    categories_ready: boolean;
+    signature: string | null;
+    style: string | null;
+    style_examples: { to: string; text: string }[] | null;
+    style_from: number | null;
+    style_at: string | null;
+    style_edited: boolean;
+    scan_before: string | null;
+    sent_before: string | null;
+    scan_done_at: string | null;
+    last_run_at: string | null;
+    last_error: string | null;
+  };
   read: number;
   suggested: number;
 };
@@ -678,7 +697,12 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
     void load();
   }
 
-  const toggles: { k: 'drafts' | 'filing' | 'marketing'; title: string; body: string }[] = [
+  const toggles: { k: 'highlight' | 'drafts' | 'filing' | 'marketing'; title: string; body: string }[] = [
+    {
+      k: 'highlight',
+      title: 'Highlight in Outlook',
+      body: `Emails that need a reply get a “Needs reply” category in Outlook, urgent ones “Urgent” and a flag (important ones are flagged too), so they stand out in your inbox and on your phone. They come off once you’ve replied or said no reply needed. Your own categories and flags are left alone.${b.highlight && !b.categories_ready ? ' (The categories show grey until the app is allowed to colour them: see the CRM guide, My email.)' : ''}`,
+    },
     { k: 'drafts', title: 'Draft replies', body: 'Writes a reply for each email that needs one, for you to check, change and send. Nothing is ever sent without you pressing Send.' },
     {
       k: 'filing',
@@ -716,6 +740,7 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
           </button>
         </section>
       ))}
+      <StyleCard key={b.style_at ?? 'none'} box={b} busy={busy} onSave={(style) => set({ style }, 'style')} onLearnt={load} />
       <section className="mx-card">
         <h3>Signature</h3>
         <p className="crm-muted">Added under replies you send from here (Outlook doesn’t add its own to these).</p>
@@ -727,7 +752,7 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
       {msg && <p className="mx-ok">{msg}</p>}
       <section className="mx-card">
         <h3>Disconnect</h3>
-        <p className="crm-muted">The app stops reading your mailbox and forgets what it saved. Your Outlook, and every folder made, stays as it is.</p>
+        <p className="crm-muted">The app stops reading your mailbox and forgets what it saved. Your Outlook, and every folder made, stays as it is: turn Highlight in Outlook off first (and wait a few minutes) if you want its categories taken off.</p>
         <button
           type="button"
           className="crm-btn crm-btn--ghost crm-btn--small"
@@ -745,5 +770,71 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
         </button>
       </section>
     </div>
+  );
+}
+
+/** Your writing style: what the app learnt from your sent emails, which every draft follows. Yours to edit. */
+function StyleCard({ box, busy, onSave, onLearnt }: { box: BoxInfo['box']; busy: string; onSave: (style: string) => void; onLearnt: () => void }) {
+  const [text, setText] = useState(box.style ?? '');
+  const [learning, setLearning] = useState(false);
+  const [err, setErr] = useState('');
+  const [showEx, setShowEx] = useState(false);
+  const learnt = box.style_at && box.style
+    ? `Learnt from ${box.style_from ?? 'your'} sent emails on ${new Date(box.style_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${box.style_edited ? ', then edited by you (it won’t be re-learnt over your edits)' : ', and learnt again every 30 days'}.`
+    : box.sent_before
+      ? 'It’s learnt once your sent emails from the last six months have been read (part of the first read).'
+      : 'Not learnt yet: it happens on the next run, or tap Learn it now.';
+  return (
+    <section className="mx-card mx-style">
+      <h3>Your writing style</h3>
+      <p className="crm-muted">
+        Every draft is written the way you write: your greetings, sign-offs, length, tone and phrases, matched most closely to emails you’ve sent the same person before. {learnt}
+      </p>
+      <div className="mx-draftbox">
+        <textarea className="crm-input" rows={12} value={text} onChange={(e) => setText(e.target.value)} placeholder="How you write appears here once it’s been learnt." disabled={learning} />
+        {learning && <WritingSpark label="Learning your style" steps={['Reading your sent emails', 'Picking out your habits', 'Writing the guide', 'Choosing examples']} />}
+      </div>
+      {!!box.style_examples?.length && (
+        <>
+          <button type="button" className="crm-link" onClick={() => setShowEx(!showEx)} aria-expanded={showEx}>
+            {showEx ? 'Hide' : 'Show'} the {box.style_examples.length} example emails it copies
+          </button>
+          {showEx && (
+            <div className="mx-convo mx-examples">
+              {box.style_examples.map((e, i) => (
+                <article key={i} className="mx-msg is-out">
+                  <header>
+                    <b>To {e.to}</b>
+                  </header>
+                  <p>{e.text}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      {err && <p className="mx-err">{err}</p>}
+      <div className="mx-actions">
+        <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={!!busy || learning || text.trim() === (box.style ?? '').trim()} onClick={() => onSave(text)}>
+          {busy === 'style' ? 'Saving…' : 'Save my changes'}
+        </button>
+        <button
+          type="button"
+          className="crm-btn crm-btn--ghost crm-btn--small"
+          disabled={!!busy || learning || !!box.sent_before}
+          onClick={async () => {
+            if (box.style_edited && !window.confirm('Learn it again from your sent emails? This replaces your edits.')) return;
+            setLearning(true);
+            setErr('');
+            const r = await call('/api/mail/box/style', { method: 'POST' });
+            setLearning(false);
+            if (!r.ok) return setErr(String(r.data.error || 'Couldn’t learn it.'));
+            onLearnt();
+          }}
+        >
+          {learning ? 'Learning…' : box.style ? 'Learn it again' : 'Learn it now'}
+        </button>
+      </div>
+    </section>
   );
 }

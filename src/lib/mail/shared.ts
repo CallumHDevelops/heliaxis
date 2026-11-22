@@ -154,3 +154,9 @@ export function textToHtml(text: string): string {
     .map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`)
     .join('');
 }
+
+/** What their latest email shows in Outlook: urgent ("Urgent", flagged), high ("Needs reply", flagged), reply ("Needs reply"), or nothing. */
+export function markFor(highlight: boolean, state: string, priority: string | null): 'urgent' | 'high' | 'reply' | null {
+  if (!highlight || state !== 'reply') return null;
+  return priority === 'urgent' ? 'urgent' : priority === 'high' ? 'high' : 'reply';
+}
