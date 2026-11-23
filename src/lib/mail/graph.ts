@@ -1,6 +1,6 @@
 import 'server-only';
 import { graph, GraphError } from '@/lib/ms365';
-import { insertAtTop, type Header } from './shared';
+import { insertAtTop, pathPart, type Header } from './shared';
 
 /**
  * My email: the Microsoft Graph calls for one person's own mailbox (src/lib/mail/sync.ts). It uses the app's own
@@ -249,4 +249,34 @@ export async function completedInInbox(address: string): Promise<string[]> {
 /** Removes a draft (Outlook moves it to Deleted Items). Only ever used on the app's own, untouched drafts. */
 export async function deleteDraft(address: string, id: string): Promise<void> {
   await graph(`${box(address)}/messages/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: IMMUTABLE } });
+}
+
+/* ── Your own folders ─────────────────────────────────────────────────────── */
+
+/**
+ * The folders you already have, at the top of the mailbox and inside the Inbox, as paths ("Inbox/GoodWe", with a "/"
+ * in a folder's own name kept as NAME_SLASH), so Hestia files into yours rather than making her own alongside.
+ */
+export async function listFolders(address: string): Promise<{ path: string; name: string; id: string }[]> {
+  const q = new URLSearchParams({ $select: 'id,displayName', $top: '250' });
+  const [top, inbox] = await Promise.all([
+    graph<{ value: { id: string; displayName: string }[] }>(`${box(address)}/mailFolders?${q}`, { headers: { Prefer: IMMUTABLE } }),
+    graph<{ value: { id: string; displayName: string }[] }>(`${box(address)}/mailFolders/inbox/childFolders?${q}`, { headers: { Prefer: IMMUTABLE } }),
+  ]);
+  return [
+    ...(top.value ?? []).map((f) => ({ path: pathPart(f.displayName), name: f.displayName, id: f.id })),
+    ...(inbox.value ?? []).map((f) => ({ path: `Inbox/${pathPart(f.displayName)}`, name: f.displayName, id: f.id })),
+  ];
+}
+
+/** Removes a folder only if it's completely empty (no emails, no folders inside). True if it went. */
+export async function deleteFolderIfEmpty(address: string, id: string): Promise<boolean> {
+  try {
+    const f = await graph<{ totalItemCount?: number; childFolderCount?: number }>(`${box(address)}/mailFolders/${encodeURIComponent(id)}?$select=totalItemCount,childFolderCount`, { headers: { Prefer: IMMUTABLE } });
+    if ((f.totalItemCount ?? 1) !== 0 || (f.childFolderCount ?? 1) !== 0) return false;
+    await graph(`${box(address)}/mailFolders/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Prefer: IMMUTABLE } });
+    return true;
+  } catch {
+    return false;
+  }
 }

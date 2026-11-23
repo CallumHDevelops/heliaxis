@@ -504,15 +504,16 @@ needs you** panel are an extra view.
   Drafts use only what's in the email and the CRM. Anything it doesn't know is left in [square brackets],
   and Send asks you to fill those in first. In the app: **Send**; **Update the Outlook draft** with your
   edits; **Rewrite** with a steer ("say yes to Thursday at 10"); **No reply needed**.
-- **No reply needed** (on each email in To reply, or inside one) takes the conversation out of your Inbox at once: to
-  its folder if it has one (a customer's Customers › Name (HX-…), or a company's folder, approved or still
-  suggested), otherwise to **Deleted Items** (Outlook keeps it there, so it can be got back). A bar says where it
-  went, with **Undo** (puts it back in the Inbox and on To reply). An email you've already moved yourself is left
-  alone.
+- **No reply needed** (on each email in To reply, or inside one) stores the conversation out of your Inbox at once,
+  never deleting it: in its folder (a customer's Customers › Name (HX-…), or a company's), Marketing for marketing,
+  otherwise **Inbox › Filed**. **Delete** is its own button, for when you mean it: to Deleted Items (Outlook keeps
+  it there). A bar says where it went, with **Undo** (back to the Inbox and To reply). An email you've already
+  moved yourself is left alone.
 - **Waiting on them**: you sent the last email 3+ days ago and nothing's come back. **New people**:
   someone asking about a job who isn't in the CRM; **Add to the CRM** in one tap.
-- **Folders**: everyone at a company by its domain (goodwe.com → Suppliers/GoodWe, nationalgrid.co.uk →
-  Grid and DNO/National Grid), customers by their own address (Customers/Jane Smith). CRM customers,
+- **Folders**: everyone at a company by its domain, customers by their own address (Inbox › Customers › Name
+  (HX-…)). Your own folders are used where they fit (goodwe.com → your Inbox › GoodWe, a bank → your Finance / Bank);
+  otherwise a folder is made inside your Inbox. Folders the app made and no longer uses are removed once empty. CRM customers,
   contacts and organisations are approved straight away; other companies are named by the assistant and
   wait for you to check them (**Approve all**). Rename any folder; a / makes a folder inside a folder.
 - **Filing everyone else** (off until you turn it on in Settings): once you've replied, or there's nothing to reply

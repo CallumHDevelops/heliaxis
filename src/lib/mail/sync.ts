@@ -2,14 +2,12 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
 import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
-import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, moveToDeleted, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
+import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, deleteFolderIfEmpty, listFolders, moveToDeleted, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
 import {
   addressOf,
   companyDomain,
   domainFromText,
   domainOf,
-  folderFor,
-  groupForOrgType,
   guessLabel,
   isPersonalDomain,
   looksAutomated,
@@ -19,6 +17,9 @@ import {
   readyToFile,
   customerFolder,
   clearAwayTo,
+  FILED_FOLDER,
+  companyFolder,
+  matchExisting,
   textToHtml,
   cidsIn,
   pickFont,
@@ -117,6 +118,8 @@ export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult
   const started = new Date().toISOString();
   try {
     const ctx = await Context.load(db, box);
+    // Folders from before they lived inside the Inbox (and before your own were used): brought up to date.
+    await tidyRules(ctx).catch(() => null);
     res.read = await readMail(ctx, until);
     if (Date.now() < until) res.named = await nameNewCompanies(ctx);
     if (Date.now() < until) res.triaged = await triage(ctx, until);
@@ -144,6 +147,10 @@ export class Context {
   byId = new Map<string, Rule>();
   orgByDomain = new Map<string, Org>();
   folders = new Map<string, string>();
+  /** Your own folders (top of the mailbox and inside the Inbox), to file into instead of making new ones. */
+  existing: { path: string; name: string; id: string }[] = [];
+  /** Paths of yours that the app didn't make: never saved as the app's, never removed. */
+  yours = new Set<string>();
   ownDomain: string;
   owner = '';
   private crmCache = new Map<string, Rule | null>();
@@ -171,8 +178,20 @@ export class Context {
       }
     }
     for (const f of folders ?? []) c.folders.set(f.path as string, f.graph_id as string);
+    c.existing = await listFolders(box.address).catch(() => []);
+    for (const f of c.existing) {
+      if (!c.folders.has(f.path)) {
+        c.folders.set(f.path, f.id);
+        c.yours.add(f.path);
+      }
+    }
     c.owner = String(me?.full_name || me?.email || '').split(/[\s@]/)[0] || 'Callum';
     return c;
+  }
+
+  /** A company's or person's folder: yours if you have one by that name, else a new one inside the Inbox. */
+  folderFor(name: string): string {
+    return matchExisting(name, this.existing) ?? companyFolder(name);
   }
 
   remember(r: Rule) {
@@ -213,20 +232,20 @@ export class Context {
       const orgId = con[0].organisation_id as string | null;
       const { data: org } = orgId ? await db.from('organisations').select('id, name, type').eq('id', orgId).maybeSingle() : { data: null };
       if (org && !personal) {
-        return this.insert({ kind: 'domain', match: dom, label: org.name as string, folder: folderFor(groupForOrgType(org.type as string), org.name as string), status: 'on', source: 'crm', named: true, organisation_id: org.id as string });
+        return this.insert({ kind: 'domain', match: dom, label: org.name as string, folder: this.folderFor(org.name as string), status: 'on', source: 'crm', named: true, organisation_id: org.id as string });
       }
       const label = String(con[0].name || name || a);
-      return this.insert({ kind: 'address', match: a, label, folder: folderFor(org ? groupForOrgType(org.type as string) : 'Other', org ? (org.name as string) : label), status: 'on', source: 'crm', named: true, contact_id: con[0].id as string, organisation_id: org?.id ?? null });
+      return this.insert({ kind: 'address', match: a, label, folder: this.folderFor(org ? (org.name as string) : label), status: 'on', source: 'crm', named: true, contact_id: con[0].id as string, organisation_id: org?.id ?? null });
     }
     if (personal) return null;
     // An organisation in the CRM with this domain.
     const org = this.orgByDomain.get(dom);
-    if (org) return this.insert({ kind: 'domain', match: dom, label: org.name, folder: folderFor(groupForOrgType(org.type), org.name), status: 'on', source: 'crm', named: true, organisation_id: org.id });
+    if (org) return this.insert({ kind: 'domain', match: dom, label: org.name, folder: this.folderFor(org.name), status: 'on', source: 'crm', named: true, organisation_id: org.id });
     // The team.
-    if (dom === this.ownDomain) return this.insert({ kind: 'domain', match: dom, label: 'Heliaxis team', folder: 'Team', status: 'suggested', source: 'scan', named: true });
+    if (dom === this.ownDomain) return this.insert({ kind: 'domain', match: dom, label: 'Heliaxis team', folder: this.folderFor('Team'), status: 'suggested', source: 'scan', named: true });
     // A company we don't know yet: suggested, to be named and approved.
     const label = guessLabel(dom);
-    return this.insert({ kind: 'domain', match: dom, label, folder: folderFor('Other', label), status: 'suggested', source: 'scan', named: false });
+    return this.insert({ kind: 'domain', match: dom, label, folder: this.folderFor(label), status: 'suggested', source: 'scan', named: false });
   }
 
   private async insert(r: Partial<Rule> & { kind: Rule['kind']; match: string; label: string; folder: string; status: Rule['status']; source: string; named: boolean }): Promise<Rule> {
@@ -434,11 +453,12 @@ export async function noteThreadOnCrm(db: Db, box: Pick<Box, 'id' | 'address'>, 
 }
 
 /**
- * "No reply needed": the conversation's emails still in the Inbox go to their folder if they have one (Inbox ›
- * Customers › Name (HX-…), Suppliers › GoodWe…), otherwise to Deleted Items. Emails you've already moved
+ * "No reply needed": the conversation's emails still in the Inbox are stored, never deleted: in their folder (Inbox ›
+ * Customers › Name (HX-…), a company's), Marketing, or Inbox › Filed. With { delete: true } ("Delete"), to Deleted
+ * Items instead. Your own folders are used as they are (they're known with their ids). Emails you've already moved
  * yourself are left where they are. Undo with putBack().
  */
-export async function clearAway(db: Db, box: Pick<Box, 'id' | 'address'>, conversationId: string): Promise<{ filed: number; deleted: number; folder: string | null }> {
+export async function clearAway(db: Db, box: Pick<Box, 'id' | 'address'>, conversationId: string, o: { delete?: boolean } = {}): Promise<{ filed: number; deleted: number; folder: string | null }> {
   const { data: msgs } = await db
     .from('mail_messages')
     .select('id, graph_id, rule:mail_rules(folder, status, action)')
@@ -451,7 +471,14 @@ export async function clearAway(db: Db, box: Pick<Box, 'id' | 'address'>, conver
   if (!list.length) return out;
   const { data: saved } = await db.from('mail_folders').select('path, graph_id').eq('box_id', box.id);
   const known = new Map((saved ?? []).map((f) => [f.path as string, f.graph_id as string]));
-  const before = known.size;
+  const yours = new Set<string>();
+  for (const f of await listFolders(box.address).catch(() => [])) {
+    if (!known.has(f.path)) {
+      known.set(f.path, f.id);
+      yours.add(f.path);
+    }
+  }
+  const before = new Set(known.keys());
   const inbox = await inboxId(box.address);
   const now = new Date().toISOString();
   for (const m of list) {
@@ -460,25 +487,25 @@ export async function clearAway(db: Db, box: Pick<Box, 'id' | 'address'>, conver
         await db.from('mail_messages').update({ place: 'elsewhere' }).eq('id', m.id);
         continue;
       }
-      const folder = clearAwayTo(m.rule);
-      if (folder) {
+      if (o.delete) {
+        await moveToDeleted(box.address, m.graph_id as string);
+        await db.from('mail_messages').update({ place: 'deleted', filed_at: now, file_error: null }).eq('id', m.id);
+        out.deleted++;
+      } else {
+        // Stored, never deleted: its folder, Marketing, or Inbox › Filed.
+        const folder = clearAwayTo(m.rule);
         await moveMessage(box.address, m.graph_id as string, await ensureFolder(box.address, folder, known));
         await db.from('mail_messages').update({ place: 'filed', filed_at: now, file_error: null }).eq('id', m.id);
         out.filed++;
         out.folder = folder;
-      } else {
-        await moveToDeleted(box.address, m.graph_id as string);
-        await db.from('mail_messages').update({ place: 'deleted', filed_at: now, file_error: null }).eq('id', m.id);
-        out.deleted++;
       }
     } catch (e) {
       await db.from('mail_messages').update({ file_error: (e instanceof Error ? e.message : 'failed').slice(0, 300) }).eq('id', m.id);
     }
   }
-  if (known.size !== before) {
-    const rows = [...known].map(([path, graph_id]) => ({ box_id: box.id, path, graph_id }));
-    await db.from('mail_folders').upsert(rows, { onConflict: 'box_id,path', ignoreDuplicates: true });
-  }
+  // Folders the app just made (not yours) are remembered as the app's.
+  const made = [...known].filter(([path]) => !before.has(path) && !yours.has(path)).map(([path, graph_id]) => ({ box_id: box.id, path, graph_id }));
+  if (made.length) await db.from('mail_folders').upsert(made, { onConflict: 'box_id,path', ignoreDuplicates: true });
   return out;
 }
 
@@ -603,6 +630,77 @@ async function refreshThreads(ctx: Context) {
   }
 }
 
+/* ── Keeping the folders tidy ───────────────────────────────────────────── */
+
+/**
+ * Brings older rules into line, then moves anything already filed under an old folder:
+ *  - customers: Inbox › Customers › "Name (HX-0069)";
+ *  - companies and contacts in the CRM (and any you approved): your own folder by that name, else one inside the Inbox;
+ *  - Hestia's own suggestions outside the Inbox: named again, now seeing your folders (so GoodWe goes to yours).
+ * Then removes folders the app made that nothing uses any more, once they're empty. Rules you've edited are left alone.
+ */
+async function tidyRules(ctx: Context): Promise<void> {
+  const { db, box } = ctx;
+  const yoursTop = new Set(ctx.existing.map((f) => f.path));
+  const old = [...ctx.byId.values()].filter((r) => r.action === 'file' && !r.folder.startsWith('Inbox/') && !yoursTop.has(r.folder));
+  const customers = [...ctx.byId.values()].filter((r) => r.enquiry_id && !r.folder.startsWith('Inbox/Customers/'));
+  if (!old.length && !customers.length) return cleanFolders(ctx);
+  const { data: src } = await db.from('mail_rules').select('id, source').eq('box_id', box.id).in('id', [...new Set([...old, ...customers].map((r) => r.id))]);
+  const source = new Map((src ?? []).map((r) => [r.id as string, r.source as string]));
+  const refs = new Map<string, string | null>();
+  const ids = [...new Set(customers.map((r) => r.enquiry_id!))];
+  if (ids.length) {
+    const { data } = await db.from('enquiries').select('id, customer_ref').in('id', ids);
+    for (const e of data ?? []) refs.set(e.id as string, (e.customer_ref as string | null) ?? null);
+  }
+  const moved = new Map<string, string>(); // rule id → its new folder
+  for (const r of [...customers, ...old]) {
+    if (moved.has(r.id) || source.get(r.id) === 'you') continue;
+    if (r.enquiry_id) moved.set(r.id, customerFolder(r.label, refs.get(r.enquiry_id) ?? null));
+    else if (r.status === 'suggested' && source.get(r.id) === 'scan') {
+      // Hestia's suggestion: she names it again with your folders in view.
+      await db.from('mail_rules').update({ named: false, updated_at: new Date().toISOString() }).eq('id', r.id);
+    } else moved.set(r.id, ctx.folderFor(r.label));
+  }
+  for (const [id, folder] of moved) {
+    if (ctx.byId.get(id)?.folder === folder) {
+      moved.delete(id);
+      continue;
+    }
+    await db.from('mail_rules').update({ folder, updated_at: new Date().toISOString() }).eq('id', id);
+    const r = ctx.byId.get(id);
+    if (r) r.folder = folder;
+  }
+  // Emails already filed under the old folder follow their rule.
+  if (moved.size) {
+    const { data: filed } = await db.from('mail_messages').select('id, graph_id, rule_id').eq('box_id', box.id).eq('place', 'filed').in('rule_id', [...moved.keys()]).limit(100);
+    for (const m of filed ?? []) {
+      try {
+        await moveMessage(box.address, m.graph_id as string, await ensureFolder(box.address, moved.get(m.rule_id as string)!, ctx.folders));
+      } catch (e) {
+        await db.from('mail_messages').update({ file_error: (e instanceof Error ? e.message : 'failed').slice(0, 300) }).eq('id', m.id);
+      }
+    }
+    await saveFolders(ctx);
+  }
+  await cleanFolders(ctx);
+}
+
+/** Folders the app made that no rule uses any more: removed once empty (the deepest first). Never yours. */
+async function cleanFolders(ctx: Context): Promise<void> {
+  const { db, box } = ctx;
+  const { data: made } = await db.from('mail_folders').select('path, graph_id').eq('box_id', box.id);
+  const inUse = [...ctx.byId.values()].map((r) => r.folder);
+  const keep = (path: string) => path === MARKETING_FOLDER || path === FILED_FOLDER || inUse.some((f) => f === path || f.startsWith(`${path}/`));
+  const unused = (made ?? []).filter((f) => !keep(f.path as string)).sort((a, b) => String(b.path).split('/').length - String(a.path).split('/').length);
+  for (const f of unused.slice(0, 10)) {
+    if (await deleteFolderIfEmpty(box.address, f.graph_id as string)) {
+      await db.from('mail_folders').delete().eq('box_id', box.id).eq('path', f.path);
+      ctx.folders.delete(f.path as string);
+    }
+  }
+}
+
 /* ── 2. Naming the companies ─────────────────────────────────────────────── */
 
 async function nameNewCompanies(ctx: Context): Promise<number> {
@@ -618,14 +716,14 @@ async function nameNewCompanies(ctx: Context): Promise<number> {
       subjects: [...new Set((msgs ?? []).map((m) => String(m.subject || '')).filter(Boolean))],
     });
   }
-  const named = await nameDomains(samples);
+  const named = await nameDomains(samples, ctx.existing.map((f) => f.name));
   if (!named.length) return 0;
   let n = 0;
   for (const r of rules) {
     const hit = named.find((x) => x.domain.toLowerCase() === String(r.match));
     if (!hit) {
       // Left out of the answer: keep the tidied domain as its name rather than ask again every run.
-      await db.from('mail_rules').update({ named: true }).eq('id', r.id).eq('named', false);
+      await db.from('mail_rules').update({ named: true, folder: ctx.folderFor(guessLabel(r.match as string)) }).eq('id', r.id).eq('named', false);
       continue;
     }
     const marketingOnly = hit.marketing_only;
@@ -633,7 +731,10 @@ async function nameNewCompanies(ctx: Context): Promise<number> {
       .from('mail_rules')
       .update({
         label: hit.name || guessLabel(r.match as string),
-        folder: marketingOnly ? MARKETING_FOLDER : folderFor(hit.group, hit.name || guessLabel(r.match as string)),
+        // One of your folders if Hestia says it belongs there (its own, or one like "Finance / Bank"), else by name.
+        folder: marketingOnly
+          ? MARKETING_FOLDER
+          : ((hit.existing_folder && ctx.existing.find((f) => f.name === hit.existing_folder)?.path) ?? ctx.folderFor(hit.name || guessLabel(r.match as string))),
         action: marketingOnly ? 'marketing' : 'file',
         named: true,
         updated_at: new Date().toISOString(),
@@ -1145,7 +1246,7 @@ async function fileMail(ctx: Context, until: number): Promise<{ filed: number; m
 }
 
 async function saveFolders(ctx: Context) {
-  const rows = [...ctx.folders].map(([path, graph_id]) => ({ box_id: ctx.box.id, path, graph_id }));
+  const rows = [...ctx.folders].filter(([path]) => !ctx.yours.has(path)).map(([path, graph_id]) => ({ box_id: ctx.box.id, path, graph_id }));
   if (rows.length) await ctx.db.from('mail_folders').upsert(rows, { onConflict: 'box_id,path', ignoreDuplicates: true });
 }
 

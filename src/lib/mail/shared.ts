@@ -347,10 +347,40 @@ export function withSignOff(text: string, signOff: string): string {
   return `${text.trim()}\n\n${want}`;
 }
 
+/** Where "No reply needed" stores an email that has no folder of its own: Inbox › Filed. */
+export const FILED_FOLDER = 'Inbox/Filed';
+
 /**
- * Where "No reply needed" sends a conversation: its folder (a customer's own, or any approved or suggested folder),
- * or null for Deleted Items (no folder, marketing, or a folder you've turned off).
+ * Where "No reply needed" stores a conversation. It's always kept, never deleted (Delete is its own button): a
+ * customer's or company's folder (approved or suggested), Marketing for marketing, otherwise Inbox › Filed.
  */
-export function clearAwayTo(rule: { folder: string; status: string; action: string } | null | undefined): string | null {
-  return rule && rule.action === 'file' && rule.status !== 'off' ? rule.folder : null;
+export function clearAwayTo(rule: { folder: string; status: string; action: string } | null | undefined): string {
+  if (rule?.action === 'marketing') return MARKETING_FOLDER;
+  if (rule && rule.action === 'file' && rule.status !== 'off' && rule.folder) return rule.folder;
+  return FILED_FOLDER;
+}
+
+/* ── Your own folders ─────────────────────────────────────────────────────── */
+
+/**
+ * A "/" inside a folder's own name ("Finance / Bank") is kept as this lookalike in a path, so the path's "/" still
+ * only separates levels. Shown as "/" again on screen (prettyFolder).
+ */
+export const NAME_SLASH = '∕';
+export const pathPart = (name: string) => name.replace(/\//g, NAME_SLASH);
+
+/** A company's folder when you don't already have one: inside the Inbox, as yours are (Inbox › GoodWe). */
+export const companyFolder = (name: string) => `Inbox/${cleanFolderPart(name)}`;
+
+/** "Inbox/Customers/Sarah Davies (HX-0069)" → "Customers › Sarah Davies (HX-0069)"; "Inbox/Finance ∕ Bank" → "Finance / Bank". */
+export const prettyFolder = (folder: string) => folder.replace(/^Inbox\//, '').split('/').join(' › ').replaceAll(NAME_SLASH, '/');
+
+const squashName = (s: string) => s.toLowerCase().replaceAll(NAME_SLASH, '/').replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
+
+/** Your existing folder with this name (GoodWe → Inbox/GoodWe; "Lovell and Co" → Inbox/Lovell & Co.), or null. */
+export function matchExisting(name: string, existing: { path: string; name: string }[]): string | null {
+  const want = squashName(name);
+  if (!want) return null;
+  const hit = existing.find((f) => squashName(f.name) === want);
+  return hit ? hit.path : null;
 }

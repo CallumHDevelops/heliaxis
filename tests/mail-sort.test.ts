@@ -12,6 +12,10 @@ import {
   markFor,
   customerFolder,
   clearAwayTo,
+  companyFolder,
+  matchExisting,
+  pathPart,
+  prettyFolder,
   withSignOff,
   cidsIn,
   cleanSignature,
@@ -196,11 +200,34 @@ describe('customer folders', () => {
 });
 
 describe('No reply needed', () => {
-  it('goes to its folder, or Deleted Items when there isn’t one', () => {
+  it('always stores it: its folder, Marketing, or Inbox › Filed; never deletes', () => {
     expect(clearAwayTo({ folder: 'Inbox/Customers/Sarah Davies (HX-0069)', status: 'on', action: 'file' })).toBe('Inbox/Customers/Sarah Davies (HX-0069)');
-    expect(clearAwayTo({ folder: 'Suppliers/GoodWe', status: 'suggested', action: 'file' })).toBe('Suppliers/GoodWe');
-    expect(clearAwayTo({ folder: 'Suppliers/GoodWe', status: 'off', action: 'file' })).toBeNull();
-    expect(clearAwayTo({ folder: 'Marketing', status: 'on', action: 'marketing' })).toBeNull();
-    expect(clearAwayTo(null)).toBeNull();
+    expect(clearAwayTo({ folder: 'Inbox/GoodWe', status: 'suggested', action: 'file' })).toBe('Inbox/GoodWe');
+    expect(clearAwayTo({ folder: 'Inbox/GoodWe', status: 'off', action: 'file' })).toBe('Inbox/Filed');
+    expect(clearAwayTo({ folder: 'Marketing', status: 'on', action: 'marketing' })).toBe('Marketing');
+    expect(clearAwayTo(null)).toBe('Inbox/Filed');
+  });
+});
+
+describe('your own folders', () => {
+  const existing = [
+    { path: 'Inbox/GoodWe', name: 'GoodWe' },
+    { path: `Inbox/${pathPart('Finance / Bank')}`, name: 'Finance / Bank' },
+    { path: 'Inbox/Lovell & Co.', name: 'Lovell & Co.' },
+    { path: 'READ Inbox', name: 'READ Inbox' },
+  ];
+  it('reuses a folder you already have', () => {
+    expect(matchExisting('Goodwe', existing)).toBe('Inbox/GoodWe');
+    expect(matchExisting('Lovell and Co', existing)).toBe('Inbox/Lovell & Co.');
+    expect(matchExisting('Finance/Bank', existing)).toBe('Inbox/Finance ∕ Bank');
+    expect(matchExisting('National Grid', existing)).toBeNull();
+  });
+  it('otherwise makes one inside the Inbox, as yours are', () => {
+    expect(companyFolder('National Grid')).toBe('Inbox/National Grid');
+  });
+  it('shows paths the way Outlook does', () => {
+    expect(prettyFolder('Inbox/Customers/Sarah Davies (HX-0069)')).toBe('Customers › Sarah Davies (HX-0069)');
+    expect(prettyFolder(`Inbox/${pathPart('Finance / Bank')}`)).toBe('Finance / Bank');
+    expect(prettyFolder('Marketing')).toBe('Marketing');
   });
 });

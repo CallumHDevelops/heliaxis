@@ -71,6 +71,7 @@ const Naming = z.object({
       name: z.string().max(60),
       group: z.enum(GROUPS),
       marketing_only: z.boolean(),
+      existing_folder: z.string(),
     })
   ),
 });
@@ -89,11 +90,15 @@ the names people sign with and a few subject lines. Return:
   Companies House, payroll), Software and services (apps, websites, phone, IT, design tools, OpenSolar), Team (Heliaxis
   staff), Other.
 - marketing_only: true when everything from this domain looks like newsletters, offers or adverts, never a person writing.
+- existing_folder: Callum already has folders (listed in <folders>). If one of them is clearly where this company's
+  emails belong (its own folder, e.g. "GoodWe" for goodwe.com, or a group folder Callum uses, e.g. "Finance / Bank"
+  for a bank or "IT / Microsoft" for a software company), give that folder's name exactly as listed. Otherwise "".
+  Never put a company into a folder that's another company's own.
 ${UNTRUSTED}`;
 
 export type DomainSample = { domain: string; names: string[]; subjects: string[] };
 
-export async function nameDomains(samples: DomainSample[]) {
+export async function nameDomains(samples: DomainSample[], folders: string[] = []) {
   if (!samples.length) return [];
   const body = samples
     .map(
@@ -107,7 +112,8 @@ export async function nameDomains(samples: DomainSample[]) {
           .join('\n')}\n</company>`
     )
     .join('\n');
-  const out = await ask('mail_triage', Naming, NAMING_SYSTEM, `${body}\n\nName every company above.`, 'low');
+  const list = folders.length ? `<folders>\n${folders.slice(0, 250).map((f) => `<folder>${esc(f.slice(0, 80))}</folder>`).join('\n')}\n</folders>\n` : '<folders>none</folders>\n';
+  const out = await ask('mail_triage', Naming, NAMING_SYSTEM, `${list}${body}\n\nName every company above.`, 'low');
   return out?.companies ?? [];
 }
 

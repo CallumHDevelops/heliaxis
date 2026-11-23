@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { BrandIcon, Sheet } from '../crm/CrmUi';
 import { WritingSpark } from '../sales/quotes/[id]/WritingSpark';
 import type { MailCounts, ThreadRow } from '@/lib/mail/server';
-import { clearAwayTo } from '@/lib/mail/shared';
+import { clearAwayTo, prettyFolder } from '@/lib/mail/shared';
 
 type Cleared = { filed: number; deleted: number; folder: string | null };
 import '../crm/crm.css';
@@ -102,10 +102,10 @@ export function MailView(p: {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 8000);
   }
-  async function quickDone(row: ThreadRow) {
+  async function quickDone(row: ThreadRow, how: 'done' | 'delete' = 'done') {
     // Off the list at once; back if it didn't work.
     setRows((rs) => rs.filter((r) => r.id !== row.id));
-    const r = await call(`/api/mail/threads/${row.id}`, { method: 'POST', body: JSON.stringify({ action: 'done' }) });
+    const r = await call(`/api/mail/threads/${row.id}`, { method: 'POST', body: JSON.stringify({ action: how }) });
     if (!r.ok) {
       setRows((rs) => [row, ...rs]);
       setToast({ id: row.id, text: String(r.data.error || 'That didn’t work. Try again.'), busy: false });
@@ -220,7 +220,7 @@ export function MailView(p: {
 }
 
 /** "Inbox/Customers/Sarah Davies (HX-0069)" → "Customers › Sarah Davies (HX-0069)". */
-const pretty = (folder: string) => folder.replace(/^Inbox\//, '').split('/').join(' › ');
+const pretty = prettyFolder;
 
 function Head({ counts }: { counts?: MailCounts | null }) {
   return (
@@ -301,7 +301,7 @@ const HINT: Record<string, string> = {
   marketing: 'Newsletters and offers, moved to your Marketing folder. If one isn’t marketing, open it and say so: it comes back to your inbox.',
 };
 
-function ThreadList({ tab, rows, loading, now, onOpen, onDone }: { tab: Tab; rows: ThreadRow[]; loading: boolean; now: number; onOpen: (r: ThreadRow) => void; onDone: (r: ThreadRow) => void }) {
+function ThreadList({ tab, rows, loading, now, onOpen, onDone }: { tab: Tab; rows: ThreadRow[]; loading: boolean; now: number; onOpen: (r: ThreadRow) => void; onDone: (r: ThreadRow, how: 'done' | 'delete') => void }) {
   if (loading && !rows.length) return <p className="crm-muted mx-pad">Loading…</p>;
   return (
     <>
@@ -341,14 +341,14 @@ function ThreadList({ tab, rows, loading, now, onOpen, onDone }: { tab: Tab; row
                   </span>
                 </button>
                 {tab === 'reply' && (
-                  <button
-                    type="button"
-                    className="crm-btn crm-btn--ghost crm-btn--small mx-quick"
-                    onClick={() => onDone(r)}
-                    title={clearAwayTo(r.rule) ? `Moves to ${pretty(clearAwayTo(r.rule)!)}` : 'Moves to Deleted Items'}
-                  >
-                    No reply needed
-                  </button>
+                  <span className="mx-quick">
+                    <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" onClick={() => onDone(r, 'done')} title={`Stores it in ${pretty(clearAwayTo(r.rule))}`}>
+                      No reply needed
+                    </button>
+                    <button type="button" className="crm-btn crm-btn--ghost crm-btn--small mx-del" onClick={() => onDone(r, 'delete')} title="Moves it to Deleted Items">
+                      Delete
+                    </button>
+                  </span>
                 )}
               </li>
             );
@@ -386,7 +386,7 @@ function ThreadSheet({
   const [text, setText] = useState(row.draft ?? '');
   const [steer, setSteer] = useState('');
   const [all, setAll] = useState(false);
-  const [busy, setBusy] = useState<'' | 'send' | 'outlook' | 'redraft' | 'done' | 'undone' | 'crm' | 'notMarketing'>('');
+  const [busy, setBusy] = useState<'' | 'send' | 'outlook' | 'redraft' | 'done' | 'delete' | 'undone' | 'crm' | 'notMarketing'>('');
   const [err, setErr] = useState('');
   const [note, setNote] = useState('');
   const [gaps, setGaps] = useState(false);
@@ -611,12 +611,24 @@ function ThreadSheet({
                   const d = await act('done');
                   if (d) onCleared(d as Cleared);
                 }}
-                title={clearAwayTo(row.rule) ? `Moves to ${pretty(clearAwayTo(row.rule)!)}` : 'Moves to Deleted Items'}
+                title={`Stores it in ${pretty(clearAwayTo(row.rule))}`}
               >
-                {busy === 'done' ? 'Moving…' : 'No reply needed'}
+                {busy === 'done' ? 'Storing…' : 'No reply needed'}
+              </button>
+              <button
+                type="button"
+                className="crm-btn crm-btn--ghost crm-btn--small mx-del"
+                disabled={!!busy}
+                onClick={async () => {
+                  const d = await act('delete');
+                  if (d) onCleared(d as Cleared);
+                }}
+                title="Moves it to Deleted Items"
+              >
+                {busy === 'delete' ? 'Deleting…' : 'Delete'}
               </button>
             </div>
-            <p className="crm-muted crm-small mx-dest">No reply needed moves it to {clearAwayTo(row.rule) ? pretty(clearAwayTo(row.rule)!) : 'Deleted Items'}.</p>
+            <p className="crm-muted crm-small mx-dest">No reply needed stores it in {pretty(clearAwayTo(row.rule))}. Delete moves it to Deleted Items.</p>
           </section>
         ) : (
           <div className="mx-actions">
@@ -684,7 +696,7 @@ function Folders() {
   return (
     <div className="mx-folders">
       <p className="crm-muted mx-hint">
-        Every company is matched by its email domain (everyone at goodwe.com goes to GoodWe), and customers by their own address. Customers, contacts and organisations already in the CRM are on straight away; the rest are suggestions to check. Use a / for a folder inside a folder: “Suppliers/GoodWe”. Nothing moves until filing is on in Settings.
+        Every company is matched by its email domain (everyone at goodwe.com goes to GoodWe), and customers by their own address, into Inbox › Customers › “Name (HX-number)”. Your own folders are used where they fit (GoodWe goes to your Inbox › GoodWe, a bank to your Finance / Bank); otherwise a folder is made inside your Inbox. Use a / for a folder inside a folder: “Inbox/Suppliers/GoodWe”.
       </p>
       {suggested.length > 0 && (
         <div className="mx-banner">

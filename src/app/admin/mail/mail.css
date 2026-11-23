@@ -464,7 +464,12 @@
 }
 .mx-quick {
   flex: none;
+  display: flex;
+  gap: 0.4rem;
   margin-right: 0.8rem;
+}
+.crm-btn.mx-del {
+  color: var(--danger);
 }
 .mx-dest {
   margin: 0.4rem 0 0;

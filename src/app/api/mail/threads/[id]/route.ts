@@ -105,11 +105,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await s.db.from('mail_threads').update({ done_at: doneAt, state, ...(action === 'undone' ? { needs_reply: true } : {}), updated_at: now }).eq('id', t.id);
     if (action === 'done') {
       await dropOutlookDraft(s.db, box.address, t.id as string).catch(() => null);
-      // No reply needed: out of the Inbox now, to its folder if it has one, otherwise to Deleted Items.
+      // No reply needed: stored out of the Inbox now (its folder, Marketing, or Inbox › Filed). Never deleted.
       const away = await clearAway(s.db, box, t.conversation_id as string).catch(() => ({ filed: 0, deleted: 0, folder: null }));
       return json({ ok: true, state, ...away });
     }
     return json({ ok: true, state });
+  }
+
+  // Delete: only when you choose it. To Deleted Items (Outlook keeps it there), and off To reply.
+  if (action === 'delete') {
+    await dropOutlookDraft(s.db, box.address, t.id as string).catch(() => null);
+    const state = threadState({ marketing: !!t.marketing, lastInAt: t.last_in_at as string | null, lastOutAt: t.last_out_at as string | null, doneAt: now, triagedFor: (t.triaged_for as string | null) ?? null, needsReply: (t.needs_reply as boolean | null) ?? null });
+    await s.db.from('mail_threads').update({ done_at: now, state, updated_at: now }).eq('id', t.id);
+    const away = await clearAway(s.db, box, t.conversation_id as string, { delete: true }).catch(() => ({ filed: 0, deleted: 0, folder: null }));
+    return json({ ok: true, state, ...away });
   }
 
   // Undo "No reply needed": back in the Inbox, and back on To reply.
