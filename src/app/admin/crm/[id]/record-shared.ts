@@ -138,7 +138,7 @@ export type WaInfo = {
 };
 
 export type OtherJob = { id: string; title: string; stage: string; products: string[]; created_at: string; project_ref: string | null };
-export type Duplicate = { enquiry_id: string; name: string; project_ref: string | null; project_id: string | null; why?: 'email' | 'number' | 'booking' };
+export type Duplicate = { enquiry_id: string; name: string; project_ref: string | null; project_id: string | null; why?: 'email' | 'number' | 'name' | 'booking' };
 export type SurveyItem = { id: string; type: string; status: string; completed_at: string | null; flags: string[]; surveyor: string };
 export type Booking = {
   id: string;
