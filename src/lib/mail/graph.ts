@@ -346,3 +346,37 @@ export async function attachmentFile(address: string, id: string, attachmentId: 
   if (!r.contentBytes) return null;
   return { name: r.name || 'attachment', contentType: r.contentType || 'application/octet-stream', bytes: Buffer.from(r.contentBytes, 'base64') };
 }
+
+/* ── Emptying your old folders ────────────────────────────────────────────── */
+
+/** Outlook's own folders (never emptied or removed): their ids. */
+export async function wellKnownFolderIds(address: string): Promise<Set<string>> {
+  const names = ['inbox', 'drafts', 'sentitems', 'deleteditems', 'archive', 'junkemail', 'outbox', 'conversationhistory', 'clutter', 'scheduled', 'syncissues', 'conflicts', 'localfailures', 'serverfailures', 'msgfolderroot', 'searchfolders'];
+  const ids = await Promise.all(
+    names.map((n) => graph<{ id: string }>(`${box(address)}/mailFolders/${n}?$select=id`, { headers: { Prefer: IMMUTABLE } }).then((r) => r.id).catch(() => null))
+  );
+  return new Set(ids.filter((x): x is string => !!x));
+}
+
+/** The folders inside a folder, with how much is in each. */
+export async function childFolders(address: string, id: string): Promise<{ id: string; name: string; items: number; children: number }[]> {
+  const q = new URLSearchParams({ $select: 'id,displayName,totalItemCount,childFolderCount', $top: '250' });
+  const r = await graph<{ value: { id: string; displayName: string; totalItemCount?: number; childFolderCount?: number }[] }>(
+    `${box(address)}/mailFolders/${encodeURIComponent(id)}/childFolders?${q}`,
+    { headers: { Prefer: IMMUTABLE } }
+  );
+  return (r.value ?? []).map((f) => ({ id: f.id, name: f.displayName, items: f.totalItemCount ?? 0, children: f.childFolderCount ?? 0 }));
+}
+
+/** A page of the emails in a folder: who they're from and to, and the Reply-To. */
+export async function folderMessages(address: string, id: string, top = 50): Promise<{ id: string; from: string; fromName: string | null; to: string[]; replyTo: string | null }[]> {
+  const q = new URLSearchParams({ $select: 'id,from,toRecipients,replyTo', $top: String(top) });
+  const r = await graph<{ value: GMessage[] }>(`${box(address)}/mailFolders/${encodeURIComponent(id)}/messages?${q}`, { headers: { Prefer: IMMUTABLE } });
+  return (r.value ?? []).map((m) => ({
+    id: m.id,
+    from: m.from?.emailAddress?.address ?? '',
+    fromName: m.from?.emailAddress?.name ?? null,
+    to: (m.toRecipients ?? []).map((t) => t.emailAddress?.address ?? '').filter(Boolean),
+    replyTo: m.replyTo?.[0]?.emailAddress?.address ?? null,
+  }));
+}

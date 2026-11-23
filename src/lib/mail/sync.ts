@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
 import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
-import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, deleteFolderIfEmpty, getReplyTo, listFolders, moveToDeleted, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type FileToAttach, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
+import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, childFolders, deleteFolderIfEmpty, folderMessages, getReplyTo, listFolders, moveToDeleted, wellKnownFolderIds, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type FileToAttach, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
 import {
   addressOf,
   companyDomain,
@@ -56,6 +56,7 @@ type Box = {
   filing: boolean;
   file_customers: boolean;
   auto_approve: boolean;
+  clear_old_folders: boolean;
   marketing: boolean;
   drafts: boolean;
   scan_before: string | null;
@@ -76,7 +77,7 @@ type Box = {
   style_at: string | null;
   style_edited: boolean;
 };
-const BOX_COLS = 'id, user_id, address, filing, file_customers, auto_approve, marketing, drafts, sign_off, signature, signature_html, signature_locked, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
+const BOX_COLS = 'id, user_id, address, filing, file_customers, auto_approve, clear_old_folders, marketing, drafts, sign_off, signature, signature_html, signature_locked, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
 type Rule = {
   id: string;
   kind: 'domain' | 'address';
@@ -139,6 +140,8 @@ export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult
     if (styleDue(box) && Date.now() < until - 25_000) res.styled = await learnFromSent(ctx);
     if (box.drafts && Date.now() < until) res.drafted = await draftReplies(ctx, until);
     if ((box.filing || box.file_customers || box.marketing) && Date.now() < until) Object.assign(res, await fileMail(ctx, until));
+    // You asked Hestia to take over your old folders: emptied into hers, then removed once empty.
+    if (box.clear_old_folders && Date.now() < until - 8_000) await emptyOldFolders(ctx, until).catch(() => null);
     await db.from('mail_boxes').update({ last_run_at: started, last_error: null }).eq('id', box.id);
   } catch (e) {
     res.error = e instanceof Error ? e.message : 'failed';
@@ -638,6 +641,62 @@ async function refreshThreads(ctx: Context) {
     });
     const { error } = await db.from('mail_threads').upsert(rows, { onConflict: 'box_id,conversation_id' });
     if (error) throw new Error(error.message);
+  }
+}
+
+/* ── Your old folders ───────────────────────────────────────────────────── */
+
+const OLD_MOVES_PER_RUN = 60;
+
+/**
+ * Your own folders (at the top and inside the Inbox, and the folders inside them), emptied into Hestia's: each email
+ * to its company's or customer's folder, or Inbox › Filed, then the folder removed once it's completely empty. Never
+ * Outlook's own folders (Drafts, Sent, Deleted Items, Archive…), never Hestia's, and never an email deleted.
+ */
+async function emptyOldFolders(ctx: Context, until: number): Promise<void> {
+  const { db, box } = ctx;
+  const wellKnown = await wellKnownFolderIds(box.address);
+  const { data: made } = await db.from('mail_folders').select('graph_id').eq('box_id', box.id);
+  const hestias = new Set([...(made ?? []).map((f) => f.graph_id as string), ...[...ctx.folders].filter(([p]) => !ctx.yours.has(p)).map(([, id]) => id)]);
+  // Never a folder Hestia files into, or one holding hers (a "Suppliers" of yours she reused for Inbox › Suppliers › …).
+  const inUse = [...ctx.byId.values()].map((r) => r.folder).concat([FILED_FOLDER, MARKETING_FOLDER]);
+  const hosts = (path: string) => inUse.some((f) => f === path || f.startsWith(`${path}/`));
+  const old = ctx.existing.filter((f) => !wellKnown.has(f.id) && !hestias.has(f.id) && !hosts(f.path));
+  if (!old.length) return;
+  const me = addressOf(box.address);
+  let moves = 0;
+
+  // One folder at a time, its own folders first (a folder can only go once nothing is inside it).
+  const empty = async (id: string, depth: number): Promise<boolean> => {
+    if (depth > 4 || moves >= OLD_MOVES_PER_RUN || Date.now() > until - 6_000) return false;
+    for (const c of await childFolders(box.address, id)) {
+      if (hestias.has(c.id)) return false; // one of Hestia's inside it: this folder stays
+      if (!(await empty(c.id, depth + 1))) return false;
+    }
+    for (;;) {
+      if (moves >= OLD_MOVES_PER_RUN || Date.now() > until - 6_000) return false;
+      const page = await folderMessages(box.address, id, 25);
+      if (!page.length) break;
+      for (const m of page) {
+        const sentByYou = addressOf(m.from) === me;
+        const owner = sentByYou ? (m.to.find((a) => addressOf(a) !== me) ?? '') : belongsTo(m.from, m.replyTo);
+        const rule = owner ? await ctx.ruleFor(owner, sentByYou ? null : m.fromName) : null;
+        const destId = await ensureFolder(box.address, clearAwayTo(rule), ctx.folders);
+        if (destId === id) return false; // already where it belongs: leave this folder as it is
+        await moveMessage(box.address, m.id, destId);
+        moves++;
+      }
+      await saveFolders(ctx);
+    }
+    return deleteFolderIfEmpty(box.address, id);
+  };
+
+  for (const f of old) {
+    if (moves >= OLD_MOVES_PER_RUN || Date.now() > until - 6_000) break;
+    if (await empty(f.id, 0)) {
+      ctx.folders.delete(f.path);
+      ctx.yours.delete(f.path);
+    }
   }
 }
 
