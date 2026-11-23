@@ -792,7 +792,7 @@ function Folders() {
   return (
     <div className="mx-folders">
       <p className="crm-muted mx-hint">
-        Every company is matched by its email domain (everyone at goodwe.com goes to GoodWe), and customers by their own address, into Inbox › Customers › “Name (HX-number)”. Your own folders are used where they fit (GoodWe goes to your Inbox › GoodWe, a bank to your Finance / Bank); otherwise a folder is made inside your Inbox. Use a / for a folder inside a folder: “Inbox/Suppliers/GoodWe”.
+        Every company is matched by its email domain (everyone at goodwe.com goes to GoodWe), and customers by their own address, into Inbox › Customers › “Name (HX-number)”. Companies go inside your Inbox under their group: Inbox › Suppliers › GoodWe, Inbox › Grid and DNO › National Grid. Anything with no folder is stored in Inbox › Filed. Use a / for a folder inside a folder.
       </p>
       {suggested.length > 0 && (
         <div className="mx-banner">

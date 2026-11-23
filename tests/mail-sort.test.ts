@@ -15,6 +15,7 @@ import {
   belongsTo,
   isSendingService,
   companyFolder,
+  isHestiaFolder,
   matchExisting,
   pathPart,
   prettyFolder,
@@ -224,8 +225,15 @@ describe('your own folders', () => {
     expect(matchExisting('Finance/Bank', existing)).toBe('Inbox/Finance ∕ Bank');
     expect(matchExisting('National Grid', existing)).toBeNull();
   });
-  it('otherwise makes one inside the Inbox, as yours are', () => {
-    expect(companyFolder('National Grid')).toBe('Inbox/National Grid');
+  it('Hestia’s own folders sit inside the Inbox, under their group', () => {
+    expect(companyFolder('National Grid', 'Grid and DNO')).toBe('Inbox/Grid and DNO/National Grid');
+    expect(companyFolder('Someone')).toBe('Inbox/Other/Someone');
+    expect(isHestiaFolder('Inbox/Suppliers/GoodWe')).toBe(true);
+    expect(isHestiaFolder('Inbox/Customers/Sarah Davies (HX-0069)')).toBe(true);
+    expect(isHestiaFolder('Inbox/Filed')).toBe(true);
+    expect(isHestiaFolder('Marketing')).toBe(true);
+    expect(isHestiaFolder('Inbox/Bell Group')).toBe(false);
+    expect(isHestiaFolder('Suppliers/GoodWe')).toBe(false);
   });
   it('shows paths the way Outlook does', () => {
     expect(prettyFolder('Inbox/Customers/Sarah Davies (HX-0069)')).toBe('Customers › Sarah Davies (HX-0069)');

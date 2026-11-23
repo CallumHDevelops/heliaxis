@@ -369,8 +369,18 @@ export function clearAwayTo(rule: { folder: string; status: string; action: stri
 export const NAME_SLASH = '∕';
 export const pathPart = (name: string) => name.replace(/\//g, NAME_SLASH);
 
-/** A company's folder when you don't already have one: inside the Inbox, as yours are (Inbox › GoodWe). */
-export const companyFolder = (name: string) => `Inbox/${cleanFolderPart(name)}`;
+/** Hestia's folder for a company or contact: inside the Inbox, under its group (Inbox › Suppliers › GoodWe). */
+export const companyFolder = (name: string, group: string = 'Other') => `Inbox/${cleanFolderPart(group)}/${cleanFolderPart(name)}`;
+
+/**
+ * Whether a folder is one of Hestia's own: inside the Inbox under a group (Inbox › Customers › …, Inbox › Suppliers ›
+ * …), or Inbox › Filed, Inbox › Team, or Marketing. Anything else (your old folders, the app's old top-level ones) is
+ * sorted again.
+ */
+export function isHestiaFolder(path: string): boolean {
+  if (path === MARKETING_FOLDER || path === 'Inbox/Filed' || path === 'Inbox/Team') return true;
+  return path.startsWith('Inbox/') && path.split('/').length >= 3;
+}
 
 /** "Inbox/Customers/Sarah Davies (HX-0069)" → "Customers › Sarah Davies (HX-0069)"; "Inbox/Finance ∕ Bank" → "Finance / Bank". */
 export const prettyFolder = (folder: string) => folder.replace(/^Inbox\//, '').split('/').join(' › ').replaceAll(NAME_SLASH, '/');

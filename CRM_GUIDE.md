@@ -517,8 +517,9 @@ needs you** panel are an extra view.
 - **Waiting on them**: you sent the last email 3+ days ago and nothing's come back. **New people**:
   someone asking about a job who isn't in the CRM; **Add to the CRM** in one tap.
 - **Folders**: everyone at a company by its domain, customers by their own address (Inbox › Customers › Name
-  (HX-…)). Your own folders are used where they fit (goodwe.com → your Inbox › GoodWe, a bank → your Finance / Bank);
-  otherwise a folder is made inside your Inbox. Folders the app made and no longer uses are removed once empty. CRM customers,
+  (HX-…)), companies inside the Inbox under their group (goodwe.com → Inbox › Suppliers › GoodWe, nationalgrid.co.uk →
+  Inbox › Grid and DNO › National Grid). Hestia uses only her own folders; yours are left as they are. Folders the app
+  made and no longer uses are removed once empty. CRM customers,
   contacts and organisations are approved straight away; other companies are named by the assistant and
   wait for you to check them (**Approve all**). Rename any folder; a / makes a folder inside a folder.
 - **Filing everyone else** (off until you turn it on in Settings): once you've replied, or there's nothing to reply

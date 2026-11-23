@@ -20,8 +20,9 @@ import {
   customerFolder,
   clearAwayTo,
   FILED_FOLDER,
+  isHestiaFolder,
+  groupForOrgType,
   companyFolder,
-  matchExisting,
   textToHtml,
   cidsIn,
   pickFont,
@@ -53,6 +54,7 @@ type Box = {
   address: string;
   filing: boolean;
   file_customers: boolean;
+  auto_approve: boolean;
   marketing: boolean;
   drafts: boolean;
   scan_before: string | null;
@@ -72,7 +74,7 @@ type Box = {
   style_at: string | null;
   style_edited: boolean;
 };
-const BOX_COLS = 'id, user_id, address, filing, file_customers, marketing, drafts, sign_off, signature, signature_html, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
+const BOX_COLS = 'id, user_id, address, filing, file_customers, auto_approve, marketing, drafts, sign_off, signature, signature_html, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
 type Rule = {
   id: string;
   kind: 'domain' | 'address';
@@ -194,9 +196,9 @@ export class Context {
     return c;
   }
 
-  /** A company's or person's folder: yours if you have one by that name, else a new one inside the Inbox. */
-  folderFor(name: string): string {
-    return matchExisting(name, this.existing) ?? companyFolder(name);
+  /** Hestia's folder for a company or person: inside the Inbox under its group (Inbox › Suppliers › GoodWe). */
+  folderFor(name: string, group: string = 'Other'): string {
+    return companyFolder(name, group);
   }
 
   remember(r: Rule) {
@@ -237,17 +239,17 @@ export class Context {
       const orgId = con[0].organisation_id as string | null;
       const { data: org } = orgId ? await db.from('organisations').select('id, name, type').eq('id', orgId).maybeSingle() : { data: null };
       if (org && !personal) {
-        return this.insert({ kind: 'domain', match: dom, label: org.name as string, folder: this.folderFor(org.name as string), status: 'on', source: 'crm', named: true, organisation_id: org.id as string });
+        return this.insert({ kind: 'domain', match: dom, label: org.name as string, folder: this.folderFor(org.name as string, groupForOrgType(org.type as string)), status: 'on', source: 'crm', named: true, organisation_id: org.id as string });
       }
       const label = String(con[0].name || name || a);
-      return this.insert({ kind: 'address', match: a, label, folder: this.folderFor(org ? (org.name as string) : label), status: 'on', source: 'crm', named: true, contact_id: con[0].id as string, organisation_id: org?.id ?? null });
+      return this.insert({ kind: 'address', match: a, label, folder: this.folderFor(org ? (org.name as string) : label, org ? groupForOrgType(org.type as string) : 'Other'), status: 'on', source: 'crm', named: true, contact_id: con[0].id as string, organisation_id: org?.id ?? null });
     }
     if (personal) return null;
     // An organisation in the CRM with this domain.
     const org = this.orgByDomain.get(dom);
-    if (org) return this.insert({ kind: 'domain', match: dom, label: org.name, folder: this.folderFor(org.name), status: 'on', source: 'crm', named: true, organisation_id: org.id });
+    if (org) return this.insert({ kind: 'domain', match: dom, label: org.name, folder: this.folderFor(org.name, groupForOrgType(org.type)), status: 'on', source: 'crm', named: true, organisation_id: org.id });
     // The team.
-    if (dom === this.ownDomain) return this.insert({ kind: 'domain', match: dom, label: 'Heliaxis team', folder: this.folderFor('Team'), status: 'suggested', source: 'scan', named: true });
+    if (dom === this.ownDomain) return this.insert({ kind: 'domain', match: dom, label: 'Heliaxis team', folder: 'Inbox/Team', status: this.box.auto_approve ? 'on' : 'suggested', source: 'scan', named: true });
     // A company we don't know yet: suggested, to be named and approved.
     const label = guessLabel(dom);
     return this.insert({ kind: 'domain', match: dom, label, folder: this.folderFor(label), status: 'suggested', source: 'scan', named: false });
@@ -640,34 +642,40 @@ async function refreshThreads(ctx: Context) {
 /* ── Keeping the folders tidy ───────────────────────────────────────────── */
 
 /**
- * Brings older rules into line, then moves anything already filed under an old folder:
+ * Brings every rule into Hestia's own structure, then moves anything already filed to match:
  *  - customers: Inbox › Customers › "Name (HX-0069)";
- *  - companies and contacts in the CRM (and any you approved): your own folder by that name, else one inside the Inbox;
- *  - Hestia's own suggestions outside the Inbox: named again, now seeing your folders (so GoodWe goes to yours).
- * Then removes folders the app made that nothing uses any more, once they're empty. Rules you've edited are left alone.
+ *  - companies and contacts in the CRM: Inbox › <their group> › Name;
+ *  - Hestia's suggestions elsewhere (your old folders, the app's old top-level ones): named again into hers.
+ * Then removes folders the app made that nothing uses any more, once they're empty. Your own folders are never touched.
  */
 async function tidyRules(ctx: Context): Promise<void> {
-  const { db, box } = ctx;
-  const yoursTop = new Set(ctx.existing.map((f) => f.path));
-  const old = [...ctx.byId.values()].filter((r) => r.action === 'file' && !r.folder.startsWith('Inbox/') && !yoursTop.has(r.folder));
+  const { db } = ctx;
+  // Everything not in Hestia's own structure is sorted again, rules you edited before included (you asked for hers).
+  const old = [...ctx.byId.values()].filter((r) => r.action === 'file' && !r.enquiry_id && !isHestiaFolder(r.folder));
   const customers = [...ctx.byId.values()].filter((r) => r.enquiry_id && !r.folder.startsWith('Inbox/Customers/'));
-  if (!old.length && !customers.length) return cleanFolders(ctx);
-  const { data: src } = await db.from('mail_rules').select('id, source').eq('box_id', box.id).in('id', [...new Set([...old, ...customers].map((r) => r.id))]);
-  const source = new Map((src ?? []).map((r) => [r.id as string, r.source as string]));
+  if (!old.length && !customers.length) {
+    await rehome(ctx);
+    return cleanFolders(ctx);
+  }
   const refs = new Map<string, string | null>();
   const ids = [...new Set(customers.map((r) => r.enquiry_id!))];
   if (ids.length) {
     const { data } = await db.from('enquiries').select('id, customer_ref').in('id', ids);
     for (const e of data ?? []) refs.set(e.id as string, (e.customer_ref as string | null) ?? null);
   }
+  const orgIds = [...new Set(old.map((r) => r.organisation_id).filter((x): x is string => !!x))];
+  const orgType = new Map<string, string | null>();
+  if (orgIds.length) {
+    const { data } = await db.from('organisations').select('id, type').in('id', orgIds);
+    for (const o of data ?? []) orgType.set(o.id as string, (o.type as string | null) ?? null);
+  }
   const moved = new Map<string, string>(); // rule id → its new folder
-  for (const r of [...customers, ...old]) {
-    if (moved.has(r.id) || source.get(r.id) === 'you') continue;
-    if (r.enquiry_id) moved.set(r.id, customerFolder(r.label, refs.get(r.enquiry_id) ?? null));
-    else if (r.status === 'suggested' && source.get(r.id) === 'scan') {
-      // Hestia's suggestion: she names it again with your folders in view.
-      await db.from('mail_rules').update({ named: false, updated_at: new Date().toISOString() }).eq('id', r.id);
-    } else moved.set(r.id, ctx.folderFor(r.label));
+  for (const r of customers) moved.set(r.id, customerFolder(r.label, refs.get(r.enquiry_id!) ?? null));
+  for (const r of old) {
+    if (r.status === 'suggested' && !r.organisation_id && !r.contact_id) {
+      // Hestia's suggestion: she names it again, into her own structure.
+      await db.from('mail_rules').update({ named: false, source: 'scan', updated_at: new Date().toISOString() }).eq('id', r.id);
+    } else moved.set(r.id, ctx.folderFor(r.label, r.organisation_id ? groupForOrgType(orgType.get(r.organisation_id)) : 'Other'));
   }
   for (const [id, folder] of moved) {
     if (ctx.byId.get(id)?.folder === folder) {
@@ -688,8 +696,7 @@ async function tidyRules(ctx: Context): Promise<void> {
  */
 async function rehome(ctx: Context): Promise<void> {
   const { db, box } = ctx;
-  const yoursTop = new Set(ctx.existing.map((f) => f.path));
-  const settled = (f: string) => f.startsWith('Inbox/') || yoursTop.has(f);
+  const settled = isHestiaFolder;
   const { data: filed } = await db
     .from('mail_messages')
     .select('id, graph_id, filed_folder, rule:mail_rules!inner(folder, action)')
@@ -769,14 +776,14 @@ async function nameNewCompanies(ctx: Context): Promise<number> {
       subjects: [...new Set((msgs ?? []).map((m) => String(m.subject || '')).filter(Boolean))],
     });
   }
-  const named = await nameDomains(samples, ctx.existing.map((f) => f.name));
+  const named = await nameDomains(samples);
   if (!named.length) return 0;
   let n = 0;
   for (const r of rules) {
     const hit = named.find((x) => x.domain.toLowerCase() === String(r.match));
     if (!hit) {
       // Left out of the answer: keep the tidied domain as its name rather than ask again every run.
-      await db.from('mail_rules').update({ named: true, folder: ctx.folderFor(guessLabel(r.match as string)) }).eq('id', r.id).eq('named', false);
+      await db.from('mail_rules').update({ named: true, folder: ctx.folderFor(guessLabel(r.match as string)), ...(box.auto_approve ? { status: 'on' } : {}) }).eq('id', r.id).eq('named', false);
       continue;
     }
     const marketingOnly = hit.marketing_only;
@@ -784,10 +791,10 @@ async function nameNewCompanies(ctx: Context): Promise<number> {
       .from('mail_rules')
       .update({
         label: hit.name || guessLabel(r.match as string),
-        // One of your folders if Hestia says it belongs there (its own, or one like "Finance / Bank"), else by name.
-        folder: marketingOnly
-          ? MARKETING_FOLDER
-          : ((hit.existing_folder && ctx.existing.find((f) => f.name === hit.existing_folder)?.path) ?? ctx.folderFor(hit.name || guessLabel(r.match as string))),
+        // Hestia's own: inside the Inbox under its group (Inbox › Suppliers › GoodWe).
+        folder: marketingOnly ? MARKETING_FOLDER : ctx.folderFor(hit.name || guessLabel(r.match as string), hit.group),
+        // You asked for her folders to be used as they come: approved as she names them.
+        ...(box.auto_approve ? { status: 'on' as const } : {}),
         action: marketingOnly ? 'marketing' : 'file',
         named: true,
         updated_at: new Date().toISOString(),
