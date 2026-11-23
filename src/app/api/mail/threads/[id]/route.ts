@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createReplyDraft, messageText, moveToInbox, sendDraft } from '@/lib/mail/graph';
-import { contextFor, dropOutlookDraft, putOutlookDraft, replyHtml, signatureImages, writeDraft } from '@/lib/mail/sync';
+import { contextFor, dropOutlookDraft, fileThreadNow, noteThreadOnCrm, putOutlookDraft, replyHtml, signatureImages, writeDraft } from '@/lib/mail/sync';
 import { mailSession } from '@/lib/mail/server';
-import { addressOf, folderFor, threadState } from '@/lib/mail/shared';
+import { addressOf, customerFolder, folderFor, threadState } from '@/lib/mail/shared';
 import { canAccess } from '@/lib/portals';
 import { requireApproved } from '@/lib/auth';
 import { toWaId } from '@/lib/whatsapp/shared';
@@ -65,7 +65,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         await s.db.from('mail_threads').update({ last_out_at: now, state: 'replied', draft: text, updated_at: now }).eq('id', t.id);
         // The same reply waiting in Outlook's Drafts would be a second copy: it goes (unless you've edited it there).
         await dropOutlookDraft(s.db, box.address, t.id as string).catch(() => null);
-        return json({ ok: true });
+        // A customer's conversation goes into their folder now (Inbox › Customers › Name (HX-…)).
+        const filed = await fileThreadNow(s.db, box, t.conversation_id as string).catch(() => 0);
+        return json({ ok: true, filed });
       }
       // In place of the app's earlier Outlook draft for this conversation.
       await s.db.from('mail_threads').update({ draft: text }).eq('id', t.id);
@@ -101,8 +103,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       needsReply: action === 'undone' ? true : ((t.needs_reply as boolean | null) ?? null),
     });
     await s.db.from('mail_threads').update({ done_at: doneAt, state, ...(action === 'undone' ? { needs_reply: true } : {}), updated_at: now }).eq('id', t.id);
-    if (action === 'done') await dropOutlookDraft(s.db, box.address, t.id as string).catch(() => null);
-    return json({ ok: true, state });
+    let filed = 0;
+    if (action === 'done') {
+      await dropOutlookDraft(s.db, box.address, t.id as string).catch(() => null);
+      // No reply needed: a customer's conversation goes into their folder now.
+      filed = await fileThreadNow(s.db, box, t.conversation_id as string).catch(() => 0);
+    }
+    return json({ ok: true, state, filed });
   }
 
   if (action === 'crm') {
@@ -114,22 +121,24 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const phone = String(b.phone || '').trim() || null;
     const postcode = String(b.postcode || '').trim().toUpperCase() || null;
     // Already a customer under this address? Use them.
-    const { data: found } = await s.db.from('enquiries').select('id, name').ilike('email', email).order('created_at', { ascending: false }).limit(1);
+    const { data: found } = await s.db.from('enquiries').select('id, name, customer_ref').ilike('email', email).order('created_at', { ascending: false }).limit(1);
     let enquiryId = (found?.[0]?.id as string | undefined) ?? null;
+    let ref = (found?.[0]?.customer_ref as string | null | undefined) ?? null;
     if (!enquiryId) {
       const { data, error } = await s.db
         .from('enquiries')
         .insert({ name, email, phone, postcode, wa_id: toWaId(phone), source: 'email', status: 'contacted' })
-        .select('id')
+        .select('id, customer_ref')
         .single();
       if (error || !data) return json({ error: error?.message || 'Couldn’t add them.' }, 500);
       enquiryId = data.id as string;
+      ref = (data.customer_ref as string | null) ?? null;
     }
     // Their own folder from now on, and this conversation filed under them.
     const label = String(found?.[0]?.name || name);
     const { data: rule } = await s.db
       .from('mail_rules')
-      .upsert({ box_id: box.id, kind: 'address', match: email, label, folder: folderFor('Customers', label), status: 'on', source: 'crm', named: true, enquiry_id: enquiryId, action: 'file' }, { onConflict: 'box_id,kind,match' })
+      .upsert({ box_id: box.id, kind: 'address', match: email, label, folder: customerFolder(label, ref), status: 'on', source: 'crm', named: true, enquiry_id: enquiryId, action: 'file' }, { onConflict: 'box_id,kind,match' })
       .select('id')
       .single();
     if (rule) {
@@ -138,7 +147,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
     await s.db.from('mail_threads').update({ enquiry_id: enquiryId, rule_id: rule?.id ?? t.rule_id, prospect: null, updated_at: now }).eq('box_id', box.id).eq('who_address', email);
     await s.db.from('mail_threads').update({ enquiry_id: enquiryId, rule_id: rule?.id ?? t.rule_id, prospect: null, updated_at: now }).eq('id', t.id);
-    return json({ ok: true, enquiryId });
+    // Their emails so far go on their new record (each of their conversations).
+    const { data: theirs } = await s.db.from('mail_threads').select('conversation_id').eq('box_id', box.id).eq('who_address', email);
+    for (const c of new Set([t.conversation_id as string, ...(theirs ?? []).map((x) => x.conversation_id as string)])) {
+      await noteThreadOnCrm(s.db, box, c, enquiryId).catch(() => null);
+    }
+    return json({ ok: true, enquiryId, ref });
   }
 
   if (action === 'notMarketing') {

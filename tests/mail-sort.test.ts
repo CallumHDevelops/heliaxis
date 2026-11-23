@@ -10,6 +10,7 @@ import {
   looksAutomated,
   looksLikeMarketing,
   markFor,
+  customerFolder,
   withSignOff,
   cidsIn,
   cleanSignature,
@@ -182,5 +183,13 @@ describe('sign-off', () => {
     expect(withSignOff('Hi Tom,\n\nSplit it please.\n\nCheers,\nCallum', 'Kind regards,')).toBe('Hi Tom,\n\nSplit it please.\n\nKind regards,\nCallum');
     expect(withSignOff('Hi,\n\nThanks.\n\nKind regards,\nCallum', 'Kind regards,')).toBe('Hi,\n\nThanks.\n\nKind regards,\nCallum');
     expect(withSignOff('Hi,\n\nThanks.\n\nKind Regards', 'Kind regards,')).toBe('Hi,\n\nThanks.\n\nKind Regards');
+  });
+});
+
+describe('customer folders', () => {
+  it('sit inside the Inbox, under Customers, with the customer number', () => {
+    expect(customerFolder('Sarah Davies', 'HX-0069')).toBe('Inbox/Customers/Sarah Davies (HX-0069)');
+    expect(customerFolder('Smith / Jones', 'HX-0101')).toBe('Inbox/Customers/Smith Jones (HX-0101)');
+    expect(customerFolder('Jane Smith', null)).toBe('Inbox/Customers/Jane Smith');
   });
 });

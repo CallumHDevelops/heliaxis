@@ -58,6 +58,12 @@ export function cleanFolderPart(s: string): string {
 }
 export const folderFor = (group: string, name: string) => `${cleanFolderPart(group)}/${cleanFolderPart(name)}`;
 
+/**
+ * A CRM customer's own folder, inside your Inbox: Inbox › Customers › "Sarah Davies (HX-0069)". The reference ties
+ * the folder to their record (and keeps two customers with the same name apart).
+ */
+export const customerFolder = (name: string, ref: string | null | undefined) => `Inbox/Customers/${cleanFolderPart(ref ? `${name} (${ref})` : name)}`;
+
 /** Splits and tidies a folder path someone typed: " Suppliers / GoodWe " → "Suppliers/GoodWe". At most three levels. */
 export function tidyFolderPath(path: string): string {
   return path

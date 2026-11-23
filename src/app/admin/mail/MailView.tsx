@@ -359,9 +359,18 @@ function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: Threa
           {row.rule && (
             <span className="crm-muted">
               {' '}
-              · folder {row.rule.folder}
+              · folder {row.rule.folder.replace(/\//g, ' › ')}
               {row.rule.status !== 'on' ? ' (not approved yet)' : ''}
             </span>
+          )}
+          {row.enquiry_id && (
+            <>
+              {' '}
+              ·{' '}
+              <a className="crm-link" href={`/admin/crm?enquiry=${row.enquiry_id}`}>
+                Open their record
+              </a>
+            </>
           )}
         </p>
         {(row.summary || row.why || row.opportunity) && (
@@ -691,6 +700,7 @@ type BoxInfo = {
   box: {
     address: string;
     filing: boolean;
+    file_customers: boolean;
     marketing: boolean;
     drafts: boolean;
     outlook_drafts: boolean;
@@ -743,7 +753,7 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
     void load();
   }
 
-  const toggles: { k: 'highlight' | 'drafts' | 'outlook_drafts' | 'filing' | 'marketing'; title: string; body: string }[] = [
+  const toggles: { k: 'highlight' | 'drafts' | 'outlook_drafts' | 'file_customers' | 'filing' | 'marketing'; title: string; body: string }[] = [
     {
       k: 'highlight',
       title: 'Highlight in Outlook',
@@ -756,9 +766,14 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
       body: 'Each draft also waits in Outlook’s Drafts, as a reply under their email, so you can check and send it from Outlook on your phone or computer. Once you’ve replied (from Outlook or here) or said no reply needed, the app takes its draft away again; one you’ve changed in Outlook is always left alone.',
     },
     {
+      k: 'file_customers',
+      title: 'File customers’ emails into their own folders',
+      body: 'Each CRM customer has a folder inside your Inbox: Customers › “Sarah Davies (HX-0069)”, with their customer number. Once you’ve replied, or said no reply needed, their emails move into it straight away. Emails still waiting on you stay in the Inbox. Their emails are noted on their customer record too.',
+    },
+    {
       k: 'filing',
-      title: 'File emails into folders',
-      body: `Once you’ve replied (or there’s nothing to reply to), the email moves from your inbox to its folder. Emails still waiting on you stay in the inbox. Only approved folders are used${info.suggested ? `: ${info.suggested} still to check in Folders` : ''}.`,
+      title: 'File everyone else’s emails into folders',
+      body: `Companies and other contacts: once you’ve replied (or there’s nothing to reply to), the email moves from your inbox to its folder (Suppliers › GoodWe, say). Emails still waiting on you stay in the inbox. Only approved folders are used${info.suggested ? `: ${info.suggested} still to check in Folders` : ''}.`,
     },
     { k: 'marketing', title: 'Move marketing to a Marketing folder', body: 'Newsletters and offers (anything with an unsubscribe link) go to a Marketing folder. Never from customers, or anyone you’ve replied to. Nothing is deleted.' },
   ];

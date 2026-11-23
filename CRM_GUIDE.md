@@ -476,8 +476,14 @@ needs you** panel are an extra view.
   - The colours need one more permission; without it the categories still work, just grey. In PowerShell
     (as in section 4, after `Connect-ExchangeOnline` and the **Set app** line):
     `New-ManagementRoleAssignment -App $app -Role "Application MailboxSettings.ReadWrite" -CustomResourceScope "Heliaxis CRM mailboxes"`
-- **CRM customers**: their emails (and your replies to them) are noted on their record, and an email from them stops
-  their automatic follow-ups, as a reply to hello@ does.
+- **CRM customers**: when Hestia recognises a customer (by their email address), their emails and your replies go on
+  their record, on their current job, and an email from them stops their automatic follow-ups, as a reply to hello@
+  does. Each has their own folder inside your Inbox: **Customers › Sarah Davies (HX-0069)**, named with their
+  customer number. Once you've replied, or said **No reply needed** (in the app, or by ticking the flag complete in
+  Outlook), their conversation moves into it straight away; emails still waiting on you stay in the Inbox.
+  On by default (Settings › File customers' emails into their own folders), even with filing for everyone else off.
+  Someone you add with **Add to the CRM** gets their folder and number at once, and their emails so far go on
+  their new record.
 - **Your writing style**: once six months of your sent emails have been read, Hestia studies up to 40 you wrote (to a
   spread of people) and writes down how you write: greetings, length, tone, the phrases you use and never use, and
   how that changes for customers, suppliers and the DNO, with a few of your own emails as examples. Every draft
@@ -504,7 +510,7 @@ needs you** panel are an extra view.
   Grid and DNO/National Grid), customers by their own address (Customers/Jane Smith). CRM customers,
   contacts and organisations are approved straight away; other companies are named by the assistant and
   wait for you to check them (**Approve all**). Rename any folder; a / makes a folder inside a folder.
-- **Filing** (off until you turn it on in Settings): once you've replied, or there's nothing to reply
+- **Filing everyone else** (off until you turn it on in Settings): once you've replied, or there's nothing to reply
   to, the email moves from the inbox to its folder, so the inbox only holds what still needs you.
   Anything older than 30 days is filed anyway. An email you've already moved yourself is left alone.
 - **Marketing** (on from the start): anything with an unsubscribe link goes to a Marketing

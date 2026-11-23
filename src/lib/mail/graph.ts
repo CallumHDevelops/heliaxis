@@ -73,11 +73,20 @@ export async function messageText(address: string, id: string): Promise<{ text: 
   return { text, webLink: r.webLink ?? null };
 }
 
-/** The folder at "Suppliers/GoodWe" under the top of the mailbox, made if it isn't there. Returns its id. */
+/**
+ * The folder at "Suppliers/GoodWe" under the top of the mailbox (or "Inbox/Customers/Sarah Davies (HX-0069)" inside the
+ * Inbox), made if it isn't there. Returns its id.
+ */
 export async function ensureFolder(address: string, path: string, known: Map<string, string>): Promise<string> {
   const parts = path.split('/').filter(Boolean);
   let parent: string | null = null;
   let sofar = '';
+  // "Inbox/…": inside the Inbox itself (Outlook's well-known name for it), not a folder called Inbox at the top.
+  if (parts[0]?.toLowerCase() === 'inbox' && parts.length > 1) {
+    parent = 'inbox';
+    sofar = 'Inbox';
+    parts.shift();
+  }
   for (const name of parts) {
     sofar = sofar ? `${sofar}/${name}` : name;
     const cached = known.get(sofar);
@@ -223,6 +232,13 @@ export async function draftState(address: string, id: string): Promise<{ isDraft
     if (e instanceof GraphError && e.status === 404) return null;
     throw e;
   }
+}
+
+/** Inbox emails whose flag you've ticked complete in Outlook (up to 100): Hestia reads that as "dealt with". */
+export async function completedInInbox(address: string): Promise<string[]> {
+  const q = new URLSearchParams({ $filter: "flag/flagStatus eq 'complete'", $select: 'id', $top: '100' });
+  const r = await graph<{ value: { id: string }[] }>(`${box(address)}/mailFolders/inbox/messages?${q}`, { headers: { Prefer: IMMUTABLE } });
+  return (r.value ?? []).map((m) => m.id);
 }
 
 /** Removes a draft (Outlook moves it to Deleted Items). Only ever used on the app's own, untouched drafts. */

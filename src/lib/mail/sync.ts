@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
 import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
-import { CAT_ACTION, CAT_REPLY, CAT_URGENT, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
+import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
 import {
   addressOf,
   companyDomain,
@@ -17,6 +17,7 @@ import {
   MARKETING_FOLDER,
   markFor,
   readyToFile,
+  customerFolder,
   textToHtml,
   cidsIn,
   pickFont,
@@ -47,6 +48,7 @@ type Box = {
   user_id: string;
   address: string;
   filing: boolean;
+  file_customers: boolean;
   marketing: boolean;
   drafts: boolean;
   scan_before: string | null;
@@ -66,7 +68,7 @@ type Box = {
   style_at: string | null;
   style_edited: boolean;
 };
-const BOX_COLS = 'id, user_id, address, filing, marketing, drafts, sign_off, signature, signature_html, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
+const BOX_COLS = 'id, user_id, address, filing, file_customers, marketing, drafts, sign_off, signature, signature_html, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
 type Rule = {
   id: string;
   kind: 'domain' | 'address';
@@ -125,7 +127,7 @@ export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult
     // Your style, once six months of sent emails have been read (and again every 30 days, unless you edited it).
     if (styleDue(box) && Date.now() < until - 25_000) res.styled = await learnFromSent(ctx);
     if (box.drafts && Date.now() < until) res.drafted = await draftReplies(ctx, until);
-    if ((box.filing || box.marketing) && Date.now() < until) Object.assign(res, await fileMail(ctx, until));
+    if ((box.filing || box.file_customers || box.marketing) && Date.now() < until) Object.assign(res, await fileMail(ctx, until));
     await db.from('mail_boxes').update({ last_run_at: started, last_error: null }).eq('id', box.id);
   } catch (e) {
     res.error = e instanceof Error ? e.message : 'failed';
@@ -198,10 +200,11 @@ export class Context {
   private async makeRule(a: string, dom: string, personal: boolean, name: string | null): Promise<Rule | null> {
     const db = this.db;
     // A customer in the CRM: their own folder, on straight away.
-    const { data: enq } = await db.from('enquiries').select('id, name').ilike('email', a).order('created_at', { ascending: false }).limit(1);
+    const { data: enq } = await db.from('enquiries').select('id, name, customer_ref').ilike('email', a).order('created_at', { ascending: false }).limit(1);
     if (enq?.[0]) {
       const label = String(enq[0].name || name || a);
-      return this.insert({ kind: 'address', match: a, label, folder: folderFor('Customers', label), status: 'on', source: 'crm', named: true, enquiry_id: enq[0].id as string });
+      // Inbox › Customers › "Sarah Davies (HX-0069)": tied to their record by its reference.
+      return this.insert({ kind: 'address', match: a, label, folder: customerFolder(label, enq[0].customer_ref as string | null), status: 'on', source: 'crm', named: true, enquiry_id: enq[0].id as string });
     }
     // A contact in the CRM: their organisation's folder (by domain), or their own.
     const { data: con } = await db.from('crm_contacts').select('id, name, organisation_id').ilike('email', a).limit(1);
@@ -382,10 +385,93 @@ async function noteOnCrm(ctx: Context, page: GMessage[], direction: 'in' | 'out'
     });
     if (direction === 'in' && Date.now() - Date.parse(at) < 86_400_000) emailedUs.add(rule.enquiry_id);
   }
-  if (rows.length) await db.from('crm_emails').upsert(rows, { onConflict: 'graph_id', ignoreDuplicates: true });
+  if (rows.length) {
+    // On their current job too (the latest still going, else the latest), as replies to hello@ are.
+    const jobs = await currentJobs(db, [...new Set(rows.map((r) => r.enquiry_id as string))]);
+    for (const r of rows) r.project_id = jobs.get(r.enquiry_id as string) ?? null;
+    await db.from('crm_emails').upsert(rows, { onConflict: 'graph_id', ignoreDuplicates: true });
+  }
   for (const id of emailedUs) {
     await db.from('crm_projects').update({ sequence_stopped_at: new Date().toISOString() }).eq('enquiry_id', id).is('sequence_stopped_at', null);
   }
+}
+
+/** Each customer's current job: the latest one still going (not complete or lost), else their latest. */
+async function currentJobs(db: Db, enquiryIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!enquiryIds.length) return out;
+  const { data } = await db.from('crm_projects').select('id, enquiry_id, stage, created_at').in('enquiry_id', enquiryIds).order('created_at', { ascending: false }).limit(200);
+  for (const id of enquiryIds) {
+    const theirs = (data ?? []).filter((p) => p.enquiry_id === id);
+    const job = theirs.find((p) => p.stage !== 'complete' && p.stage !== 'lost') ?? theirs[0];
+    if (job) out.set(id, job.id as string);
+  }
+  return out;
+}
+
+/**
+ * A conversation's emails on the customer's record, now: for someone just added to the CRM from Hestia (their
+ * earlier emails were read before they were a customer). Once each.
+ */
+export async function noteThreadOnCrm(db: Db, box: Pick<Box, 'id' | 'address'>, conversationId: string, enquiryId: string): Promise<void> {
+  const { data: msgs } = await db.from('mail_messages').select('internet_id, direction, from_address, to_addresses, subject, preview, at').eq('box_id', box.id).eq('conversation_id', conversationId);
+  const jobs = await currentJobs(db, [enquiryId]);
+  const rows = (msgs ?? [])
+    .filter((m) => m.internet_id)
+    .map((m) => ({
+      enquiry_id: enquiryId,
+      project_id: jobs.get(enquiryId) ?? null,
+      graph_id: m.internet_id,
+      direction: m.direction,
+      subject: m.subject,
+      body: m.preview,
+      from_address: m.direction === 'in' ? m.from_address : box.address,
+      to_address: m.direction === 'in' ? box.address : ((m.to_addresses as string[] | null)?.[0] ?? null),
+      at: m.at,
+    }));
+  if (rows.length) await db.from('crm_emails').upsert(rows, { onConflict: 'graph_id', ignoreDuplicates: true });
+}
+
+/**
+ * A customer's conversation into their folder straight away (when you say no reply needed, or send from the app),
+ * rather than on the next run. Only CRM customers' approved folders, and only emails still in the Inbox. Returns how
+ * many moved.
+ */
+export async function fileThreadNow(db: Db, box: Pick<Box, 'id' | 'address' | 'filing' | 'file_customers'>, conversationId: string): Promise<number> {
+  const { data: msgs } = await db
+    .from('mail_messages')
+    .select('id, graph_id, rule:mail_rules!inner(folder, status, action, enquiry_id)')
+    .eq('box_id', box.id)
+    .eq('conversation_id', conversationId)
+    .eq('place', 'inbox')
+    .eq('direction', 'in');
+  const list = (msgs ?? []).map((m) => ({ ...m, rule: (Array.isArray(m.rule) ? m.rule[0] : m.rule) as { folder: string; status: string; action: string; enquiry_id: string | null } }));
+  const ok = list.filter((m) => m.rule?.status === 'on' && m.rule.action === 'file' && (box.filing || (box.file_customers && m.rule.enquiry_id)));
+  if (!ok.length) return 0;
+  const { data: saved } = await db.from('mail_folders').select('path, graph_id').eq('box_id', box.id);
+  const known = new Map((saved ?? []).map((f) => [f.path as string, f.graph_id as string]));
+  const before = known.size;
+  const inbox = await inboxId(box.address);
+  let n = 0;
+  for (const m of ok) {
+    try {
+      if ((await getParentFolder(box.address, m.graph_id as string)) !== inbox) {
+        await db.from('mail_messages').update({ place: 'elsewhere' }).eq('id', m.id);
+        continue;
+      }
+      const folderId = await ensureFolder(box.address, m.rule.folder, known);
+      await moveMessage(box.address, m.graph_id as string, folderId);
+      await db.from('mail_messages').update({ place: 'filed', filed_at: new Date().toISOString(), file_error: null }).eq('id', m.id);
+      n++;
+    } catch (e) {
+      await db.from('mail_messages').update({ file_error: (e instanceof Error ? e.message : 'failed').slice(0, 300) }).eq('id', m.id);
+    }
+  }
+  if (known.size !== before) {
+    const rows = [...known].map(([path, graph_id]) => ({ box_id: box.id, path, graph_id }));
+    await db.from('mail_folders').upsert(rows, { onConflict: 'box_id,path', ignoreDuplicates: true });
+  }
+  return n;
 }
 
 /** Brings each touched conversation's row up to date from its emails. */
@@ -858,6 +944,20 @@ const MARKS_PER_RUN = 40;
  */
 async function highlight(ctx: Context, until: number): Promise<number> {
   const { db, box } = ctx;
+  // Ticked complete in Outlook = dealt with: the same as "No reply needed" in the app (and a customer's
+  // conversation goes into their folder).
+  if (box.highlight) {
+    const done = await completedInInbox(box.address).catch(() => [] as string[]);
+    if (done.length) {
+      const { data: ticked } = await db.from('mail_threads').select('id, conversation_id').eq('box_id', box.id).eq('state', 'reply').in('mark_id', done.slice(0, 100));
+      for (const t of ticked ?? []) {
+        const now = new Date().toISOString();
+        await db.from('mail_threads').update({ done_at: now, state: 'done', updated_at: now }).eq('id', t.id);
+        await dropOutlookDraft(db, box.address, t.id as string).catch(() => null);
+        await fileThreadNow(db, box, t.conversation_id as string).catch(() => 0);
+      }
+    }
+  }
   const { data } = await db
     .from('mail_threads')
     .select('id, state, priority, action_only, last_in_graph_id, mark, mark_id')
@@ -897,15 +997,18 @@ async function highlight(ctx: Context, until: number): Promise<number> {
 
 async function fileMail(ctx: Context, until: number): Promise<{ filed: number; marketing: number }> {
   const { db, box } = ctx;
-  type Cand = { id: string; graph_id: string; conversation_id: string; at: string; marketing: boolean; rule: { folder: string; status: string; action: string; never_marketing: boolean } | null };
-  const cols = 'id, graph_id, conversation_id, at, marketing, rule:mail_rules!inner(folder, status, action, never_marketing)';
+  type Cand = { id: string; graph_id: string; conversation_id: string; at: string; marketing: boolean; rule: { folder: string; status: string; action: string; never_marketing: boolean; enquiry_id: string | null } | null };
+  const cols = 'id, graph_id, conversation_id, at, marketing, rule:mail_rules!inner(folder, status, action, never_marketing, enquiry_id)';
+  // Approved folders when filing is on; with it off, only CRM customers' own folders (their own setting, on by default).
+  const fileQuery = () => {
+    const q = db.from('mail_messages').select(cols).eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('rule.status', 'on').eq('rule.action', 'file');
+    return box.filing ? q : q.not('rule.enquiry_id', 'is', null);
+  };
   // Only emails that could move: an approved folder (filing on), or marketing (marketing on). Oldest first.
   const [toFile, toMarket, toMarketByRule] = await Promise.all([
-    box.filing
-      ? db.from('mail_messages').select(cols).eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('rule.status', 'on').eq('rule.action', 'file').order('at').limit(500)
-      : Promise.resolve({ data: [] }),
+    box.filing || box.file_customers ? fileQuery().order('at').limit(500) : Promise.resolve({ data: [] }),
     box.marketing
-      ? db.from('mail_messages').select('id, graph_id, conversation_id, at, marketing, rule:mail_rules(folder, status, action, never_marketing)').eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('marketing', true).order('at').limit(200)
+      ? db.from('mail_messages').select('id, graph_id, conversation_id, at, marketing, rule:mail_rules(folder, status, action, never_marketing, enquiry_id)').eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('marketing', true).order('at').limit(200)
       : Promise.resolve({ data: [] }),
     box.marketing
       ? db.from('mail_messages').select(cols).eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('rule.status', 'on').eq('rule.action', 'marketing').order('at').limit(200)
