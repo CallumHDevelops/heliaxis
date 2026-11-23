@@ -155,10 +155,10 @@ export const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, norma
 /** Plain text to the little HTML Outlook wants for a reply: escaped, line breaks kept. */
 export function textToHtml(text: string): string {
   const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return esc
-    .split(/\n{2,}/)
-    .map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`)
-    .join('');
+  // A blank line between paragraphs, none after the last: so a signature that starts with your name sits right
+  // under "Kind Regards", as in Outlook.
+  const paras = esc.split(/\n{2,}/);
+  return paras.map((p, i) => `<p style="margin: 0 0 ${i === paras.length - 1 ? '0' : '1em'} 0;">${p.replace(/\n/g, '<br>')}</p>`).join('');
 }
 
 /**

@@ -119,7 +119,7 @@ describe('where a conversation stands', () => {
 
 describe('replies', () => {
   it('escapes and keeps paragraphs', () => {
-    expect(textToHtml('Hi Jane,\n\nYes <ok> & thanks\nCallum')).toBe('<p>Hi Jane,</p><p>Yes &lt;ok&gt; &amp; thanks<br>Callum</p>');
+    expect(textToHtml('Hi Jane,\n\nYes <ok> & thanks\nCallum')).toBe('<p style="margin: 0 0 1em 0;">Hi Jane,</p><p style="margin: 0 0 0 0;">Yes &lt;ok&gt; &amp; thanks<br>Callum</p>');
   });
 });
 
