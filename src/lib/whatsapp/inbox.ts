@@ -5,6 +5,7 @@ import { chatHref, chatRef, chatTag, replyRef } from '@/lib/notification-refs';
 import { canAccess } from '@/lib/portals';
 import { callBackTask } from './call-back';
 import { suggestCall } from '@/lib/crm/call-suggest';
+import { fillFromMessage } from '@/lib/crm/read-details';
 import { inboundMediaColumns, storeMediaSoon } from './media';
 import { defaultTemplate, markRead, sendDocument, sendTemplate, sendText, whatsappConfigured } from './api';
 import {
@@ -213,6 +214,9 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
     .eq('kind', 'chase');
 
   const queued = kind === 'text' && m.type !== 'reaction' && !word ? await queueSmartReply(db, enquiry, body, m.id) : null;
+
+  // Their name, postcode, address or email written in the message: onto the customer and the job (only where blank).
+  if (kind === 'text' && !word) await fillFromMessage(enquiry.id, body, 'WhatsApp').catch(() => null);
 
   // "Call me today / tomorrow": a call task on their job, so a reply like that is never missed.
   const callBack = kind === 'text' && !word ? await callBackTask(db, { enquiry, body, messageId: m.id, at }, (t, b, h) => notifyEnquiryTeam(t, b, h)).catch(() => null) : null;
