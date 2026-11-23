@@ -327,3 +327,22 @@ export async function deleteFolderIfEmpty(address: string, id: string): Promise<
     return false;
   }
 }
+
+/** The files attached to an email (not the pictures inside it). */
+export async function listAttachments(address: string, id: string): Promise<{ id: string; name: string; size: number; contentType: string }[]> {
+  const r = await graph<{ value: { id: string; name?: string; size?: number; contentType?: string; isInline?: boolean }[] }>(
+    `${box(address)}/messages/${encodeURIComponent(id)}/attachments?$select=id,name,size,contentType,isInline`,
+    { headers: { Prefer: IMMUTABLE } }
+  );
+  return (r.value ?? []).filter((a) => !a.isInline).map((a) => ({ id: a.id, name: a.name || 'attachment', size: a.size ?? 0, contentType: a.contentType || 'application/octet-stream' }));
+}
+
+/** One attachment's file, to open from the app. */
+export async function attachmentFile(address: string, id: string, attachmentId: string): Promise<{ name: string; contentType: string; bytes: Buffer } | null> {
+  const r = await graph<{ name?: string; contentType?: string; contentBytes?: string }>(
+    `${box(address)}/messages/${encodeURIComponent(id)}/attachments/${encodeURIComponent(attachmentId)}`,
+    { headers: { Prefer: IMMUTABLE } }
+  );
+  if (!r.contentBytes) return null;
+  return { name: r.name || 'attachment', contentType: r.contentType || 'application/octet-stream', bytes: Buffer.from(r.contentBytes, 'base64') };
+}

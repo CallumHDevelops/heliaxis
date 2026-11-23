@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createReplyDraft, MAX_ATTACH_TOTAL, messageText, moveToInbox, sendDraft, type FileToAttach } from '@/lib/mail/graph';
+import { createReplyDraft, listAttachments, MAX_ATTACH_TOTAL, messageText, moveToInbox, sendDraft, type FileToAttach } from '@/lib/mail/graph';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { DOCS_BUCKET, safeName } from '@/lib/crm/server';
 import { clearAway, contextFor, dropOutlookDraft, fileThreadNow, noteThreadOnCrm, putBack, putOutlookDraft, replyHtml, signatureImages, writeDraft } from '@/lib/mail/sync';
@@ -90,7 +90,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { s, box, t } = l;
   const { data: msgs } = await s.db.from('mail_messages').select('id, graph_id, direction, from_name, from_address, to_addresses, subject, preview, at, place').eq('box_id', box.id).eq('conversation_id', t.conversation_id).order('at').limit(50);
   let latest: { text: string; webLink: string | null } | null = null;
-  if (t.last_in_graph_id) latest = await messageText(box.address, t.last_in_graph_id as string).catch(() => null);
+  // The files attached to each email from them (a forwarded estimate, a datasheet…), to open from here.
+  const received: Record<string, { id: string; name: string; size: number }[]> = {};
+  const ins = (msgs ?? []).filter((m) => m.direction === 'in').slice(-5);
+  const [text, ...lists] = await Promise.all([
+    t.last_in_graph_id ? messageText(box.address, t.last_in_graph_id as string).catch(() => null) : Promise.resolve(null),
+    ...ins.map((m) => listAttachments(box.address, m.graph_id as string).catch(() => [])),
+  ]);
+  latest = text;
+  ins.forEach((m, i) => {
+    if (lists[i]?.length) received[m.id as string] = lists[i].map(({ id, name, size }) => ({ id, name, size }));
+  });
   // What can be attached in one tap: the customer's job documents, and the company library.
   let documents: { id: string; name: string; size: number | null; job: string | null }[] = [];
   if (t.enquiry_id) {
@@ -101,7 +111,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
   }
   const { data: library } = await s.db.from('crm_library').select('id, name, size').order('name').limit(60);
-  return json({ messages: msgs ?? [], latest, signature: box.signature, documents, library: library ?? [] });
+  return json({ messages: (msgs ?? []).map(({ graph_id: _g, ...m }) => m), latest, signature: box.signature, documents, library: library ?? [], received }); // eslint-disable-line @typescript-eslint/no-unused-vars
 }
 
 /**

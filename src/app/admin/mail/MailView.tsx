@@ -386,6 +386,7 @@ function ThreadSheet({
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [latest, setLatest] = useState<{ text: string; webLink: string | null } | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
+  const [received, setReceived] = useState<Record<string, { id: string; name: string; size: number }[]>>({});
   // Attachments: files from your device (uploaded as you add them), and one-tap picks from their documents and the library.
   const [documents, setDocuments] = useState<Doc[]>([]);
   const [library, setLibrary] = useState<Doc[]>([]);
@@ -437,6 +438,7 @@ function ThreadSheet({
       setMsgs((r.data.messages as Msg[]) ?? []);
       setLatest((r.data.latest as typeof latest) ?? null);
       setSignature((r.data.signature as string | null) ?? null);
+      setReceived((r.data.received as typeof received) ?? {});
       setDocuments((r.data.documents as Doc[]) ?? []);
       setLibrary((r.data.library as Doc[]) ?? []);
     });
@@ -510,6 +512,19 @@ function ThreadSheet({
                   <time>{ago(m.at, now)}</time>
                 </header>
                 <p>{full ? latest!.text : m.preview}</p>
+                {received[m.id]?.length ? (
+                  <ul className="mx-files" aria-label="Attachments">
+                    {received[m.id].map((f) => (
+                      <li key={f.id}>
+                        <BrandIcon k="document" size={16} />{' '}
+                        <a className="crm-link" href={`/api/mail/threads/${row.id}/attachment?m=${m.id}&a=${encodeURIComponent(f.id)}`} target="_blank" rel="noopener noreferrer">
+                          {f.name}
+                        </a>{' '}
+                        <span className="crm-muted crm-small">{size(f.size)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </article>
             );
           })}

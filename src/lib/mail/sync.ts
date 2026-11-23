@@ -181,7 +181,9 @@ export class Context {
       }
     }
     for (const f of folders ?? []) c.folders.set(f.path as string, f.graph_id as string);
-    c.existing = await listFolders(box.address).catch(() => []);
+    // Only folders you made: ones the app made before (Suppliers, Partners… at the top) aren't "yours" to file into.
+    const appMade = new Set((folders ?? []).map((f) => f.graph_id as string));
+    c.existing = (await listFolders(box.address).catch(() => [])).filter((f) => !appMade.has(f.id));
     for (const f of c.existing) {
       if (!c.folders.has(f.path)) {
         c.folders.set(f.path, f.id);

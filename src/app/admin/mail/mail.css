@@ -533,3 +533,27 @@
   padding: 0.2rem 0;
   font-size: 0.9rem;
 }
+
+/* Files attached to an email they sent. */
+.mx-files {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0 0;
+  border-top: 1px solid var(--border);
+}
+.mx-files li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0;
+  font-size: 0.9rem;
+}
+
+/* A conversation: wider than the CRM's other sheets, so emails read comfortably. */
+.crm-sheet-box--wide:has(.mx-sheet) {
+  width: min(1180px, 96vw);
+  max-width: min(1180px, 96vw);
+}
+.mx-sheet .mx-convo {
+  max-height: 56vh;
+}
