@@ -223,6 +223,11 @@ function SearchBox({ variant, inputRef, onDone }: { variant: 'inline' | 'overlay
                       </b>
                       <small>{[o.person.postcode, o.person.phone, o.person.source].filter(Boolean).join(' · ')}</small>
                     </span>
+                    {o.person.dupes?.length ? (
+                      <span className="gs-dupe" title={`Looks like the same person as ${o.person.dupes.map((d) => [d.name, d.ref].filter(Boolean).join(' ')).join(', ')} (${o.person.dupes[0].why === 'email' ? 'same email' : o.person.dupes[0].why === 'number' ? 'same number' : 'same name'})`}>
+                        Possible duplicate
+                      </span>
+                    ) : null}
                     <span className="gs-hint">{personHint(o.person)}</span>
                   </>
                 ) : (

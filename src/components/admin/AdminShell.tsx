@@ -411,6 +411,7 @@ export async function AdminShell({
       label: 'CRM',
       items: [
         { href: '/admin/crm/dashboard', label: 'Dashboard', icon: icons.analytics, show: can('crm'), section: 'Customers' },
+        { href: '/admin/crm/duplicates', label: 'Possible duplicates', short: 'Duplicates', icon: icons.crm, show: can('crm'), section: 'Customers' },
         { href: '/admin/crm', label: 'Opportunities', icon: icons.crm, show: can('crm'), tab: true, section: 'Customers' },
         { href: '/admin/crm/organisations', label: 'Organisations', icon: <svg {...ICON}><path d="M4 21V4l9-1v18M13 8h7v13M7.5 8h2M7.5 12h2M7.5 16h2M16 12h1.5M16 16h1.5M2 21h20" /></svg>, show: can('crm'), section: 'Customers' },
         { href: '/admin/crm/contacts', label: 'Contacts', icon: <svg {...ICON}><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>, show: can('crm'), section: 'Customers' },

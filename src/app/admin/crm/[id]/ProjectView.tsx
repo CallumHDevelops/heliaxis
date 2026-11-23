@@ -141,6 +141,13 @@ export function ProjectView({
   // After a merge that opened this job: "Merged. HX-0069 now finds Robert Evans HX-0080."
   const [notice, setNotice] = useState(() => mergeNotice.read());
   const [merging, setMerging] = useState<MergeStart | null>(null);
+  // From the possible-duplicates list: ?merge=<the other customer> opens the merge sheet for the pair.
+  const [mergeAsked, setMergeAsked] = useState(false);
+  if (rec && !mergeAsked && typeof window !== 'undefined') {
+    setMergeAsked(true);
+    const other = new URLSearchParams(window.location.search).get('merge');
+    if (other && /^[0-9a-f-]{36}$/i.test(other) && other !== rec.customer.id) setMerging({ a: rec.customer.id, b: other, name: rec.customer.name });
+  }
   /** This job was joined into another while open (a merge elsewhere). */
   const [joined, setJoined] = useState<{ id: string; ref: string | null } | null>(null);
   const [tabSel, setTabSel] = useState<Tab | null>(initialTab === 'handover' ? 'docs' : initialTab && TABS.includes(initialTab) ? initialTab : initialView ? 'docs' : null);

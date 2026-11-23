@@ -6,6 +6,7 @@ import { cleanSearch, groupResults, jobMatches, orgResults, postcodePattern, typ
 import { orgsReady, searchOrgsAndContacts } from '@/lib/organisations/server';
 import { sourcesNow } from '@/lib/lead-source-server';
 import { canAccess } from '@/lib/portals';
+import { possibleDuplicates, type Duplicate } from '@/lib/projects/duplicates';
 import { looksLikeRef, refOnly, refPatterns } from '@/lib/projects/refs';
 import { missingColumn, type Db } from '@/lib/projects/server';
 import { accentPattern, everyGroup, searchWords, withoutAccents } from '@/lib/search-words';
@@ -89,6 +90,7 @@ export async function GET(req: Request) {
   });
   // Where the ones shown came from, with a Meta ad's name now (they keep the name it had when they came in).
   const shown = new Set(results.map((p) => p.id));
-  const sources = await sourcesNow(rows.filter((r) => shown.has(r.id)));
-  return json({ q, people: results.map((p) => ({ ...p, source: sources.get(p.id)?.label ?? p.source })), orgs });
+  const [sources, dupes] = await Promise.all([sourcesNow(rows.filter((r) => shown.has(r.id))), possibleDuplicates([...shown]).catch(() => new Map())]);
+  // "Possible duplicate": another customer with the same email, number or name (src/lib/projects/duplicates.ts).
+  return json({ q, people: results.map((p) => ({ ...p, source: sources.get(p.id)?.label ?? p.source, dupes: ((dupes.get(p.id) ?? []) as Duplicate[]).map((d) => ({ name: d.name, ref: d.project_ref, why: d.why })) })), orgs });
 }

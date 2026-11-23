@@ -376,6 +376,7 @@ function StagePath({
 const DUPE_WHY: Record<NonNullable<Duplicate['why']>, string> = {
   email: 'same email',
   number: 'same number',
+  name: 'same name',
   booking: 'booked online with the same details',
 };
 
