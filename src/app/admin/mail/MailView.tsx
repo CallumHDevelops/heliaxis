@@ -1,10 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BrandIcon, Sheet } from '../crm/CrmUi';
 import { WritingSpark } from '../sales/quotes/[id]/WritingSpark';
 import type { MailCounts, ThreadRow } from '@/lib/mail/server';
+import { clearAwayTo } from '@/lib/mail/shared';
+
+type Cleared = { filed: number; deleted: number; folder: string | null };
 import '../crm/crm.css';
 import '../sales/quotes/quotes.css';
 import './mail.css';
@@ -90,6 +93,34 @@ export function MailView(p: {
     [fetchList]
   );
 
+  // "No reply needed" from the list or a conversation: where it went, with Undo for a few seconds.
+  const [toast, setToast] = useState<{ id: string; text: string; busy: boolean } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function cleared(row: ThreadRow, d: Cleared) {
+    const text = d.folder ? `Moved to ${pretty(d.folder)}` : d.deleted ? 'Moved to Deleted Items' : 'Marked no reply needed';
+    setToast({ id: row.id, text: `${row.who_name || row.who_address || 'Email'}: ${text}`, busy: false });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 8000);
+  }
+  async function quickDone(row: ThreadRow) {
+    // Off the list at once; back if it didn't work.
+    setRows((rs) => rs.filter((r) => r.id !== row.id));
+    const r = await call(`/api/mail/threads/${row.id}`, { method: 'POST', body: JSON.stringify({ action: 'done' }) });
+    if (!r.ok) {
+      setRows((rs) => [row, ...rs]);
+      setToast({ id: row.id, text: String(r.data.error || 'That didn’t work. Try again.'), busy: false });
+      return;
+    }
+    cleared(row, r.data as unknown as Cleared);
+    setCounts((c) => (c ? { ...c, reply: Math.max(0, c.reply - 1), urgent: row.priority === 'urgent' || row.priority === 'high' ? Math.max(0, c.urgent - 1) : c.urgent } : c));
+  }
+  async function undo(id: string) {
+    setToast((t) => (t ? { ...t, busy: true } : t));
+    await call(`/api/mail/threads/${id}`, { method: 'POST', body: JSON.stringify({ action: 'restore' }) });
+    setToast(null);
+    load(tab);
+  }
+
   function pick(t: Tab) {
     setTab(t);
     if (LIST_TABS.includes(t)) {
@@ -152,6 +183,7 @@ export function MailView(p: {
             loading={loading}
             now={now}
             onOpen={setOpen}
+            onDone={quickDone}
           />
         )}
         {tab === 'folders' && <Folders />}
@@ -168,11 +200,27 @@ export function MailView(p: {
             setOpen(null);
             load(tab);
           }}
+          onCleared={(d) => {
+            setOpen(null);
+            cleared(open, d);
+            load(tab);
+          }}
         />
+      )}
+      {toast && (
+        <div className="mx-toast" role="status">
+          <span>{toast.text}</span>
+          <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={toast.busy} onClick={() => undo(toast.id)}>
+            {toast.busy ? 'Putting it back…' : 'Undo'}
+          </button>
+        </div>
       )}
     </div>
   );
 }
+
+/** "Inbox/Customers/Sarah Davies (HX-0069)" → "Customers › Sarah Davies (HX-0069)". */
+const pretty = (folder: string) => folder.replace(/^Inbox\//, '').split('/').join(' › ');
 
 function Head({ counts }: { counts?: MailCounts | null }) {
   return (
@@ -253,7 +301,7 @@ const HINT: Record<string, string> = {
   marketing: 'Newsletters and offers, moved to your Marketing folder. If one isn’t marketing, open it and say so: it comes back to your inbox.',
 };
 
-function ThreadList({ tab, rows, loading, now, onOpen }: { tab: Tab; rows: ThreadRow[]; loading: boolean; now: number; onOpen: (r: ThreadRow) => void }) {
+function ThreadList({ tab, rows, loading, now, onOpen, onDone }: { tab: Tab; rows: ThreadRow[]; loading: boolean; now: number; onOpen: (r: ThreadRow) => void; onDone: (r: ThreadRow) => void }) {
   if (loading && !rows.length) return <p className="crm-muted mx-pad">Loading…</p>;
   return (
     <>
@@ -266,7 +314,7 @@ function ThreadList({ tab, rows, loading, now, onOpen }: { tab: Tab; rows: Threa
             const who = r.who_name || r.rule?.label || r.who_address || 'Unknown';
             const draftReady = !!r.draft && !!r.draft_for && r.draft_for >= String(r.last_in_at ?? '');
             return (
-              <li key={r.id}>
+              <li key={r.id} className="mx-li">
                 <button type="button" className={`mx-row is-${r.priority ?? 'normal'}`} onClick={() => onOpen(r)}>
                   <span className="mx-av" aria-hidden="true">
                     {initials(who)}
@@ -292,6 +340,16 @@ function ThreadList({ tab, rows, loading, now, onOpen }: { tab: Tab; rows: Threa
                     </span>
                   </span>
                 </button>
+                {tab === 'reply' && (
+                  <button
+                    type="button"
+                    className="crm-btn crm-btn--ghost crm-btn--small mx-quick"
+                    onClick={() => onDone(r)}
+                    title={clearAwayTo(r.rule) ? `Moves to ${pretty(clearAwayTo(r.rule)!)}` : 'Moves to Deleted Items'}
+                  >
+                    No reply needed
+                  </button>
+                )}
               </li>
             );
           })}
@@ -305,7 +363,23 @@ function ThreadList({ tab, rows, loading, now, onOpen }: { tab: Tab; rows: Threa
 
 type Msg = { id: string; direction: 'in' | 'out'; from_name: string | null; from_address: string | null; subject: string | null; preview: string | null; at: string; place: string };
 
-function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: ThreadRow; tab: Tab; canCrm: boolean; now: number; onClose: () => void; onChanged: () => void }) {
+function ThreadSheet({
+  row,
+  tab,
+  canCrm,
+  now,
+  onClose,
+  onChanged,
+  onCleared,
+}: {
+  row: ThreadRow;
+  tab: Tab;
+  canCrm: boolean;
+  now: number;
+  onClose: () => void;
+  onChanged: () => void;
+  onCleared: (d: Cleared) => void;
+}) {
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [latest, setLatest] = useState<{ text: string; webLink: string | null } | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
@@ -452,10 +526,11 @@ function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: Threa
                 className="crm-btn crm-btn--solar"
                 disabled={!!busy}
                 onClick={async () => {
-                  if (await act('done')) onChanged();
+                  const d = await act('done');
+                  if (d) onCleared(d as Cleared);
                 }}
               >
-                {busy === 'done' ? 'Saving…' : 'Done'}
+                {busy === 'done' ? 'Moving…' : 'Done'}
               </button>
             </div>
           </section>
@@ -533,12 +608,15 @@ function ThreadSheet({ row, tab, canCrm, now, onClose, onChanged }: { row: Threa
                 className="crm-btn crm-btn--ghost crm-btn--small mx-actions__end"
                 disabled={!!busy}
                 onClick={async () => {
-                  if (await act('done')) onChanged();
+                  const d = await act('done');
+                  if (d) onCleared(d as Cleared);
                 }}
+                title={clearAwayTo(row.rule) ? `Moves to ${pretty(clearAwayTo(row.rule)!)}` : 'Moves to Deleted Items'}
               >
-                {busy === 'done' ? 'Saving…' : 'No reply needed'}
+                {busy === 'done' ? 'Moving…' : 'No reply needed'}
               </button>
             </div>
+            <p className="crm-muted crm-small mx-dest">No reply needed moves it to {clearAwayTo(row.rule) ? pretty(clearAwayTo(row.rule)!) : 'Deleted Items'}.</p>
           </section>
         ) : (
           <div className="mx-actions">

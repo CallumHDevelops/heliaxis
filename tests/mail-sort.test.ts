@@ -11,6 +11,7 @@ import {
   looksLikeMarketing,
   markFor,
   customerFolder,
+  clearAwayTo,
   withSignOff,
   cidsIn,
   cleanSignature,
@@ -191,5 +192,15 @@ describe('customer folders', () => {
     expect(customerFolder('Sarah Davies', 'HX-0069')).toBe('Inbox/Customers/Sarah Davies (HX-0069)');
     expect(customerFolder('Smith / Jones', 'HX-0101')).toBe('Inbox/Customers/Smith Jones (HX-0101)');
     expect(customerFolder('Jane Smith', null)).toBe('Inbox/Customers/Jane Smith');
+  });
+});
+
+describe('No reply needed', () => {
+  it('goes to its folder, or Deleted Items when there isn’t one', () => {
+    expect(clearAwayTo({ folder: 'Inbox/Customers/Sarah Davies (HX-0069)', status: 'on', action: 'file' })).toBe('Inbox/Customers/Sarah Davies (HX-0069)');
+    expect(clearAwayTo({ folder: 'Suppliers/GoodWe', status: 'suggested', action: 'file' })).toBe('Suppliers/GoodWe');
+    expect(clearAwayTo({ folder: 'Suppliers/GoodWe', status: 'off', action: 'file' })).toBeNull();
+    expect(clearAwayTo({ folder: 'Marketing', status: 'on', action: 'marketing' })).toBeNull();
+    expect(clearAwayTo(null)).toBeNull();
   });
 });

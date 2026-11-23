@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createReplyDraft, messageText, moveToInbox, sendDraft } from '@/lib/mail/graph';
-import { contextFor, dropOutlookDraft, fileThreadNow, noteThreadOnCrm, putOutlookDraft, replyHtml, signatureImages, writeDraft } from '@/lib/mail/sync';
+import { clearAway, contextFor, dropOutlookDraft, fileThreadNow, noteThreadOnCrm, putBack, putOutlookDraft, replyHtml, signatureImages, writeDraft } from '@/lib/mail/sync';
 import { mailSession } from '@/lib/mail/server';
 import { addressOf, customerFolder, folderFor, threadState } from '@/lib/mail/shared';
 import { canAccess } from '@/lib/portals';
@@ -103,13 +103,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       needsReply: action === 'undone' ? true : ((t.needs_reply as boolean | null) ?? null),
     });
     await s.db.from('mail_threads').update({ done_at: doneAt, state, ...(action === 'undone' ? { needs_reply: true } : {}), updated_at: now }).eq('id', t.id);
-    let filed = 0;
     if (action === 'done') {
       await dropOutlookDraft(s.db, box.address, t.id as string).catch(() => null);
-      // No reply needed: a customer's conversation goes into their folder now.
-      filed = await fileThreadNow(s.db, box, t.conversation_id as string).catch(() => 0);
+      // No reply needed: out of the Inbox now, to its folder if it has one, otherwise to Deleted Items.
+      const away = await clearAway(s.db, box, t.conversation_id as string).catch(() => ({ filed: 0, deleted: 0, folder: null }));
+      return json({ ok: true, state, ...away });
     }
-    return json({ ok: true, state, filed });
+    return json({ ok: true, state });
+  }
+
+  // Undo "No reply needed": back in the Inbox, and back on To reply.
+  if (action === 'restore') {
+    const back = await putBack(s.db, box, t.conversation_id as string).catch(() => 0);
+    const state = threadState({ marketing: !!t.marketing, lastInAt: t.last_in_at as string | null, lastOutAt: t.last_out_at as string | null, doneAt: null, triagedFor: (t.triaged_for as string | null) ?? null, needsReply: (t.needs_reply as boolean | null) ?? true });
+    await s.db.from('mail_threads').update({ done_at: null, state, updated_at: now }).eq('id', t.id);
+    return json({ ok: true, back, state });
   }
 
   if (action === 'crm') {

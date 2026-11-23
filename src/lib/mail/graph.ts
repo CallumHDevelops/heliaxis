@@ -120,6 +120,11 @@ export async function moveMessage(address: string, id: string, folderId: string)
   await graph(`${box(address)}/messages/${encodeURIComponent(id)}/move`, { method: 'POST', headers: { Prefer: IMMUTABLE }, body: JSON.stringify({ destinationId: folderId }) });
 }
 
+/** To Deleted Items (Outlook keeps it there, so it can be got back). */
+export async function moveToDeleted(address: string, id: string): Promise<void> {
+  await moveMessage(address, id, 'deleteditems');
+}
+
 /** Moves an email back to the inbox ("Not marketing"). */
 export async function moveToInbox(address: string, id: string): Promise<void> {
   await moveMessage(address, id, 'inbox');

@@ -346,3 +346,11 @@ export function withSignOff(text: string, signOff: string): string {
   }
   return `${text.trim()}\n\n${want}`;
 }
+
+/**
+ * Where "No reply needed" sends a conversation: its folder (a customer's own, or any approved or suggested folder),
+ * or null for Deleted Items (no folder, marketing, or a folder you've turned off).
+ */
+export function clearAwayTo(rule: { folder: string; status: string; action: string } | null | undefined): string | null {
+  return rule && rule.action === 'file' && rule.status !== 'off' ? rule.folder : null;
+}

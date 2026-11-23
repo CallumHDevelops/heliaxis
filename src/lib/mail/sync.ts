@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
 import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
-import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
+import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, moveToDeleted, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
 import {
   addressOf,
   companyDomain,
@@ -18,6 +18,7 @@ import {
   markFor,
   readyToFile,
   customerFolder,
+  clearAwayTo,
   textToHtml,
   cidsIn,
   pickFont,
@@ -430,6 +431,78 @@ export async function noteThreadOnCrm(db: Db, box: Pick<Box, 'id' | 'address'>, 
       at: m.at,
     }));
   if (rows.length) await db.from('crm_emails').upsert(rows, { onConflict: 'graph_id', ignoreDuplicates: true });
+}
+
+/**
+ * "No reply needed": the conversation's emails still in the Inbox go to their folder if they have one (Inbox ›
+ * Customers › Name (HX-…), Suppliers › GoodWe…), otherwise to Deleted Items. Emails you've already moved
+ * yourself are left where they are. Undo with putBack().
+ */
+export async function clearAway(db: Db, box: Pick<Box, 'id' | 'address'>, conversationId: string): Promise<{ filed: number; deleted: number; folder: string | null }> {
+  const { data: msgs } = await db
+    .from('mail_messages')
+    .select('id, graph_id, rule:mail_rules(folder, status, action)')
+    .eq('box_id', box.id)
+    .eq('conversation_id', conversationId)
+    .eq('place', 'inbox')
+    .eq('direction', 'in');
+  const list = (msgs ?? []).map((m) => ({ ...m, rule: (Array.isArray(m.rule) ? m.rule[0] : m.rule) as { folder: string; status: string; action: string } | null }));
+  const out = { filed: 0, deleted: 0, folder: null as string | null };
+  if (!list.length) return out;
+  const { data: saved } = await db.from('mail_folders').select('path, graph_id').eq('box_id', box.id);
+  const known = new Map((saved ?? []).map((f) => [f.path as string, f.graph_id as string]));
+  const before = known.size;
+  const inbox = await inboxId(box.address);
+  const now = new Date().toISOString();
+  for (const m of list) {
+    try {
+      if ((await getParentFolder(box.address, m.graph_id as string)) !== inbox) {
+        await db.from('mail_messages').update({ place: 'elsewhere' }).eq('id', m.id);
+        continue;
+      }
+      const folder = clearAwayTo(m.rule);
+      if (folder) {
+        await moveMessage(box.address, m.graph_id as string, await ensureFolder(box.address, folder, known));
+        await db.from('mail_messages').update({ place: 'filed', filed_at: now, file_error: null }).eq('id', m.id);
+        out.filed++;
+        out.folder = folder;
+      } else {
+        await moveToDeleted(box.address, m.graph_id as string);
+        await db.from('mail_messages').update({ place: 'deleted', filed_at: now, file_error: null }).eq('id', m.id);
+        out.deleted++;
+      }
+    } catch (e) {
+      await db.from('mail_messages').update({ file_error: (e instanceof Error ? e.message : 'failed').slice(0, 300) }).eq('id', m.id);
+    }
+  }
+  if (known.size !== before) {
+    const rows = [...known].map(([path, graph_id]) => ({ box_id: box.id, path, graph_id }));
+    await db.from('mail_folders').upsert(rows, { onConflict: 'box_id,path', ignoreDuplicates: true });
+  }
+  return out;
+}
+
+/** Undo "No reply needed": what it moved in the last day goes back to the Inbox. Returns how many. */
+export async function putBack(db: Db, box: Pick<Box, 'id' | 'address'>, conversationId: string): Promise<number> {
+  const since = new Date(Date.now() - 86_400_000).toISOString();
+  const { data: msgs } = await db
+    .from('mail_messages')
+    .select('id, graph_id')
+    .eq('box_id', box.id)
+    .eq('conversation_id', conversationId)
+    .in('place', ['filed', 'deleted'])
+    .gte('filed_at', since);
+  let n = 0;
+  for (const m of msgs ?? []) {
+    try {
+      await moveMessage(box.address, m.graph_id as string, 'inbox');
+      await db.from('mail_messages').update({ place: 'inbox', filed_at: null }).eq('id', m.id);
+      n++;
+    } catch {
+      // gone for good (emptied from Deleted Items): nothing to put back
+    }
+  }
+  return n;
 }
 
 /**

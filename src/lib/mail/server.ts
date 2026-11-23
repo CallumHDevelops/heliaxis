@@ -77,11 +77,11 @@ export type ThreadRow = {
   draft: string | null;
   draft_for: string | null;
   draft_error: string | null;
-  rule: { label: string; folder: string; status: string } | null;
+  rule: { label: string; folder: string; status: string; action: string } | null;
 };
 
 export const THREAD_LIST_COLS =
-  'id, subject, who_name, who_address, state, priority, kind, summary, why, due, tone, opportunity, action_only, prospect, enquiry_id, last_in_at, last_out_at, messages, draft, draft_for, draft_error, rule:mail_rules(label, folder, status)';
+  'id, subject, who_name, who_address, state, priority, kind, summary, why, due, tone, opportunity, action_only, prospect, enquiry_id, last_in_at, last_out_at, messages, draft, draft_for, draft_error, rule:mail_rules(label, folder, status, action)';
 
 export type View = 'reply' | 'waiting' | 'opps' | 'people' | 'fyi' | 'marketing';
 

@@ -452,3 +452,52 @@
 .mx-why__opp b {
   color: var(--text);
 }
+
+/* To reply: No reply needed on each row, and where it went (with Undo). */
+.mx-li {
+  display: flex;
+  align-items: center;
+}
+.mx-li .mx-row {
+  flex: 1;
+  min-width: 0;
+}
+.mx-quick {
+  flex: none;
+  margin-right: 0.8rem;
+}
+.mx-dest {
+  margin: 0.4rem 0 0;
+}
+.mx-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 0.7rem 0.6rem 1rem;
+  border-radius: 10px;
+  background: var(--inverse);
+  color: var(--on-solid);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+.mx-toast span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .mx-li {
+    flex-wrap: wrap;
+  }
+  .mx-li .mx-row {
+    flex: 1 1 100%;
+  }
+  .mx-quick {
+    margin: 0 0.8rem 0.7rem auto;
+  }
+}
