@@ -415,3 +415,17 @@ export function belongsTo(from: string, replyTo: string | null | undefined): str
   if (r && r.includes('@') && r !== f && isSendingService(domainOf(f)) && !isSendingService(domainOf(r))) return r;
   return f;
 }
+
+/**
+ * With a signature that carries your name, a draft ends at the sign-off ("Kind Regards"): a name typed under it would
+ * appear twice. Lines after the sign-off are dropped.
+ */
+export function endAtSignOff(text: string, signOff: string): string {
+  const want = signOff.trim().toLowerCase().replace(/[,.!]+$/, '');
+  if (!want) return text.trim();
+  const lines = text.trim().split('\n');
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 4); i--) {
+    if (lines[i].trim().toLowerCase().replace(/[,.!]+$/, '') === want) return lines.slice(0, i + 1).join('\n').trim();
+  }
+  return text.trim();
+}

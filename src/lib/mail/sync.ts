@@ -15,6 +15,7 @@ import {
   MARKETING_FOLDER,
   markFor,
   readyToFile,
+  endAtSignOff,
   belongsTo,
   isSendingService,
   customerFolder,
@@ -63,6 +64,7 @@ type Box = {
   sign_off: string;
   signature: string | null;
   signature_html: string | null;
+  signature_locked: boolean;
   signature_images: InlineImage[] | null;
   signature_at: string | null;
   reply_font: string | null;
@@ -74,7 +76,7 @@ type Box = {
   style_at: string | null;
   style_edited: boolean;
 };
-const BOX_COLS = 'id, user_id, address, filing, file_customers, auto_approve, marketing, drafts, sign_off, signature, signature_html, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
+const BOX_COLS = 'id, user_id, address, filing, file_customers, auto_approve, marketing, drafts, sign_off, signature, signature_html, signature_locked, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
 type Rule = {
   id: string;
   kind: 'domain' | 'address';
@@ -963,7 +965,10 @@ export async function writeDraft(
 ): Promise<string | null> {
   const thread = await threadForAi(ctx, t);
   const notes = { priority: t.priority ?? null, tone: t.tone ?? null, opportunity: t.opportunity ?? null, summary: t.summary ?? null };
-  const draft = await draftForThread(thread, ctx.owner, await voiceFor(ctx, t), ctx.box.sign_off || 'Kind regards,', notes, steer);
+  const signOff = ctx.box.sign_off || 'Kind regards,';
+  const written = await draftForThread(thread, ctx.owner, await voiceFor(ctx, t), signOff, notes, steer);
+  // Your signature carries your name: the draft ends at the sign-off, so it isn't there twice.
+  const draft = written && ctx.box.signature_html ? endAtSignOff(written, signOff) : written;
   await ctx.db
     .from('mail_threads')
     .update(draft ? { draft, draft_for: t.last_in_at, draft_error: null } : { draft_error: 'The writing assistant couldn’t write this one. Try again, or write it yourself.', draft_for: t.last_in_at })
@@ -1140,7 +1145,8 @@ async function voiceFor(ctx: Context, t: { who_address: string | null; conversat
 
 /* ── Your signature ───────────────────────────────────────────────────── */
 
-const signatureDue = (box: Box) => !box.signature_at || Date.now() - Date.parse(box.signature_at) > 7 * 86_400_000;
+// Not when you've given it (signature_locked): then it's yours as it is.
+const signatureDue = (box: Box) => !box.signature_locked && (!box.signature_at || Date.now() - Date.parse(box.signature_at) > 7 * 86_400_000);
 
 /**
  * Copies your Outlook signature from your latest sent emails (the one they have in common, with its logo), and the

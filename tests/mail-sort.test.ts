@@ -20,6 +20,7 @@ import {
   pathPart,
   prettyFolder,
   withSignOff,
+  endAtSignOff,
   cidsIn,
   cleanSignature,
   insertAtTop,
@@ -250,5 +251,12 @@ describe('emails sent through Xero, Stripe and the like', () => {
     expect(belongsTo('messaging-service@post.xero.com', null)).toBe('messaging-service@post.xero.com');
     expect(belongsTo('tom@goodwe.com', 'sales@goodwe.com')).toBe('tom@goodwe.com');
     expect(belongsTo('dse_na4@docusign.net', 'noreply@docusign.net')).toBe('dse_na4@docusign.net');
+  });
+});
+
+describe('your signature carries your name', () => {
+  it('so a draft ends at the sign-off', () => {
+    expect(endAtSignOff('Hi Sam,\n\nYes.\n\nKind Regards\nCallum', 'Kind Regards')).toBe('Hi Sam,\n\nYes.\n\nKind Regards');
+    expect(endAtSignOff('Hi Sam,\n\nYes.\n\nKind Regards', 'Kind Regards')).toBe('Hi Sam,\n\nYes.\n\nKind Regards');
   });
 });
