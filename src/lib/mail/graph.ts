@@ -21,6 +21,7 @@ export type GMessage = {
   from?: { emailAddress?: { address?: string; name?: string } };
   toRecipients?: { emailAddress?: { address?: string; name?: string } }[];
   ccRecipients?: { emailAddress?: { address?: string; name?: string } }[];
+  replyTo?: { emailAddress?: { address?: string; name?: string } }[];
   receivedDateTime?: string;
   sentDateTime?: string;
   isDraft?: boolean;
@@ -28,7 +29,7 @@ export type GMessage = {
   parentFolderId?: string;
 };
 
-const SELECT = 'id,internetMessageId,conversationId,subject,bodyPreview,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,isDraft,internetMessageHeaders,parentFolderId';
+const SELECT = 'id,internetMessageId,conversationId,subject,bodyPreview,from,toRecipients,ccRecipients,replyTo,receivedDateTime,sentDateTime,isDraft,internetMessageHeaders,parentFolderId';
 
 /** A page of one folder's emails, newest first: newer than `since` and/or older than `before`. */
 export async function listFolder(
@@ -109,6 +110,12 @@ export async function ensureFolder(address: string, path: string, known: Map<str
   return parent;
 }
 
+/** An email's Reply-To address (for emails sent through Xero and the like: the business behind it). */
+export async function getReplyTo(address: string, id: string): Promise<string | null> {
+  const r = await graph<{ replyTo?: { emailAddress?: { address?: string } }[] }>(`${box(address)}/messages/${encodeURIComponent(id)}?$select=replyTo`, { headers: { Prefer: IMMUTABLE } });
+  return r.replyTo?.[0]?.emailAddress?.address ?? null;
+}
+
 /** The folder an email is in now. */
 export async function getParentFolder(address: string, id: string): Promise<string | null> {
   const r = await graph<{ parentFolderId?: string }>(`${box(address)}/messages/${encodeURIComponent(id)}?$select=parentFolderId`, { headers: { Prefer: IMMUTABLE } });
@@ -174,6 +181,45 @@ export async function markMessage(address: string, id: string, o: { category: st
 
 export type InlineImage = { contentId: string; name: string; contentType: string; contentBytes: string };
 
+/** A document attached to a reply (from your device, the customer's job documents or the library). */
+export type FileToAttach = { name: string; contentType: string; bytes: Uint8Array };
+
+/** Outlook's own limit on one email's attachments, roughly. */
+export const MAX_ATTACH_TOTAL = 25 * 1024 * 1024;
+const SIMPLE_ATTACH = 3 * 1024 * 1024;
+
+/**
+ * Attaches a file to a draft: in one go up to 3 MB, otherwise through Outlook's upload session in chunks (a multiple
+ * of 320 KB each, as Microsoft asks).
+ */
+export async function attachFile(address: string, draftId: string, f: FileToAttach): Promise<void> {
+  const url = `${box(address)}/messages/${encodeURIComponent(draftId)}/attachments`;
+  if (f.bytes.length <= SIMPLE_ATTACH) {
+    await graph(url, {
+      method: 'POST',
+      headers: { Prefer: IMMUTABLE },
+      body: JSON.stringify({ '@odata.type': '#microsoft.graph.fileAttachment', name: f.name, contentType: f.contentType, contentBytes: Buffer.from(f.bytes).toString('base64') }),
+    });
+    return;
+  }
+  const session = await graph<{ uploadUrl: string }>(`${url}/createUploadSession`, {
+    method: 'POST',
+    headers: { Prefer: IMMUTABLE },
+    body: JSON.stringify({ AttachmentItem: { attachmentType: 'file', name: f.name, size: f.bytes.length, contentType: f.contentType } }),
+  });
+  const CHUNK = 320 * 1024 * 10; // 3.2 MB
+  for (let start = 0; start < f.bytes.length; start += CHUNK) {
+    const end = Math.min(start + CHUNK, f.bytes.length);
+    // The upload URL carries its own permission: no sign-in header.
+    const r = await fetch(session.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Length': String(end - start), 'Content-Range': `bytes ${start}-${end - 1}/${f.bytes.length}`, 'Content-Type': 'application/octet-stream' },
+      body: Buffer.from(f.bytes.subarray(start, end)),
+    });
+    if (!r.ok && r.status !== 202) throw new Error(`Microsoft didn’t take ${f.name} (${r.status}).`);
+  }
+}
+
 const HTML_PREFER = `${IMMUTABLE}, outlook.body-content-type="html"`;
 
 /**
@@ -185,7 +231,7 @@ export async function createReplyDraft(
   address: string,
   id: string,
   html: string,
-  o: { all?: boolean; images?: InlineImage[] } = {}
+  o: { all?: boolean; images?: InlineImage[]; files?: FileToAttach[] } = {}
 ): Promise<{ id: string; lastModifiedDateTime: string; webLink: string | null }> {
   const made = await graph<{ id: string; body?: { content?: string } }>(`${box(address)}/messages/${encodeURIComponent(id)}/${o.all ? 'createReplyAll' : 'createReply'}`, {
     method: 'POST',
@@ -201,6 +247,7 @@ export async function createReplyDraft(
       body: JSON.stringify({ '@odata.type': '#microsoft.graph.fileAttachment', name: img.name, contentType: img.contentType, contentBytes: img.contentBytes, contentId: img.contentId, isInline: true }),
     });
   }
+  for (const f of o.files ?? []) await attachFile(address, made.id, f);
   const r = await graph<{ lastModifiedDateTime?: string; webLink?: string }>(`${url}?$select=lastModifiedDateTime,webLink`, { headers: { Prefer: IMMUTABLE } });
   return { id: made.id, lastModifiedDateTime: r.lastModifiedDateTime ?? new Date().toISOString(), webLink: r.webLink ?? null };
 }

@@ -12,6 +12,8 @@ import {
   markFor,
   customerFolder,
   clearAwayTo,
+  belongsTo,
+  isSendingService,
   companyFolder,
   matchExisting,
   pathPart,
@@ -229,5 +231,16 @@ describe('your own folders', () => {
     expect(prettyFolder('Inbox/Customers/Sarah Davies (HX-0069)')).toBe('Customers › Sarah Davies (HX-0069)');
     expect(prettyFolder(`Inbox/${pathPart('Finance / Bank')}`)).toBe('Finance / Bank');
     expect(prettyFolder('Marketing')).toBe('Marketing');
+  });
+});
+
+describe('emails sent through Xero, Stripe and the like', () => {
+  it('belong with the business behind them, from Reply-To', () => {
+    expect(isSendingService('post.xero.com')).toBe(true);
+    expect(isSendingService('goodwe.com')).toBe(false);
+    expect(belongsTo('messaging-service@post.xero.com', 'accounts@anymeters.co.uk')).toBe('accounts@anymeters.co.uk');
+    expect(belongsTo('messaging-service@post.xero.com', null)).toBe('messaging-service@post.xero.com');
+    expect(belongsTo('tom@goodwe.com', 'sales@goodwe.com')).toBe('tom@goodwe.com');
+    expect(belongsTo('dse_na4@docusign.net', 'noreply@docusign.net')).toBe('dse_na4@docusign.net');
   });
 });

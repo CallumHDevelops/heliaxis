@@ -2,7 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
 import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
-import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, deleteFolderIfEmpty, listFolders, moveToDeleted, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
+import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, deleteFolderIfEmpty, getReplyTo, listFolders, moveToDeleted, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type FileToAttach, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
 import {
   addressOf,
   companyDomain,
@@ -15,6 +15,8 @@ import {
   MARKETING_FOLDER,
   markFor,
   readyToFile,
+  belongsTo,
+  isSendingService,
   customerFolder,
   clearAwayTo,
   FILED_FOLDER,
@@ -120,6 +122,7 @@ export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult
     const ctx = await Context.load(db, box);
     // Folders from before they lived inside the Inbox (and before your own were used): brought up to date.
     await tidyRules(ctx).catch(() => null);
+    await rehomeServices(ctx).catch(() => null);
     res.read = await readMail(ctx, until);
     if (Date.now() < until) res.named = await nameNewCompanies(ctx);
     if (Date.now() < until) res.triaged = await triage(ctx, until);
@@ -325,8 +328,10 @@ async function ingest(ctx: Context, page: GMessage[], direction: 'in' | 'out'): 
     const to = [...(m.toRecipients ?? []), ...(m.ccRecipients ?? [])].map((r) => addressOf(r.emailAddress?.address)).filter(Boolean);
     const other = direction === 'in' ? from : to.find((a) => a !== me);
     if (!other || !m.conversationId) continue;
+    // Sent through Xero, Stripe and the like: it belongs with the business behind it (its Reply-To), not the service.
+    const owner = direction === 'in' ? belongsTo(from, m.replyTo?.[0]?.emailAddress?.address) : other;
     // Sent to yourself, or to the team only: kept, but with no rule.
-    const rule = await ctx.ruleFor(other, direction === 'in' ? (m.from?.emailAddress?.name ?? null) : (m.toRecipients?.[0]?.emailAddress?.name ?? null));
+    const rule = await ctx.ruleFor(owner, direction === 'in' ? (m.from?.emailAddress?.name ?? null) : (m.toRecipients?.[0]?.emailAddress?.name ?? null));
     const at = (direction === 'in' ? m.receivedDateTime : m.sentDateTime) || new Date().toISOString();
     rows.push({
       box_id: box.id,
@@ -495,7 +500,7 @@ export async function clearAway(db: Db, box: Pick<Box, 'id' | 'address'>, conver
         // Stored, never deleted: its folder, Marketing, or Inbox › Filed.
         const folder = clearAwayTo(m.rule);
         await moveMessage(box.address, m.graph_id as string, await ensureFolder(box.address, folder, known));
-        await db.from('mail_messages').update({ place: 'filed', filed_at: now, file_error: null }).eq('id', m.id);
+        await db.from('mail_messages').update({ place: 'filed', filed_at: now, filed_folder: folder, file_error: null }).eq('id', m.id);
         out.filed++;
         out.folder = folder;
       }
@@ -561,7 +566,7 @@ export async function fileThreadNow(db: Db, box: Pick<Box, 'id' | 'address' | 'f
       }
       const folderId = await ensureFolder(box.address, m.rule.folder, known);
       await moveMessage(box.address, m.graph_id as string, folderId);
-      await db.from('mail_messages').update({ place: 'filed', filed_at: new Date().toISOString(), file_error: null }).eq('id', m.id);
+      await db.from('mail_messages').update({ place: 'filed', filed_at: new Date().toISOString(), filed_folder: m.rule.folder, file_error: null }).eq('id', m.id);
       n++;
     } catch (e) {
       await db.from('mail_messages').update({ file_error: (e instanceof Error ? e.message : 'failed').slice(0, 300) }).eq('id', m.id);
@@ -671,19 +676,65 @@ async function tidyRules(ctx: Context): Promise<void> {
     const r = ctx.byId.get(id);
     if (r) r.folder = folder;
   }
-  // Emails already filed under the old folder follow their rule.
-  if (moved.size) {
-    const { data: filed } = await db.from('mail_messages').select('id, graph_id, rule_id').eq('box_id', box.id).eq('place', 'filed').in('rule_id', [...moved.keys()]).limit(100);
-    for (const m of filed ?? []) {
-      try {
-        await moveMessage(box.address, m.graph_id as string, await ensureFolder(box.address, moved.get(m.rule_id as string)!, ctx.folders));
-      } catch (e) {
-        await db.from('mail_messages').update({ file_error: (e instanceof Error ? e.message : 'failed').slice(0, 300) }).eq('id', m.id);
-      }
-    }
-    await saveFolders(ctx);
-  }
+  await rehome(ctx);
   await cleanFolders(ctx);
+}
+
+/**
+ * Emails already filed follow their rule when its folder changes (a customer's moved inside the Inbox, a suggestion
+ * renamed onto one of your folders). Only to settled folders: inside the Inbox, or one of yours. 50 a run.
+ */
+async function rehome(ctx: Context): Promise<void> {
+  const { db, box } = ctx;
+  const yoursTop = new Set(ctx.existing.map((f) => f.path));
+  const settled = (f: string) => f.startsWith('Inbox/') || yoursTop.has(f);
+  const { data: filed } = await db
+    .from('mail_messages')
+    .select('id, graph_id, filed_folder, rule:mail_rules!inner(folder, action)')
+    .eq('box_id', box.id)
+    .eq('place', 'filed')
+    .eq('rule.action', 'file')
+    .limit(1000);
+  const todo = (filed ?? [])
+    .map((m) => ({ ...m, rule: (Array.isArray(m.rule) ? m.rule[0] : m.rule) as { folder: string } }))
+    .filter((m) => m.rule && settled(m.rule.folder) && m.filed_folder !== m.rule.folder)
+    .slice(0, 50);
+  if (!todo.length) return;
+  for (const m of todo) {
+    try {
+      await moveMessage(box.address, m.graph_id as string, await ensureFolder(box.address, m.rule.folder, ctx.folders));
+      await db.from('mail_messages').update({ filed_folder: m.rule.folder, file_error: null }).eq('id', m.id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'failed';
+      await db.from('mail_messages').update(/not found|ErrorItemNotFound/i.test(msg) ? { place: 'elsewhere', file_error: msg.slice(0, 300) } : { file_error: msg.slice(0, 300) }).eq('id', m.id);
+    }
+  }
+  await saveFolders(ctx);
+}
+
+/**
+ * Emails read before Hestia knew about Xero and the like were put with the service ("Xero"): each is checked once for
+ * the business behind it (its Reply-To) and put with them instead. Without one, it has no rule (No reply needed then
+ * stores it in Inbox › Filed). 30 a run.
+ */
+async function rehomeServices(ctx: Context): Promise<void> {
+  const { db, box } = ctx;
+  const services = [...ctx.byId.values()].filter((r) => r.kind === 'domain' && isSendingService(r.match));
+  if (!services.length) return;
+  const { data: msgs } = await db
+    .from('mail_messages')
+    .select('id, graph_id, conversation_id, from_name')
+    .eq('box_id', box.id)
+    .eq('direction', 'in')
+    .in('rule_id', services.map((r) => r.id))
+    .limit(30);
+  for (const m of msgs ?? []) {
+    const reply = await getReplyTo(box.address, m.graph_id as string).catch(() => null);
+    const owner = reply ? belongsTo(`x@${services[0].match}`, reply) : null;
+    const rule = owner && !isSendingService(domainOf(owner)) ? await ctx.ruleFor(owner, (m.from_name as string | null) ?? null) : null;
+    await db.from('mail_messages').update({ rule_id: rule?.id ?? null }).eq('id', m.id);
+    ctx.touchedConversations.add(m.conversation_id as string);
+  }
 }
 
 /** Folders the app made that no rule uses any more: removed once empty (the deepest first). Never yours. */
@@ -947,11 +998,11 @@ async function clearOutlookDraft(address: string, id: string, at: string | null)
  * Puts this text in Outlook's Drafts as the reply to their latest email, in place of the app's earlier draft (one you've
  * edited in Outlook is never replaced: that one stays and no new one is made). Returns the link to open it.
  */
-export async function putOutlookDraft(db: Db, box: ReplyBox, threadId: string, text: string, all = false): Promise<{ link: string | null; kept: boolean }> {
+export async function putOutlookDraft(db: Db, box: ReplyBox, threadId: string, text: string, all = false, files: FileToAttach[] = []): Promise<{ link: string | null; kept: boolean }> {
   const { data: t } = await db.from('mail_threads').select('last_in_graph_id, outlook_draft_id, outlook_draft_at').eq('id', threadId).maybeSingle();
   if (!t?.last_in_graph_id) return { link: null, kept: false };
   if (t.outlook_draft_id && (await clearOutlookDraft(box.address, t.outlook_draft_id as string, t.outlook_draft_at as string | null)) === 'kept') return { link: null, kept: true };
-  const d = await createReplyDraft(box.address, t.last_in_graph_id as string, replyHtml(box, text), { all, images: signatureImages(box) });
+  const d = await createReplyDraft(box.address, t.last_in_graph_id as string, replyHtml(box, text), { all, images: signatureImages(box), files });
   await db.from('mail_threads').update({ outlook_draft_id: d.id, outlook_draft_at: d.lastModifiedDateTime }).eq('id', threadId);
   return { link: d.webLink, kept: false };
 }
@@ -1233,7 +1284,7 @@ async function fileMail(ctx: Context, until: number): Promise<{ filed: number; m
       if (ctx.folders.size !== before) await saveFolders(ctx);
       await moveMessage(box.address, m.graph_id, folderId);
       const kind = dest === MARKETING_FOLDER && m.dest === 'marketing' ? 'marketing' : 'filed';
-      await db.from('mail_messages').update({ place: kind, filed_at: new Date().toISOString(), file_error: null }).eq('id', m.id);
+      await db.from('mail_messages').update({ place: kind, filed_at: new Date().toISOString(), filed_folder: dest, file_error: null }).eq('id', m.id);
       if (kind === 'filed') filed++;
       else marketing++;
     } catch (e) {

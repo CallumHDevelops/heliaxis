@@ -509,6 +509,11 @@ needs you** panel are an extra view.
   otherwise **Inbox › Filed**. **Delete** is its own button, for when you mean it: to Deleted Items (Outlook keeps
   it there). A bar says where it went, with **Undo** (back to the Inbox and To reply). An email you've already
   moved yourself is left alone.
+- **Attachments**: when replying in the app, **Attach a file** from your phone or computer, or tap one of the
+  customer's job documents (quotes, certificates…) or **From the library**. Up to 25 MB in all (Outlook's limit), on
+  Send and on the Outlook draft.
+- **Invoices through Xero, Stripe and the like** go with the business behind them (from the email's Reply-To), so an
+  AnyMeters invoice sent by Xero goes to AnyMeters, not Xero.
 - **Waiting on them**: you sent the last email 3+ days ago and nothing's come back. **New people**:
   someone asking about a job who isn't in the CRM; **Add to the CRM** in one tap.
 - **Folders**: everyone at a company by its domain, customers by their own address (Inbox › Customers › Name

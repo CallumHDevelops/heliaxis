@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { BrandIcon, Sheet } from '../crm/CrmUi';
+import { BrandIcon, FileButton, Sheet } from '../crm/CrmUi';
+import { createClient } from '@/lib/supabase/client';
 import { WritingSpark } from '../sales/quotes/[id]/WritingSpark';
 import type { MailCounts, ThreadRow } from '@/lib/mail/server';
 import { clearAwayTo, prettyFolder } from '@/lib/mail/shared';
 
 type Cleared = { filed: number; deleted: number; folder: string | null };
+type Doc = { id: string; name: string; size: number | null; job?: string | null };
+const size = (n: number) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 import '../crm/crm.css';
 import '../sales/quotes/quotes.css';
 import './mail.css';
@@ -383,6 +386,39 @@ function ThreadSheet({
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [latest, setLatest] = useState<{ text: string; webLink: string | null } | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
+  // Attachments: files from your device (uploaded as you add them), and one-tap picks from their documents and the library.
+  const [documents, setDocuments] = useState<Doc[]>([]);
+  const [library, setLibrary] = useState<Doc[]>([]);
+  const [uploads, setUploads] = useState<{ path: string; name: string; type: string; size: number }[]>([]);
+  const [docIds, setDocIds] = useState<string[]>([]);
+  const [libIds, setLibIds] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const attachBody = () => ({ uploads: uploads.map(({ path, name, type }) => ({ path, name, type })), documentIds: docIds, libraryIds: libIds });
+  const attachedSize = uploads.reduce((n, u) => n + u.size, 0) + [...documents.filter((d) => docIds.includes(d.id)), ...library.filter((d) => libIds.includes(d.id))].reduce((n, d) => n + (d.size ?? 0), 0);
+
+  async function addFiles(files: File[]) {
+    setUploading(true);
+    setErr('');
+    for (const f of files) {
+      if (attachedSize + f.size > 25 * 1024 * 1024) {
+        setErr(`${f.name} would take the attachments over 25 MB, Outlook’s limit.`);
+        break;
+      }
+      const p = await call(`/api/mail/threads/${row.id}`, { method: 'POST', body: JSON.stringify({ action: 'attach', name: f.name, size: f.size }) });
+      if (!p.ok) {
+        setErr(String(p.data.error || `Couldn’t add ${f.name}.`));
+        break;
+      }
+      const up = await createClient().storage.from(String(p.data.bucket)).uploadToSignedUrl(String(p.data.path), String(p.data.token), f, { contentType: f.type || 'application/octet-stream' });
+      if (up.error) {
+        setErr(`Couldn’t upload ${f.name}. Try again.`);
+        break;
+      }
+      setUploads((u) => [...u, { path: String(p.data.path), name: f.name, type: f.type || 'application/octet-stream', size: f.size }]);
+    }
+    setUploading(false);
+  }
   const [text, setText] = useState(row.draft ?? '');
   const [steer, setSteer] = useState('');
   const [all, setAll] = useState(false);
@@ -401,6 +437,8 @@ function ThreadSheet({
       setMsgs((r.data.messages as Msg[]) ?? []);
       setLatest((r.data.latest as typeof latest) ?? null);
       setSignature((r.data.signature as string | null) ?? null);
+      setDocuments((r.data.documents as Doc[]) ?? []);
+      setLibrary((r.data.library as Doc[]) ?? []);
     });
     return () => {
       live = false;
@@ -555,6 +593,49 @@ function ThreadSheet({
               {busy === 'redraft' && <WritingSpark label="Hestia is writing your reply" steps={['Reading the conversation', 'Checking the CRM', 'Writing it your way', 'Reading it back']} />}
             </div>
             {signature && <p className="crm-muted crm-small">Your signature goes underneath when it’s sent.</p>}
+            <div className="mx-attach" aria-label="Attachments">
+              <div className="mx-attach__row">
+                <FileButton label={uploading ? 'Uploading…' : 'Attach a file'} multiple busy={uploading} disabled={!!busy} onFiles={addFiles} />
+                {library.length > 0 && (
+                  <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" aria-expanded={showLibrary} onClick={() => setShowLibrary(!showLibrary)}>
+                    {showLibrary ? 'Hide the library' : 'From the library'}
+                  </button>
+                )}
+                {attachedSize > 0 && <span className="crm-muted crm-small">{size(attachedSize)} of 25 MB</span>}
+              </div>
+              {documents.length > 0 && (
+                <div className="mx-attach__pick">
+                  <span className="crm-muted crm-small">Their documents:</span>
+                  {documents.map((d) => (
+                    <button key={d.id} type="button" className={`crm-btn crm-btn--ghost crm-btn--small${docIds.includes(d.id) ? ' is-on' : ''}`} aria-pressed={docIds.includes(d.id)} onClick={() => setDocIds((x) => (x.includes(d.id) ? x.filter((y) => y !== d.id) : [...x, d.id]))} title={d.job ?? undefined}>
+                      {d.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showLibrary && (
+                <div className="mx-attach__pick">
+                  <span className="crm-muted crm-small">Library:</span>
+                  {library.map((d) => (
+                    <button key={d.id} type="button" className={`crm-btn crm-btn--ghost crm-btn--small${libIds.includes(d.id) ? ' is-on' : ''}`} aria-pressed={libIds.includes(d.id)} onClick={() => setLibIds((x) => (x.includes(d.id) ? x.filter((y) => y !== d.id) : [...x, d.id]))}>
+                      {d.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {uploads.length > 0 && (
+                <ul className="mx-attach__list">
+                  {uploads.map((u) => (
+                    <li key={u.path}>
+                      <BrandIcon k="document" size={16} /> {u.name} <span className="crm-muted crm-small">{size(u.size)}</span>
+                      <button type="button" className="crm-link" onClick={() => setUploads((x) => x.filter((y) => y.path !== u.path))}>
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             {/\[[^\]\n]{1,40}\]/.test(text) && <p className="mx-warn">Fill in the parts in [square brackets] before sending.</p>}
             <div className="mx-steer">
               <input className="crm-input" value={steer} onChange={(e) => setSteer(e.target.value)} placeholder="Tell the assistant what to say, e.g. “say yes to Thursday at 10, and the battery is in stock”" />
@@ -574,7 +655,7 @@ function ThreadSheet({
                 className="crm-btn crm-btn--solar"
                 disabled={!!busy || !text.trim()}
                 onClick={async () => {
-                  const d = await act('send', { text, all, force: gaps });
+                  const d = await act('send', { text, all, force: gaps, ...attachBody() });
                   if (d) onChanged();
                 }}
               >
@@ -585,7 +666,7 @@ function ThreadSheet({
                 className="crm-btn crm-btn--ghost"
                 disabled={!!busy || !text.trim()}
                 onClick={async () => {
-                  const d = await act('outlook', { text, all });
+                  const d = await act('outlook', { text, all, ...attachBody() });
                   if (d) {
                     setNote('Your Outlook draft now says this.');
                     if (d.link) window.open(String(d.link), '_blank', 'noopener');

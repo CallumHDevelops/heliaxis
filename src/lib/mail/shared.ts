@@ -384,3 +384,24 @@ export function matchExisting(name: string, existing: { path: string; name: stri
   const hit = existing.find((f) => squashName(f.name) === want);
   return hit ? hit.path : null;
 }
+
+/**
+ * Services that send email on behalf of another business (invoices from Xero, payments via Stripe, documents to sign
+ * via DocuSign…). An email from one of these belongs with the business behind it, found from its Reply-To address,
+ * not with the service ("AnyMeters" rather than "Xero").
+ */
+const SENDING_SERVICES = new Set([
+  'xero.com', 'intuit.com', 'quickbooks.com', 'sage.com', 'freeagent.com', 'kashflow.com', 'zohoinvoice.com',
+  'stripe.com', 'gocardless.com', 'paypal.com', 'paypal.co.uk', 'squareup.com', 'sumup.com', 'invoice2go.com',
+  'docusign.net', 'docusign.com', 'hellosign.com', 'dropboxsign.com', 'echosign.com', 'adobesign.com', 'pandadoc.com',
+  'sendgrid.net', 'amazonses.com', 'mailgun.org', 'hubspotemail.net', 'mcsv.net', 'mandrillapp.com', 'sparkpostmail.com',
+]);
+export const isSendingService = (domain: string) => SENDING_SERVICES.has(companyDomain(domain.toLowerCase()));
+
+/** Who an email from them really belongs with: the Reply-To address when it came through a sending service. */
+export function belongsTo(from: string, replyTo: string | null | undefined): string {
+  const f = addressOf(from);
+  const r = addressOf(replyTo);
+  if (r && r.includes('@') && r !== f && isSendingService(domainOf(f)) && !isSendingService(domainOf(r))) return r;
+  return f;
+}

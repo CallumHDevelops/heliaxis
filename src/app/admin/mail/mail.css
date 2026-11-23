@@ -506,3 +506,30 @@
     margin: 0 0.8rem 0.7rem auto;
   }
 }
+
+/* Attachments on a reply. */
+.mx-attach {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.mx-attach__row,
+.mx-attach__pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.mx-attach__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mx-attach__list li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0;
+  font-size: 0.9rem;
+}
