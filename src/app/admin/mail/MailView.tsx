@@ -927,6 +927,7 @@ type BoxInfo = {
     address: string;
     filing: boolean;
     file_customers: boolean;
+    clear_old_folders: boolean;
     marketing: boolean;
     drafts: boolean;
     outlook_drafts: boolean;
@@ -979,7 +980,7 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
     void load();
   }
 
-  const toggles: { k: 'highlight' | 'drafts' | 'outlook_drafts' | 'file_customers' | 'filing' | 'marketing'; title: string; body: string }[] = [
+  const toggles: { k: 'highlight' | 'drafts' | 'outlook_drafts' | 'file_customers' | 'filing' | 'clear_old_folders' | 'marketing'; title: string; body: string }[] = [
     {
       k: 'highlight',
       title: 'Highlight in Outlook',
@@ -1000,6 +1001,11 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
       k: 'filing',
       title: 'File everyone else’s emails into folders',
       body: `Companies and other contacts: once you’ve replied (or there’s nothing to reply to), the email moves from your inbox to its folder (Suppliers › GoodWe, say). Emails still waiting on you stay in the inbox. Only approved folders are used${info.suggested ? `: ${info.suggested} still to check in Folders` : ''}.`,
+    },
+    {
+      k: 'clear_old_folders',
+      title: 'Take over my old folders',
+      body: 'Hestia empties the folders you made before (at the top and inside your Inbox) into hers: each email to its company’s or customer’s folder, or Inbox › Filed. Each old folder is removed once it’s completely empty. Outlook’s own folders (Drafts, Sent, Deleted Items, Archive, Junk) are never touched, and no email is deleted. About 60 emails every two minutes.',
     },
     { k: 'marketing', title: 'Move marketing to a Marketing folder', body: 'Newsletters and offers (anything with an unsubscribe link) go to a Marketing folder. Never from customers, or anyone you’ve replied to. Nothing is deleted.' },
   ];
