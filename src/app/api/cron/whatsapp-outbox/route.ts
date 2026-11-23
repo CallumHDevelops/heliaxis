@@ -7,6 +7,8 @@ import { remindTimedTasks, syncTimedTasks } from '@/lib/tasks-timed';
 import { runBookingJobs } from '@/lib/booking/jobs';
 import { pollMailbox } from '@/lib/ms365';
 import { suggestCall } from '@/lib/crm/call-suggest';
+import { fillFromMessage } from '@/lib/crm/read-details';
+import { newPart, plainText } from '@/lib/email/call-request';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
 import { finishMergeFiles } from '@/lib/crm/merge';
 import { flushDocumentNotices } from '@/lib/crm/portal-notify';
@@ -43,6 +45,8 @@ export async function GET(req: Request) {
   const crm = await runCrmAutomations().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' }));
   const emails = await pollMailbox(async (enquiryId, name, subject, extra) => {
     await notifyEnquiryTeam(`Email from ${name}`, subject, `/admin/crm?enquiry=${enquiryId}`, { tag: `em-${enquiryId}` });
+    // Their name, postcode or address in the email (above the quoted thread): onto the customer and the job, where blank.
+    if (extra) await fillFromMessage(enquiryId, newPart(plainText(extra.body)), 'email').catch(() => null);
     // "I'm available at 12 if you are": check the diary and ask whether to add the call (src/lib/crm/call-suggest.ts).
     if (extra) await suggestCall({ enquiryId, name, body: extra.body, source: `email:${extra.messageId}`, via: 'email', receivedAt: extra.at, subject }, (t, b, h) => notifyEnquiryTeam(t, b, h)).catch(() => null);
   }).catch((e) => `error: ${e instanceof Error ? e.message : 'failed'}`);
