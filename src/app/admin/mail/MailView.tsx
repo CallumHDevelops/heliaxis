@@ -117,6 +117,9 @@ export function MailView(p: {
     cleared(row, r.data as unknown as Cleared);
     setCounts((c) => (c ? { ...c, reply: Math.max(0, c.reply - 1), urgent: row.priority === 'urgent' || row.priority === 'high' ? Math.max(0, c.urgent - 1) : c.urgent } : c));
   }
+  // A reply you typed, saved: kept on the row so reopening it shows what you wrote.
+  const savedDraft = useCallback((id: string, draft: string) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, draft } : r))), []);
+
   async function undo(id: string) {
     setToast((t) => (t ? { ...t, busy: true } : t));
     await call(`/api/mail/threads/${id}`, { method: 'POST', body: JSON.stringify({ action: 'restore' }) });
@@ -199,6 +202,7 @@ export function MailView(p: {
           canCrm={p.canCrm}
           now={now}
           onClose={() => setOpen(null)}
+          onSaved={savedDraft}
           onChanged={() => {
             setOpen(null);
             load(tab);
@@ -374,6 +378,7 @@ function ThreadSheet({
   onClose,
   onChanged,
   onCleared,
+  onSaved,
 }: {
   row: ThreadRow;
   tab: Tab;
@@ -382,6 +387,7 @@ function ThreadSheet({
   onClose: () => void;
   onChanged: () => void;
   onCleared: (d: Cleared) => void;
+  onSaved: (id: string, draft: string) => void;
 }) {
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [latest, setLatest] = useState<{ text: string; webLink: string | null } | null>(null);
@@ -421,6 +427,36 @@ function ThreadSheet({
     setUploading(false);
   }
   const [text, setText] = useState(row.draft ?? '');
+  // Your reply saves itself: a second after you stop typing, and when the window closes (so clicking off loses nothing).
+  const saved = useRef(row.draft ?? '');
+  const [saveState, setSaveState] = useState<'' | 'saving' | 'saved' | 'failed'>('');
+  const saveNow = useCallback(
+    async (value: string, keepalive = false) => {
+      if (value === saved.current) return;
+      setSaveState('saving');
+      const r = await fetch(`/api/mail/threads/${row.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', text: value }),
+        keepalive,
+      }).catch(() => null);
+      if (r?.ok) {
+        saved.current = value;
+        onSaved(row.id, value); // the list shows it next time it's opened
+        setSaveState('saved');
+      } else setSaveState('failed');
+    },
+    [row.id, onSaved]
+  );
+  useEffect(() => {
+    if (text === saved.current) return;
+    const t = setTimeout(() => void saveNow(text), 1000);
+    return () => clearTimeout(t);
+  }, [text, saveNow]);
+  const close = () => {
+    if (text !== saved.current) void saveNow(text, true);
+    onClose();
+  };
   const [steer, setSteer] = useState('');
   const [all, setAll] = useState(false);
   const [busy, setBusy] = useState<'' | 'send' | 'outlook' | 'redraft' | 'done' | 'delete' | 'undone' | 'crm' | 'notMarketing'>('');
@@ -465,7 +501,7 @@ function ThreadSheet({
   const lastIn = msgs?.filter((m) => m.direction === 'in').at(-1);
 
   return (
-    <Sheet title={who} onClose={onClose} wide>
+    <Sheet title={who} onClose={close} wide>
       <div className="mx-sheet">
         <p className="mx-sheet__subject">
           <b>{row.subject || '(no subject)'}</b>
@@ -607,7 +643,10 @@ function ThreadSheet({
               <textarea className="crm-input" rows={12} value={text} onChange={(e) => setText(e.target.value)} placeholder={row.draft_error || 'No draft yet: write your reply, or ask for one below.'} disabled={busy === 'redraft'} />
               {busy === 'redraft' && <WritingSpark label="Hestia is writing your reply" steps={['Reading the conversation', 'Checking the CRM', 'Writing it your way', 'Reading it back']} />}
             </div>
-            {signature && <p className="crm-muted crm-small">Your signature goes underneath when it’s sent.</p>}
+            <p className="crm-muted crm-small mx-saved" aria-live="polite">
+              {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : saveState === 'failed' ? 'Couldn’t save just now: it’ll try again as you type.' : ''}
+              {signature ? `${saveState ? ' · ' : ''}Your signature goes underneath when it’s sent.` : ''}
+            </p>
             <div className="mx-attach" aria-label="Attachments">
               <div className="mx-attach__row">
                 <FileButton label={uploading ? 'Uploading…' : 'Attach a file'} multiple busy={uploading} disabled={!!busy} onFiles={addFiles} />
@@ -657,6 +696,7 @@ function ThreadSheet({
               <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={!!busy} onClick={async () => {
                 const d = await act('redraft', { steer });
                 if (d?.draft) {
+                  saved.current = String(d.draft); // saved by Hestia already
                   setText(String(d.draft));
                   setSteer('');
                 }
