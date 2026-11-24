@@ -11,7 +11,7 @@ import { DEFAULT_SURVEY_MINUTES, isSurveyType, noSurveyNeeded, SURVEY_TYPES, sur
 import { HubView, type HubTask, type HubFollowUp, type HubToday, type HubTodayItem, type HubWeekDay } from './HubView';
 import { newMetaLeads } from './meta-leads';
 import { mailForHome } from '@/lib/mail/server';
-import { msConfigured } from '@/lib/ms365';
+import { calendarView, msConfigured, type CalEvent } from '@/lib/ms365';
 
 export const dynamic = 'force-dynamic';
 
@@ -173,6 +173,35 @@ async function myDiaryKeys(email: string): Promise<string[]> {
 }
 
 /**
+ * My Outlook calendar for a stretch of days: what's in it that HAP didn't put there (HAP's own survey, install and diary copies are shown from the
+ * database, so they're left out here). The calendar read is the surveyor row matched to my email, else my email. Quiet on any failure (not connected,
+ * not a mailbox, slow): the dashboard still loads.
+ */
+async function outlookFor(email: string | null, from: number, to: number): Promise<CalEvent[]> {
+  if (!email || !msConfigured()) return [];
+  try {
+    const keys = await myDiaryKeys(email.toLowerCase());
+    const mailbox = keys.find((k) => k !== email.toLowerCase()) ?? email.toLowerCase();
+    const events = await Promise.race([calendarView(mailbox, new Date(from), new Date(to)), new Promise<CalEvent[]>((_, no) => setTimeout(() => no(new Error('slow')), 7000))]);
+    return events.filter((e) => !e.isCancelled && !e.categories.some((c) => /^heliaxis\b/i.test(c)));
+  } catch {
+    return [];
+  }
+}
+
+/** An Outlook event as a dashboard line. */
+function outlookLine(e: CalEvent, key: string): { key: string; sort: number; time: string; title: string; sub: string } {
+  const where = e.location?.displayName || '';
+  return {
+    key,
+    sort: e.isAllDay ? 0 : e.start.getTime(),
+    time: e.isAllDay ? 'All day' : `${timeOf(e.start.toISOString())}–${timeOf(e.end.toISOString())}`,
+    title: e.sensitivity === 'private' || e.sensitivity === 'confidential' ? 'Busy' : e.subject || 'Outlook appointment',
+    sub: ['Outlook', e.sensitivity === 'private' ? '' : where].filter(Boolean).join(' · '),
+  };
+}
+
+/**
  * Home → Today, for people on the CRM once surveys.sql has run: today's surveys and installs (any
  * of the job's working install days), and my own diary entries. Every read is defensive.
  */
@@ -274,20 +303,33 @@ async function todayList(email: string | null, keys: PortalKey[]): Promise<HubTo
       directions: e.where_kind === 'address' ? directions(e.address, e.postcode) : null,
     });
   }
+  // What's in my Outlook that HAP didn't put there (meetings, personal time, anything made on the phone).
+  for (const e of await outlookFor(email, now - 36 * 3_600_000, now + 36 * 3_600_000)) {
+    const days = e.isAllDay && e.allDayFrom && e.allDayTo ? e.allDayFrom <= today && today < e.allDayTo : ukDay(e.start.toISOString()) === today;
+    if (!days) continue;
+    const l = outlookLine(e, `o-${e.id}`);
+    items.push({ ...l, kind: 'diary', tag: 'Outlook', href: '/admin/surveys', action: null, directions: null });
+  }
   items.sort((a, b) => a.sort - b.sort);
   return { items, canAddDiary: ready.booking };
 }
 
 /** The next seven days for the week strip: every booked survey and install day on the team's jobs (UK days). */
-async function weekAhead(keys: PortalKey[]): Promise<HubWeekDay[] | null> {
+async function weekAhead(keys: PortalKey[], email: string | null): Promise<HubWeekDay[] | null> {
   if (!keys.includes('crm')) return null;
   const db = createAdminClient();
   const today = todayISO();
   const days = Array.from({ length: 7 }, (_, i) => new Date(Date.parse(`${today}T12:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10));
   const at = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
-  const [surveyJobs, installJobs] = await Promise.all([
+  const ready = await schemaReady();
+  const mine = email ? await myDiaryKeys(email.toLowerCase()) : [];
+  const [surveyJobs, installJobs, entries, entriesAllDay, outlook] = await Promise.all([
     rows(db.from('crm_projects').select('*').gte('survey_at', at(-12)).lte('survey_at', at(24 * 8)).neq('stage', 'lost').limit(200)),
     rows(db.from('crm_projects').select('*').gte('install_at', at(-24 * 62)).lte('install_at', at(24 * 8)).neq('stage', 'lost').limit(300)),
+    // My own diary entries (a call, a site visit, a meeting) and what's only in my Outlook: they were missing from the week.
+    ready.booking && mine.length ? rows(db.from('diary_entries').select('*').is('deleted_at', null).in('surveyor_key', mine).eq('all_day', false).gte('starts_at', at(-12)).lte('starts_at', at(24 * 8)).limit(300)) : Promise.resolve([]),
+    ready.booking && mine.length ? rows(db.from('diary_entries').select('*').is('deleted_at', null).in('surveyor_key', mine).eq('all_day', true).lte('day_from', days[6]).gte('day_to', today).limit(100)) : Promise.resolve([]),
+    outlookFor(email, Date.now() - 12 * 3_600_000, Date.now() + 8 * 86_400_000),
   ]);
   const hols = installJobs.some((p) => Number(p.install_days ?? 1) > 1) ? await ukBankHolidays() : new Set<string>();
   const ids = [...new Set([...surveyJobs, ...installJobs].map((p) => String(p.enquiry_id)))];
@@ -314,6 +356,23 @@ async function weekAhead(keys: PortalKey[]): Promise<HubWeekDay[] | null> {
       d.items.push({ key: `i-${p.id}-${iso}`, kind: 'install', sort: i === 0 ? Date.parse(String(p.install_at)) : 0, time: i === 0 ? timeOf(p.install_at) : 'All day', title: nameOf(p), sub: [list.length > 1 ? `Install, day ${i + 1} of ${list.length}` : 'Install', pcOf(p)].filter(Boolean).join(' · '), href: `/admin/crm/${p.id}` });
     });
   }
+  for (const e of entries) {
+    const d = day.get(ukDay(String(e.starts_at)));
+    d?.items.push({ key: `d-${e.id}`, kind: 'diary', sort: Date.parse(String(e.starts_at)), time: `${timeOf(e.starts_at)}–${timeOf(e.ends_at)}`, title: String(e.title || DIARY_KIND[String(e.kind)] || 'Diary'), sub: DIARY_KIND[String(e.kind)] || 'Diary', href: e.project_id ? `/admin/crm/${e.project_id}` : '/admin/surveys' });
+  }
+  for (const e of entriesAllDay) {
+    for (const iso of days) {
+      if (String(e.day_from) <= iso && iso <= String(e.day_to)) day.get(iso)?.items.push({ key: `d-${e.id}-${iso}`, kind: 'diary', sort: 0, time: 'All day', title: String(e.title || DIARY_KIND[String(e.kind)] || 'Diary'), sub: DIARY_KIND[String(e.kind)] || 'Diary', href: e.project_id ? `/admin/crm/${e.project_id}` : '/admin/surveys' });
+    }
+  }
+  for (const e of outlook) {
+    const l = outlookLine(e, `o-${e.id}`);
+    if (e.isAllDay && e.allDayFrom && e.allDayTo) {
+      for (const iso of days) if (e.allDayFrom <= iso && iso < e.allDayTo) day.get(iso)?.items.push({ ...l, key: `${l.key}-${iso}`, kind: 'outlook', href: '/admin/surveys' });
+    } else {
+      day.get(ukDay(e.start.toISOString()))?.items.push({ ...l, kind: 'outlook', href: '/admin/surveys' });
+    }
+  }
   for (const d of out) d.items.sort((a, b) => a.sort - b.sort);
   return out;
 }
@@ -333,7 +392,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     isAdmin ? setupPeople() : [],
     // New Meta leads (Enquiries and CRM staff): a failure just hides the panel.
     user ? newMetaLeads(keys).catch(() => null) : null,
-    user ? weekAhead(keys).catch(() => null) : null,
+    user ? weekAhead(keys, profile?.email || user.email || null).catch(() => null) : null,
     // My email (src/lib/mail): only CRM staff, only their own mailbox. A failure just hides the panel.
     user && keys.includes('crm') ? mailForHome(user.id).catch(() => null) : null,
   ]);

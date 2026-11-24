@@ -30,8 +30,8 @@ export type HubTodayItem = {
   directions: string | null;
 };
 export type HubToday = { items: HubTodayItem[]; canAddDiary: boolean };
-/** One day of the week strip: its surveys and install days for the whole team. */
-export type HubWeekDay = { iso: string; dow: string; dom: number; items: { key: string; kind: 'survey' | 'install'; sort: number; time: string; title: string; sub: string; href: string }[] };
+/** One day of the week strip: surveys and install days for the whole team, plus my own diary entries and Outlook appointments. */
+export type HubWeekDay = { iso: string; dow: string; dom: number; items: { key: string; kind: 'survey' | 'install' | 'diary' | 'outlook'; sort: number; time: string; title: string; sub: string; href: string }[] };
 
 const ICONS: Record<PortalKey | 'users' | 'app', string> = {
   app: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',

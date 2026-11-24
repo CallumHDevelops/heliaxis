@@ -1146,3 +1146,8 @@ a.nu-main:hover b {
     animation: none;
   }
 }
+
+/* Week ahead: my own diary entries and Outlook appointments. */
+.hub-week__dots i.is-diary { background: #5b6b3a; }
+.hub-week__dots i.is-outlook { background: #2c6e9e; }
+.hub-today-tag.is-outlook { background: rgb(44 110 158 / 0.14); color: #1d5a85; }
