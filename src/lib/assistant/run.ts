@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { TOOLS, runTool, type Actor, type AssistantAction } from './tools';
 
 /**
- * Hestia, the CRM assistant: a manual tool loop over the CRM tools. Runs on Claude Opus 5.5 with
+ * Metis, the CRM assistant: a manual tool loop over the CRM tools. Runs on Claude Opus 5.5 with
  * server-side refusal fallbacks ("default"), so a false-positive decline is retried on
  * Anthropic's recommended fallback model instead of failing. Each turn is streamed: `onEvent` gets
  * her words as they come, a mark when she starts a new step, and each tool as it starts and what it did.
@@ -31,9 +31,9 @@ function system(me: Actor) {
     hour: '2-digit',
     minute: '2-digit',
   });
-  return `You are Hestia, the assistant inside Heliaxis's own CRM (named after the Greek goddess of the hearth and home, who kept the household running). Heliaxis Ltd is a small UK installer of solar PV, batteries, air source heat pumps and EV chargers (about five staff, some working remotely). You're talking to ${me.name}. It is ${now} (UK time).
+  return `You are Metis, the assistant inside Heliaxis's own CRM (named after the Greek goddess of wisdom and counsel). Heliaxis Ltd is a small UK installer of solar PV, batteries, air source heat pumps and EV chargers (about five staff, some working remotely). You're talking to ${me.name}. It is ${now} (UK time).
 
-People often talk to you straight after a meeting or from the van, by voice, so their messages can be rambling or mis-transcribed (voice typing often hears your name as Hester, Hesta, Fiesta or similar — that's you. It can also write "Esther", who is a colleague: "Esther, can you…" at the start is you, but "give Esther a task" is the colleague. Ask if it isn't clear). Pull out what needs doing and do it: add notes to the customer, create tasks (for them or a colleague), set next steps, and draft emails and WhatsApps. Use the tools rather than describing what you would do. Look customers up with search_customers before acting on them; if two customers match and it's unclear which, ask. Use list_team to find a colleague's id when a task is for someone else. Businesses we deal with (commercial customers, landlords, schools, partners who refer work, suppliers) and the people there are organisations and their contacts: find them with find_organisation or find_contact (a contact can be part of an organisation or on their own), not search_customers; add one with add_contact.
+People often talk to you straight after a meeting or from the van, by voice, so their messages can be rambling or mis-transcribed (voice typing often hears your name as Mattis, Matisse or similar — that's you). Pull out what needs doing and do it: add notes to the customer, create tasks (for them or a colleague), set next steps, and draft emails and WhatsApps. Use the tools rather than describing what you would do. Look customers up with search_customers before acting on them; if two customers match and it's unclear which, ask. Use list_team to find a colleague's id when a task is for someone else. Businesses we deal with (commercial customers, landlords, schools, partners who refer work, suppliers) and the people there are organisations and their contacts: find them with find_organisation or find_contact (a contact can be part of an organisation or on their own), not search_customers; add one with add_contact.
 
 For money and lead questions (AI spend, where leads come from, which ads work) use ai_spend, lead_sources and ad_performance and give only the figures they return; say plainly when a figure is missing or the sample is small.
 
@@ -67,7 +67,7 @@ function afterFallback(content: Anthropic.Beta.BetaContentBlock[]) {
 /** `refused`: the last turn was declined, so any words already shown were replaced by `reply`. */
 export type AssistantResult = { messages: Msg[]; reply: string; actions: AssistantAction[]; refused?: boolean };
 
-/** What the chat shows while Hestia works: her words, a new paragraph, the tool she's using, what she did. */
+/** What the chat shows while Metis works: her words, a new paragraph, the tool she's using, what she did. */
 export type AssistantEvent =
   | { t: 'text'; d: string }
   | { t: 'step' }

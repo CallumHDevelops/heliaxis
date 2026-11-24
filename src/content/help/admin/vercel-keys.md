@@ -34,7 +34,7 @@ Under each group, every key has its own mark: **✓** set, **✗** missing, or *
 | Group | What it’s for |
 | --- | --- |
 | **Core** | The app and database. Already working if you can see the page. |
-| **Hestia (Claude)** | The assistant. |
+| **Metis (Claude)** | The assistant. |
 | **Phone notifications** | Notifications to phones and browsers. |
 | **Answers for Claude** | Optional. Lets the answer boxes on Claude’s questions reach Claude. |
 | **One-tap sign-in to RAMS** | Optional. Opens RAMS already signed in. |

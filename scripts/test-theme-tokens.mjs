@@ -14,7 +14,7 @@ import { join, relative } from 'node:path';
 const ROOT = new URL('..', import.meta.url).pathname;
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
-/** Files done: the theme itself, the toggle, the admin shell and Hestia. */
+/** Files done: the theme itself, the toggle, the admin shell and Metis. */
 const CONVERTED = [
   'src/components/theme/theme-choice.css',
   'src/components/admin/admin-shell.css',
@@ -30,7 +30,7 @@ const CONVERTED = [
   'src/components/admin/AppRuntime.tsx',
   'src/components/admin/TopMenu.tsx',
   'src/components/admin/MoreMenu.tsx',
-  'src/components/admin/HestiaIcon.tsx',
+  'src/components/admin/MetisIcon.tsx',
   'src/app/admin/loading.tsx',
   'src/app/admin/assistant/AssistantView.tsx',
   'src/app/admin/app/page.tsx',
@@ -131,8 +131,8 @@ const CONVERTED = [
 const ALLOWED_LITERALS = {
   // Full-height embeds (analytics) sit on near-black in both themes.
   'src/components/admin/AdminShell.tsx': ['#111'],
-  // Hestia's tile is brand artwork: ink with a gold glyph in both themes.
-  'src/components/admin/HestiaIcon.tsx': ['#ffd35c', '#e3a014', '#211f18'],
+  // Metis's tile is brand artwork: ink with a gold glyph in both themes.
+  'src/components/admin/MetisIcon.tsx': ['#ffd35c', '#e3a014', '#211f18'],
   // The photo viewer's backdrop: ::backdrop doesn't inherit custom properties in older browsers; black in both themes.
   'src/components/admin/whatsapp/media.css': ['rgba(20, 18, 12, 0.88)'],
   // What's put on the design (the brand's colours: backgrounds, shapes, the type styles' samples), not the studio's chrome.

@@ -118,7 +118,7 @@ export default async function ValuePage({ searchParams }: { searchParams: Promis
               ))}
             </ul>
           )}
-          <p className="va-sub">Not metered yet: the Hestia assistant (estimated if you enter a figure), WhatsApp conversation fees other than templates, and Meta lead ad spend (which is advertising, not a platform cost).</p>
+          <p className="va-sub">Not metered yet: the Metis assistant (estimated if you enter a figure), WhatsApp conversation fees other than templates, and Meta lead ad spend (which is advertising, not a platform cost).</p>
         </section>
 
         <section className="va-card">
@@ -160,7 +160,7 @@ export default async function ValuePage({ searchParams }: { searchParams: Promis
               </label>
             ))}
             <label>
-              <span>Hestia assistant: estimated £ a month</span>
+              <span>Metis assistant: estimated £ a month</span>
               <input name="metis" type="number" step="any" min="0" defaultValue={a.metis_monthly_gbp} />
             </label>
             <label>

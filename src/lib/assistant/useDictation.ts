@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { fixName, heard, joinSaid } from './dictation';
 
 /*
- * Hestia's mic: the browser's speech-to-text (Chrome, and the Android app, which is Chrome) into the
- * message box. Shared by the Hestia page in the app (/admin/assistant) and the full-screen chat
- * (/admin/hestia).
+ * Metis's mic: the browser's speech-to-text (Chrome, and the Android app, which is Chrome) into the
+ * message box. Shared by the Metis page in the app (/admin/assistant) and the full-screen chat
+ * (/admin/metis).
  */
 
 /* Browser speech-to-text. Not in TypeScript's DOM types yet. */

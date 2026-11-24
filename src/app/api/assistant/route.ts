@@ -40,7 +40,7 @@ export async function GET(req: Request) {
 }
 
 /**
- * { text, thread_id?, new?, stream? } — one message to Hestia.
+ * { text, thread_id?, new?, stream? } — one message to Metis.
  * thread_id: carry on that conversation; new: start a fresh one (saved once she has answered); neither: the
  * latest. Without stream: { reply, actions, thread_id }. With stream: newline-delimited JSON events as she
  * works ({t:'text',d}, {t:'step'}, {t:'tool',name}, {t:'action',a}), then {t:'done', reply, actions,
@@ -74,8 +74,8 @@ export async function POST(req: Request) {
     return (data?.id as string | undefined) ?? null;
   }
   const failure = (e: unknown) => {
-    const msg = e instanceof Error ? e.message : 'Hestia didn’t answer';
-    return /overloaded|529/i.test(msg) ? 'Hestia is busy right now — try again in a minute.' : msg;
+    const msg = e instanceof Error ? e.message : 'Metis didn’t answer';
+    return /overloaded|529/i.test(msg) ? 'Metis is busy right now — try again in a minute.' : msg;
   };
 
   if (b.stream !== true) {

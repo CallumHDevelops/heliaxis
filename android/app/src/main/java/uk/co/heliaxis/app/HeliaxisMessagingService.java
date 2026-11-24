@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * Receives the site's data messages (src/lib/notify.ts): a notification to show, or, with
  * type "dismiss", one to take down because it's been dealt with elsewhere (chat read, lead contacted),
- * or, with type "widget", what the Hestia widget shows (src/lib/widget.ts).
+ * or, with type "widget", what the Metis widget shows (src/lib/widget.ts).
  */
 public class HeliaxisMessagingService extends FirebaseMessagingService {
     @Override

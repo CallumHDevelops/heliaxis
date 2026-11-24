@@ -18,7 +18,7 @@ import './mail.css';
 type Tab = 'reply' | 'waiting' | 'opps' | 'people' | 'fyi' | 'marketing' | 'folders' | 'settings';
 const LIST_TABS: Tab[] = ['reply', 'waiting', 'opps', 'people', 'fyi', 'marketing'];
 
-/** How they come across (Hestia's read of their latest email): the ones worth knowing before you reply. */
+/** How they come across (Metis's read of their latest email): the ones worth knowing before you reply. */
 const TONE: Record<string, { label: string; cls: string }> = {
   angry: { label: 'Angry', cls: 'is-urgent' },
   frustrated: { label: 'Frustrated', cls: 'is-hot' },
@@ -239,9 +239,9 @@ function Head({ counts }: { counts?: MailCounts | null }) {
         <p className="crm-muted">
           {counts
             ? counts.reply
-              ? `Hestia has ${counts.reply} that need you${counts.urgent ? `, ${counts.urgent} urgent or important` : ''}${counts.drafts ? `. ${counts.drafts} draft${counts.drafts === 1 ? '' : 's'} ready to check, also in your Outlook Drafts.` : '.'}`
-              : 'Hestia has nothing waiting on you.'
-            : 'Hestia, your assistant, keeps your inbox sorted: what needs you, urgent first, with replies drafted in your style.'}
+              ? `Metis has ${counts.reply} that need you${counts.urgent ? `, ${counts.urgent} urgent or important` : ''}${counts.drafts ? `. ${counts.drafts} draft${counts.drafts === 1 ? '' : 's'} ready to check, also in your Outlook Drafts.` : '.'}`
+              : 'Metis has nothing waiting on you.'
+            : 'Metis, your assistant, keeps your inbox sorted: what needs you, urgent first, with replies drafted in your style.'}
         </p>
       </div>
     </header>
@@ -266,7 +266,7 @@ function Connect({ email, connected, onDone }: { email: string; connected: boole
       <Head />
       <section className="mx-card mx-connect">
         <h2>Connect {email}</h2>
-        <p>Hestia, your assistant, goes through your whole inbox first, then every new email within two minutes. She:</p>
+        <p>Metis, your assistant, goes through your whole inbox first, then every new email within two minutes. She:</p>
         <ul>
           <li>works out which emails need you, urgent first, reading each person’s tone, and flags them in Outlook (“Urgent”, “Needs reply” or “Action needed”), so they stand out on your phone too; anything urgent also comes to your phone straight away;</li>
           <li>spots every opportunity: new leads, referrals, add-ons, happy customers who’d leave a review;</li>
@@ -277,7 +277,7 @@ function Connect({ email, connected, onDone }: { email: string; connected: boole
           <li>spots people asking about a job who aren’t in the CRM yet, so you can add them in one tap.</li>
         </ul>
         <p className="crm-muted">
-          You carry on in Outlook as usual: the flags, drafts and folders are all there. Nothing but marketing is moved until you’ve checked the folders and turned filing on, and none of your emails are ever deleted (only Hestia’s own drafts, once you’ve replied). Only you see your email here.
+          You carry on in Outlook as usual: the flags, drafts and folders are all there. Nothing but marketing is moved until you’ve checked the folders and turned filing on, and none of your emails are ever deleted (only Metis’s own drafts, once you’ve replied). Only you see your email here.
         </p>
         {!connected && <p className="mx-err">Microsoft 365 isn’t connected to the app yet: see Setup › Connect Microsoft 365 email first.</p>}
         {err && <p className="mx-err">{err}</p>}
@@ -302,7 +302,7 @@ const EMPTY: Record<string, string> = {
 
 const HINT: Record<string, string> = {
   waiting: 'You sent the last email, three or more days ago, and they haven’t replied. Worth a nudge?',
-  opps: 'Chances Hestia spotted in the last two months: new leads, referrals, add-ons, reviews. Open one to follow it up.',
+  opps: 'Chances Metis spotted in the last two months: new leads, referrals, add-ons, reviews. Open one to follow it up.',
   people: 'They’ve emailed about a job but aren’t in the CRM. Add them so nothing is missed.',
   fyi: 'The last two weeks’ emails that need nothing from you. If one does, open it and say so.',
   marketing: 'Newsletters and offers, moved to your Marketing folder. If one isn’t marketing, open it and say so: it comes back to your inbox.',
@@ -641,7 +641,7 @@ function ThreadSheet({
             <h3>Your reply</h3>
             <div className="mx-draftbox">
               <textarea className="crm-input" rows={12} value={text} onChange={(e) => setText(e.target.value)} placeholder={row.draft_error || 'No draft yet: write your reply, or ask for one below.'} disabled={busy === 'redraft'} />
-              {busy === 'redraft' && <WritingSpark label="Hestia is writing your reply" steps={['Reading the conversation', 'Checking the CRM', 'Writing it your way', 'Reading it back']} />}
+              {busy === 'redraft' && <WritingSpark label="Metis is writing your reply" steps={['Reading the conversation', 'Checking the CRM', 'Writing it your way', 'Reading it back']} />}
             </div>
             <p className="crm-muted crm-small mx-saved" aria-live="polite">
               {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : saveState === 'failed' ? 'Couldn’t save just now: it’ll try again as you type.' : ''}
@@ -696,7 +696,7 @@ function ThreadSheet({
               <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={!!busy} onClick={async () => {
                 const d = await act('redraft', { steer });
                 if (d?.draft) {
-                  saved.current = String(d.draft); // saved by Hestia already
+                  saved.current = String(d.draft); // saved by Metis already
                   setText(String(d.draft));
                   setSteer('');
                 }
@@ -986,7 +986,7 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
       title: 'Highlight in Outlook',
       body: `Every email that needs a reply is flagged in Outlook, with the category “Urgent” or “Needs reply”, so it stands out in your inbox and on your phone. The flag and category come off once you’ve replied or said no reply needed. Your own categories and flags are left alone.${b.highlight && !b.categories_ready ? ' (The categories show grey until the app is allowed to colour them: see the CRM guide, My email.)' : ''}`,
     },
-    { k: 'drafts', title: 'Draft replies', body: 'Hestia writes a reply, in your style and right for their tone, for each email that needs one, for you to check, change and send. Nothing is ever sent without you pressing Send.' },
+    { k: 'drafts', title: 'Draft replies', body: 'Metis writes a reply, in your style and right for their tone, for each email that needs one, for you to check, change and send. Nothing is ever sent without you pressing Send.' },
     {
       k: 'outlook_drafts',
       title: 'Put the drafts in Outlook too',
@@ -1005,7 +1005,7 @@ function Settings({ onDisconnect }: { onDisconnect: () => void }) {
     {
       k: 'clear_old_folders',
       title: 'Take over my old folders',
-      body: 'Hestia empties the folders you made before (at the top and inside your Inbox) into hers: each email to its company’s or customer’s folder, or Inbox › Filed. Each old folder is removed once it’s completely empty. Outlook’s own folders (Drafts, Sent, Deleted Items, Archive, Junk) are never touched, and no email is deleted. About 60 emails every two minutes.',
+      body: 'Metis empties the folders you made before (at the top and inside your Inbox) into hers: each email to its company’s or customer’s folder, or Inbox › Filed. Each old folder is removed once it’s completely empty. Outlook’s own folders (Drafts, Sent, Deleted Items, Archive, Junk) are never touched, and no email is deleted. About 60 emails every two minutes.',
     },
     { k: 'marketing', title: 'Move marketing to a Marketing folder', body: 'Newsletters and offers (anything with an unsubscribe link) go to a Marketing folder. Never from customers, or anyone you’ve replied to. Nothing is deleted.' },
   ];
@@ -1197,7 +1197,7 @@ function SignOffCard({ value, busy, onSave }: { value: string; busy: string; onS
   return (
     <section className="mx-card">
       <h3>Sign-off</h3>
-      <p className="crm-muted">Every reply Hestia writes ends with this, just above your signature.</p>
+      <p className="crm-muted">Every reply Metis writes ends with this, just above your signature.</p>
       <div className="mx-steer">
         <input className="crm-input" value={v} onChange={(e) => setV(e.target.value)} maxLength={60} aria-label="Sign-off" />
         <button type="button" className="crm-btn crm-btn--ghost crm-btn--small" disabled={!!busy || !v.trim() || v.trim() === (value || '').trim()} onClick={() => onSave(v.trim())}>

@@ -1,6 +1,6 @@
 /**
  * Searching Help: the index the server builds (src/lib/help/library.ts) and the ranking, shared by the
- * search box on /admin/help (in the browser, as you type) and Hestia's search_help tool. Every word typed
+ * search box on /admin/help (in the browser, as you type) and Metis's search_help tool. Every word typed
  * must match the start of a word in the article (so "temp" finds Templates); small words like "how" and
  * "the", and the words a question is wrapped in ("what does … mean"), are left out. A match in the title
  * counts most, then the keywords, the headings, the summary and the body; the exact title typed comes first.
@@ -140,7 +140,7 @@ export type HelpHit = {
 
 /**
  * `all`: every word must match (the search box). `any`: at least one, most words first (the "closest
- * matches" when nothing has them all, and Hestia when a question's wording isn't the articles').
+ * matches" when nothing has them all, and Metis when a question's wording isn't the articles').
  */
 export function searchPrepared(prepared: PreparedEntry[], q: string, { mode = 'all', limit = 50 }: { mode?: 'all' | 'any'; limit?: number } = {}): HelpHit[] {
   const terms = queryTerms(q);

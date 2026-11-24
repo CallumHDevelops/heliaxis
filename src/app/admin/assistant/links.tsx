@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 /**
- * Hestia's words with the app's pages it names (/admin/…, e.g. a Help article) as links: a bare path, or
+ * Metis's words with the app's pages it names (/admin/…, e.g. a Help article) as links: a bare path, or
  * [words](/admin/…). Anything else stays text.
  */
 export function withLinks(text: string): ReactNode[] {

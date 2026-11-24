@@ -30,7 +30,7 @@ export const BENEFITS: BenefitDef[] = [
   { key: 'online_bookings', area: 'Surveys', label: 'Surveys booked online by the customer', unit: 'bookings', why: 'No phone tag, no diary check, no travel-time sums, no Outlook entry.' },
   { key: 'booking_reminders', area: 'Surveys', label: 'Survey reminders sent automatically', unit: 'reminders', why: 'Fewer no-shows and no one making reminder calls.' },
   { key: 'emails_logged', area: 'CRM', label: 'Emails filed on the customer record', unit: 'emails', why: 'Sent and received emails appear on the customer timeline without copying them across.' },
-  { key: 'metis_drafts', area: 'Hestia', label: 'Emails and messages drafted by Hestia', unit: 'drafts', why: 'A first draft in seconds instead of writing from scratch.' },
+  { key: 'metis_drafts', area: 'Metis', label: 'Emails and messages drafted by Metis', unit: 'drafts', why: 'A first draft in seconds instead of writing from scratch.' },
   { key: 'sub_chasers', area: 'Subcontractors', label: 'Document and notice chasers sent automatically', unit: 'chasers', why: 'Expiring certificates and notices chased without a person keeping a list.' },
   { key: 'handover_packs', area: 'Handover', label: 'Handover packs built', unit: 'packs', why: 'Photos, certificates and documents gathered and packaged for the customer automatically.' },
   { key: 'purchase_orders', area: 'Purchasing', label: 'Purchase orders raised', unit: 'orders', why: 'Raised, sent to the supplier and tracked in one place.' },
@@ -60,7 +60,7 @@ export type Assumptions = {
   costs_gbp: Record<string, number>;
   /** Pence per WhatsApp template message sent (Meta's conversation fee). */
   whatsapp_template_pence: number;
-  /** Estimated monthly cost of Hestia (the assistant), which is not metered yet. */
+  /** Estimated monthly cost of Metis (the assistant), which is not metered yet. */
   metis_monthly_gbp: number;
   usd_to_gbp: number;
   /** What you would pay for the off-the-shelf tools this replaces, per month. */
@@ -127,7 +127,7 @@ export function buildValueReport(counts: Counts, measured: MeasuredCosts, a: Ass
   const costs: CostRow[] = [];
   if (measured.socialAiUsd != null) costs.push({ label: 'AI for social monitoring', gbp: r2(measured.socialAiUsd * a.usd_to_gbp), measured: true });
   if (measured.templateMessages != null) costs.push({ label: `WhatsApp template fees (${measured.templateMessages} sent)`, gbp: r2((measured.templateMessages * a.whatsapp_template_pence) / 100), measured: true });
-  if (a.metis_monthly_gbp > 0) costs.push({ label: 'Hestia assistant (estimated)', gbp: r2(a.metis_monthly_gbp), measured: false });
+  if (a.metis_monthly_gbp > 0) costs.push({ label: 'Metis assistant (estimated)', gbp: r2(a.metis_monthly_gbp), measured: false });
   for (const [label, gbp] of Object.entries(a.costs_gbp)) if (gbp > 0) costs.push({ label, gbp: r2(gbp), measured: false });
   const runningCostGbp = r2(costs.reduce((s, c) => s + c.gbp, 0));
   const replacedToolsGbp = r2(Object.values(a.replaced_tools_monthly_gbp).reduce((s, n) => s + (Number(n) || 0), 0));

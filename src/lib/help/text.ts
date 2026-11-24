@@ -2,7 +2,7 @@ import { Lexer, type Token, type Tokens } from 'marked';
 
 /**
  * An article's words without the Markdown: for the search index (src/lib/help/search.ts) and the passages
- * Hestia is given (src/lib/help/server.ts). Server and scripts only (it brings in the Markdown lexer).
+ * Metis is given (src/lib/help/server.ts). Server and scripts only (it brings in the Markdown lexer).
  */
 
 export type HelpChunk = { heading: string | null; depth: number; text: string };
@@ -23,7 +23,7 @@ function inline(tokens: Token[] | undefined, links: boolean): string {
       case 'link': {
         const l = t as Tokens.Link;
         const text = inline(l.tokens, links);
-        // Hestia is given the links to other pages (so it can point to them); the index isn't.
+        // Metis is given the links to other pages (so it can point to them); the index isn't.
         out += links && /^\/admin\//.test(l.href) ? `${text} (${l.href})` : text;
         break;
       }

@@ -2,7 +2,7 @@
 title: Tasks the app makes by itself
 summary: The paperwork deadline, survey follow-up, site and handover tasks the app adds for you, and who gets them.
 order: 50
-keywords: automatic tasks, auto tasks, deadline tasks, paperwork, MCS, G98, G99, Building Regs, BUS voucher, guarantee, survey follow-up, drawings, electricity bill, Hestia tasks
+keywords: automatic tasks, auto tasks, deadline tasks, paperwork, MCS, G98, G99, Building Regs, BUS voucher, guarantee, survey follow-up, drawings, electricity bill, Metis tasks
 where: Team › Tasks
 path: /admin/tasks
 access: tasks
@@ -40,8 +40,8 @@ The heat pump and "Get …" tasks go to whoever looks after the job (or the surv
 
 When trades sign off, the electrician finishes and the handover pack goes, the app adds tasks such as reviewing a trade’s sign-off or a put-right, chasing scaffold strike photos that still haven’t come in after the scaffold came down, telling or chasing the DNO, setting up monitoring remotely, the handover call, uploading documents into the handover pack, and sending the final invoice. They’re listed in [Tasks and next steps on a job](/admin/help/projects/tasks-and-next-steps).
 
-## From Hestia
+## From Metis
 
-Ask Hestia to remind you or someone else of something and she can create a task. Its notes end "Added by Hestia for" your name. If it’s for someone else, they get a "New task from" notification. See [What Hestia can do](/admin/help/hestia/what-hestia-can-do).
+Ask Metis to remind you or someone else of something and she can create a task. Its notes end "Added by Metis for" your name. If it’s for someone else, they get a "New task from" notification. See [What Metis can do](/admin/help/metis/what-metis-can-do).
 
 > **Good to know:** A **Call-back reminder** set from a WhatsApp chat isn’t a task: it becomes the job’s next step, shows under **My day** as a follow-up, and sends a notification when it’s due. See [Add a task from a job or a WhatsApp chat](/admin/help/tasks/from-a-job-or-chat).

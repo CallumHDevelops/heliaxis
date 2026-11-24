@@ -2,7 +2,7 @@
 title: Find your way around Help
 summary: Open Help from any page, search it, and go straight to the articles about the page you’re on.
 order: 10
-keywords: help, guide, how to, manual, instructions, support, stuck, Hestia
+keywords: help, guide, how to, manual, instructions, support, stuck, Metis
 where: Your initials › Help
 access: everyone
 ---
@@ -41,8 +41,8 @@ A long article lists its parts under **On this page**: down the side on a comput
 
 > **Good to know:** If an article needs access you don’t have, ask an admin to give it to you.
 
-## Ask Hestia
+## Ask Metis
 
-If you have CRM access, you can ask Hestia in your own words instead. Click **Ask Hestia** on the Help page, under your search results, or at the end of an article. From your search results, Hestia opens with what you searched for already in the box. Nothing is sent until you send it. Hestia answers from these articles and gives you the link to the one it used.
+If you have CRM access, you can ask Metis in your own words instead. Click **Ask Metis** on the Help page, under your search results, or at the end of an article. From your search results, Metis opens with what you searched for already in the box. Nothing is sent until you send it. Metis answers from these articles and gives you the link to the one it used.
 
-> **Watch out:** For how-to questions Hestia goes by these articles. If its answer doesn’t match what you see on the screen, open the article it links to and follow that.
+> **Watch out:** For how-to questions Metis goes by these articles. If its answer doesn’t match what you see on the screen, open the article it links to and follow that.

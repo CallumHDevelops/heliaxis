@@ -2,7 +2,7 @@
 title: Tasks and next steps on a job
 summary: Set a job’s next step, add and tick tasks, and see which tasks the app makes for you.
 order: 120
-keywords: next step, snooze, overdue, task, to-do, reminder, add task, log a call, note, site visit, automatic tasks, review task, handover call, Hestia
+keywords: next step, snooze, overdue, task, to-do, reminder, add task, log a call, note, site visit, automatic tasks, review task, handover call, Metis
 where: Operations › Projects › a job
 access: crm
 ---
@@ -36,12 +36,12 @@ The **+** button at the bottom right adds a **Task**, **Note**, **Log a call**, 
 
 > **Once switched on:** The handover pack tasks need handover.sql.
 
-## Hestia
+## Metis
 
-Hestia can add a note to a job, set its next step, create tasks for anyone, add an opportunity, and draft emails and WhatsApps. Drafts are only drafts: nothing goes without you.
+Metis can add a note to a job, set its next step, create tasks for anyone, add an opportunity, and draft emails and WhatsApps. Drafts are only drafts: nothing goes without you.
 
 Try: “Called Jane Smith: she wants the battery in the garage. Remind me Friday to confirm with the electrician.” What she did shows as chips under her reply.
 
-> **Watch out:** Hestia doesn’t send job packs, raise POs or move stages. Do those on the job.
+> **Watch out:** Metis doesn’t send job packs, raise POs or move stages. Do those on the job.
 
 For next steps and tasks on a job that’s still in sales, see [Next steps and tasks for a customer](/admin/help/customers/next-step-and-tasks). For the tasks the app adds by itself, see [Tasks the app makes by itself](/admin/help/tasks/automatic-tasks).

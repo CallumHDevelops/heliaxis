@@ -9,7 +9,7 @@ export const FEATURE_LABEL: Record<string, string> = {
   label_read: 'Reading an equipment photo',
   eic_read: 'Reading a board or test sheet photo (EIC)',
   blog: 'Blog articles',
-  assistant: 'The assistant (Hestia)',
+  assistant: 'The assistant (Metis)',
   cms_page: 'CMS page generator',
   social_classify: 'Social: sorting comments',
   social_draft: 'Social: drafting replies',

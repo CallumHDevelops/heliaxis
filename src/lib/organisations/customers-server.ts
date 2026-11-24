@@ -6,7 +6,7 @@ import type { PersonRow } from './shared';
 
 /**
  * Customers (enquiries) as people for CRM › Contacts. Kept apart from contacts-server.ts so that
- * Hestia's tools, which use that, don't load the whole customer search.
+ * Metis's tools, which use that, don't load the whole customer search.
  */
 
 type Row = Record<string, unknown>;

@@ -11,7 +11,7 @@ In the Supabase SQL editor, in this order (each is safe to re-run):
    opportunity for every existing enquiry.
 2. `supabase/crm-v2.sql` — customer portal, documents, library, saved replies, email, reminders,
    lead routing, sequences, booking, quote acceptance, deposits.
-3. `supabase/assistant.sql` — Hestia's (the assistant's) conversations and drafts.
+3. `supabase/assistant.sql` — Metis's (the assistant's) conversations and drafts.
 4. `supabase/deleted-customers.sql` — so Enquiries → Import skips customers you've deleted (see section 8).
 5. `supabase/crm-v3.sql` — the new job stages, task reminders and WhatsApp permission records
    (section 10).
@@ -131,11 +131,11 @@ who actually buy.
 Website leads are matched by the ad click id, Meta lead-form leads by their lead id, and both by
 hashed email and phone.
 
-## 7. Hestia, the assistant
+## 7. Metis, the assistant
 
-**More → Hestia** (or *Talk to Hestia* on the dashboard). Type or tap the mic and say what happened,
+**More → Metis** (or *Talk to Metis* on the dashboard). Type or tap the mic and say what happened,
 e.g. "Just left Jane Smith in BS5, wants 10 panels and a battery, quote Friday, get Esther to send the
-EV guide". Hestia adds notes, sets next steps, creates tasks (for you or a colleague) and writes
+EV guide". Metis adds notes, sets next steps, creates tasks (for you or a colleague) and writes
 emails/WhatsApps as **drafts**. Nothing reaches a customer until someone checks the draft and presses Send.
 
 1. console.anthropic.com → API keys → **Create key** → Vercel `ANTHROPIC_API_KEY` → redeploy.
@@ -151,7 +151,7 @@ people (or **Select all**) and **Delete selected**. Everything about them goes: 
 timeline, WhatsApp chat, emails, opportunities with their tasks, photos, documents and signatures,
 and the notifications about them. It can't be undone. Anyone with a signed quote or a paid deposit is
 kept unless you tick to include them, and deleting more than 5 at once asks you to type DELETE.
-Hestia forgets what she looked up about them, but what you said to her about them, and her replies,
+Metis forgets what she looked up about them, but what you said to her about them, and her replies,
 stay in your past conversations.
 
 Deleted people aren't brought back by **Import** (Meta, CSV or WhatsApp chats): it lists them as
@@ -449,16 +449,16 @@ merge them into one.
 
 Needs `supabase/merge.sql`.
 
-## 18. My email (Hestia)
+## 18. My email (Metis)
 
-Hestia, your assistant, keeps your own Microsoft 365 inbox (callum@ to start) sorted. You carry on in **Outlook as
-usual**: the flags, drafts and folders are all there. **CRM › My email** and the dashboard's **Hestia: email that
+Metis, your assistant, keeps your own Microsoft 365 inbox (callum@ to start) sorted. You carry on in **Outlook as
+usual**: the flags, drafts and folders are all there. **CRM › My email** and the dashboard's **Metis: email that
 needs you** panel are an extra view.
 
 - **Setup**: Microsoft 365 connected (section 4: its mailbox scope already includes callum@), `supabase/mail-sort.sql`
   run and its every-two-minutes job on (both done for the live site). Then **My email → Connect**. It only ever opens
   your own sign-in address, and only you see it.
-- **First read**: Hestia goes through the **whole inbox** and the whole Sent folder (to know what's been answered),
+- **First read**: Metis goes through the **whole inbox** and the whole Sent folder (to know what's been answered),
   newest first, a few hundred emails every two minutes. New emails are picked up as they arrive.
 - **What needs you**: every conversation in the inbox is reviewed. It needs you when you owe a reply, or there's
   something to do that isn't a reply (a portal, a payment, a form: **Action needed**). Older emails only if still
@@ -468,7 +468,7 @@ needs you** panel are an extra view.
   Each gets one line on what they want, why it matters, any deadline, and their **tone** (happy, formal, worried,
   confused, frustrated, angry).
 - **Urgent**: a recent urgent email also comes straight to your phone as a notification.
-- **Opportunities**: Hestia notes any chance in an email (a new lead, a friend or neighbour interested, an add-on, a
+- **Opportunities**: Metis notes any chance in an email (a new lead, a friend or neighbour interested, an add-on, a
   happy customer for a review or referral, a commercial enquiry). They're on the **Opportunities** tab.
 - **In Outlook** every email that needs you is flagged, with the category **Urgent** (red), **Needs reply** (orange) or
   **Action needed** (yellow). They come off once you've replied or ticked it done. Your own categories and flags are
@@ -476,7 +476,7 @@ needs you** panel are an extra view.
   - The colours need one more permission; without it the categories still work, just grey. In PowerShell
     (as in section 4, after `Connect-ExchangeOnline` and the **Set app** line):
     `New-ManagementRoleAssignment -App $app -Role "Application MailboxSettings.ReadWrite" -CustomResourceScope "Heliaxis CRM mailboxes"`
-- **CRM customers**: when Hestia recognises a customer (by their email address), their emails and your replies go on
+- **CRM customers**: when Metis recognises a customer (by their email address), their emails and your replies go on
   their record, on their current job, and an email from them stops their automatic follow-ups, as a reply to hello@
   does. Each has their own folder inside your Inbox: **Customers › Sarah Davies (HX-0069)**, named with their
   customer number. Once you've replied, or said **No reply needed** (in the app, or by ticking the flag complete in
@@ -484,7 +484,7 @@ needs you** panel are an extra view.
   On by default (Settings › File customers' emails into their own folders), even with filing for everyone else off.
   Someone you add with **Add to the CRM** gets their folder and number at once, and their emails so far go on
   their new record.
-- **Your writing style**: once six months of your sent emails have been read, Hestia studies up to 40 you wrote (to a
+- **Your writing style**: once six months of your sent emails have been read, Metis studies up to 40 you wrote (to a
   spread of people) and writes down how you write: greetings, length, tone, the phrases you use and never use, and
   how that changes for customers, suppliers and the DNO, with a few of your own emails as examples. Every draft
   follows it, and copies most closely the emails you've sent that same person before. See and edit it in
@@ -518,7 +518,7 @@ needs you** panel are an extra view.
   someone asking about a job who isn't in the CRM; **Add to the CRM** in one tap.
 - **Folders**: everyone at a company by its domain, customers by their own address (Inbox › Customers › Name
   (HX-…)), companies inside the Inbox under their group (goodwe.com → Inbox › Suppliers › GoodWe, nationalgrid.co.uk →
-  Inbox › Grid and DNO › National Grid). Hestia uses only her own folders; yours are left as they are. Folders the app
+  Inbox › Grid and DNO › National Grid). Metis uses only her own folders; yours are left as they are. Folders the app
   made and no longer uses are removed once empty. CRM customers,
   contacts and organisations are approved straight away; other companies are named by the assistant and
   wait for you to check them (**Approve all**). Rename any folder; a / makes a folder inside a folder.

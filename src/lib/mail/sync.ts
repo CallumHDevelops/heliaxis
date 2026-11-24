@@ -21,7 +21,7 @@ import {
   customerFolder,
   clearAwayTo,
   FILED_FOLDER,
-  isHestiaFolder,
+  isMetisFolder,
   groupForOrgType,
   companyFolder,
   textToHtml,
@@ -140,7 +140,7 @@ export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult
     if (styleDue(box) && Date.now() < until - 25_000) res.styled = await learnFromSent(ctx);
     if (box.drafts && Date.now() < until) res.drafted = await draftReplies(ctx, until);
     if ((box.filing || box.file_customers || box.marketing) && Date.now() < until) Object.assign(res, await fileMail(ctx, until));
-    // You asked Hestia to take over your old folders: emptied into hers, then removed once empty.
+    // You asked Metis to take over your old folders: emptied into hers, then removed once empty.
     if (box.clear_old_folders && Date.now() < until - 8_000) await emptyOldFolders(ctx, until).catch(() => null);
     await db.from('mail_boxes').update({ last_run_at: started, last_error: null }).eq('id', box.id);
   } catch (e) {
@@ -201,7 +201,7 @@ export class Context {
     return c;
   }
 
-  /** Hestia's folder for a company or person: inside the Inbox under its group (Inbox › Suppliers › GoodWe). */
+  /** Metis's folder for a company or person: inside the Inbox under its group (Inbox › Suppliers › GoodWe). */
   folderFor(name: string, group: string = 'Other'): string {
     return companyFolder(name, group);
   }
@@ -444,7 +444,7 @@ async function currentJobs(db: Db, enquiryIds: string[]): Promise<Map<string, st
 }
 
 /**
- * A conversation's emails on the customer's record, now: for someone just added to the CRM from Hestia (their
+ * A conversation's emails on the customer's record, now: for someone just added to the CRM from Metis (their
  * earlier emails were read before they were a customer). Once each.
  */
 export async function noteThreadOnCrm(db: Db, box: Pick<Box, 'id' | 'address'>, conversationId: string, enquiryId: string): Promise<void> {
@@ -649,16 +649,16 @@ async function refreshThreads(ctx: Context) {
 const OLD_MOVES_PER_RUN = 60;
 
 /**
- * Your own folders (at the top and inside the Inbox, and the folders inside them), emptied into Hestia's: each email
+ * Your own folders (at the top and inside the Inbox, and the folders inside them), emptied into Metis's: each email
  * to its company's or customer's folder, or Inbox › Filed, then the folder removed once it's completely empty. Never
- * Outlook's own folders (Drafts, Sent, Deleted Items, Archive…), never Hestia's, and never an email deleted.
+ * Outlook's own folders (Drafts, Sent, Deleted Items, Archive…), never Metis's, and never an email deleted.
  */
 async function emptyOldFolders(ctx: Context, until: number): Promise<void> {
   const { db, box } = ctx;
   const wellKnown = await wellKnownFolderIds(box.address);
   const { data: made } = await db.from('mail_folders').select('graph_id').eq('box_id', box.id);
   const hestias = new Set([...(made ?? []).map((f) => f.graph_id as string), ...[...ctx.folders].filter(([p]) => !ctx.yours.has(p)).map(([, id]) => id)]);
-  // Never a folder Hestia files into, or one holding hers (a "Suppliers" of yours she reused for Inbox › Suppliers › …).
+  // Never a folder Metis files into, or one holding hers (a "Suppliers" of yours she reused for Inbox › Suppliers › …).
   const inUse = [...ctx.byId.values()].map((r) => r.folder).concat([FILED_FOLDER, MARKETING_FOLDER]);
   const hosts = (path: string) => inUse.some((f) => f === path || f.startsWith(`${path}/`));
   const old = ctx.existing.filter((f) => !wellKnown.has(f.id) && !hestias.has(f.id) && !hosts(f.path));
@@ -670,7 +670,7 @@ async function emptyOldFolders(ctx: Context, until: number): Promise<void> {
   const empty = async (id: string, depth: number): Promise<boolean> => {
     if (depth > 4 || moves >= OLD_MOVES_PER_RUN || Date.now() > until - 6_000) return false;
     for (const c of await childFolders(box.address, id)) {
-      if (hestias.has(c.id)) return false; // one of Hestia's inside it: this folder stays
+      if (hestias.has(c.id)) return false; // one of Metis's inside it: this folder stays
       if (!(await empty(c.id, depth + 1))) return false;
     }
     for (;;) {
@@ -703,16 +703,16 @@ async function emptyOldFolders(ctx: Context, until: number): Promise<void> {
 /* ── Keeping the folders tidy ───────────────────────────────────────────── */
 
 /**
- * Brings every rule into Hestia's own structure, then moves anything already filed to match:
+ * Brings every rule into Metis's own structure, then moves anything already filed to match:
  *  - customers: Inbox › Customers › "Name (HX-0069)";
  *  - companies and contacts in the CRM: Inbox › <their group> › Name;
- *  - Hestia's suggestions elsewhere (your old folders, the app's old top-level ones): named again into hers.
+ *  - Metis's suggestions elsewhere (your old folders, the app's old top-level ones): named again into hers.
  * Then removes folders the app made that nothing uses any more, once they're empty. Your own folders are never touched.
  */
 async function tidyRules(ctx: Context): Promise<void> {
   const { db } = ctx;
-  // Everything not in Hestia's own structure is sorted again, rules you edited before included (you asked for hers).
-  const old = [...ctx.byId.values()].filter((r) => r.action === 'file' && !r.enquiry_id && !isHestiaFolder(r.folder));
+  // Everything not in Metis's own structure is sorted again, rules you edited before included (you asked for hers).
+  const old = [...ctx.byId.values()].filter((r) => r.action === 'file' && !r.enquiry_id && !isMetisFolder(r.folder));
   const customers = [...ctx.byId.values()].filter((r) => r.enquiry_id && !r.folder.startsWith('Inbox/Customers/'));
   if (!old.length && !customers.length) {
     await rehome(ctx);
@@ -734,7 +734,7 @@ async function tidyRules(ctx: Context): Promise<void> {
   for (const r of customers) moved.set(r.id, customerFolder(r.label, refs.get(r.enquiry_id!) ?? null));
   for (const r of old) {
     if (r.status === 'suggested' && !r.organisation_id && !r.contact_id) {
-      // Hestia's suggestion: she names it again, into her own structure.
+      // Metis's suggestion: she names it again, into her own structure.
       await db.from('mail_rules').update({ named: false, source: 'scan', updated_at: new Date().toISOString() }).eq('id', r.id);
     } else moved.set(r.id, ctx.folderFor(r.label, r.organisation_id ? groupForOrgType(orgType.get(r.organisation_id)) : 'Other'));
   }
@@ -757,7 +757,7 @@ async function tidyRules(ctx: Context): Promise<void> {
  */
 async function rehome(ctx: Context): Promise<void> {
   const { db, box } = ctx;
-  const settled = isHestiaFolder;
+  const settled = isMetisFolder;
   const { data: filed } = await db
     .from('mail_messages')
     .select('id, graph_id, filed_folder, rule:mail_rules!inner(folder, action)')
@@ -783,7 +783,7 @@ async function rehome(ctx: Context): Promise<void> {
 }
 
 /**
- * Emails read before Hestia knew about Xero and the like were put with the service ("Xero"): each is checked once for
+ * Emails read before Metis knew about Xero and the like were put with the service ("Xero"): each is checked once for
  * the business behind it (its Reply-To) and put with them instead. Without one, it has no rule (No reply needed then
  * stores it in Inbox › Filed). 30 a run.
  */
@@ -852,7 +852,7 @@ async function nameNewCompanies(ctx: Context): Promise<number> {
       .from('mail_rules')
       .update({
         label: hit.name || guessLabel(r.match as string),
-        // Hestia's own: inside the Inbox under its group (Inbox › Suppliers › GoodWe).
+        // Metis's own: inside the Inbox under its group (Inbox › Suppliers › GoodWe).
         folder: marketingOnly ? MARKETING_FOLDER : ctx.folderFor(hit.name || guessLabel(r.match as string), hit.group),
         // You asked for her folders to be used as they come: approved as she names them.
         ...(box.auto_approve ? { status: 'on' as const } : {}),
@@ -949,7 +949,7 @@ async function triageOne(ctx: Context, t: TriageThread): Promise<boolean> {
   const r = await triageThread(thread, ctx.owner);
   const stateFor = (needsReply: boolean) => threadState({ marketing: !!t.marketing, lastInAt: t.last_in_at, lastOutAt: t.last_out_at, doneAt: t.done_at, triagedFor: t.last_in_at, needsReply });
   if (!r) {
-    // Hestia couldn't sort it (or isn't set up): it goes on To reply unsorted, so nothing is missed.
+    // Metis couldn't sort it (or isn't set up): it goes on To reply unsorted, so nothing is missed.
     await db.from('mail_threads').update({ needs_reply: true, priority: null, summary: null, why: 'Not sorted automatically: have a look.', triaged_for: t.last_in_at, state: stateFor(true), updated_at: now }).eq('id', t.id);
     return false;
   }

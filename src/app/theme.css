@@ -16,7 +16,7 @@
  *     accent    --accent (gold fills, never text on light) --accent-ink (text on gold)
  *               --accent-text (gold-family text: eyebrows, links) --accent-soft --accent-line --accent-hover
  *     status    --ok --warn --danger --info (+ -soft tints, -line borders); --on-solid is text on a solid fill
- *     brand     --wa --wa-text --wa-soft (WhatsApp), --claude (Hestia/From Claude)
+ *     brand     --wa --wa-text --wa-soft (WhatsApp), --claude (Metis/From Claude)
  *     inverse   --inverse/--inverse-text (the brand's "dark" button; paper on dark), --inverse-accent (the
  *               gold-on-ink button's text: gold on light, ink on the paper button on dark),
  *               --moment* (bands that stay ink in both themes)
@@ -275,7 +275,7 @@
   }
 }
 
-/* Hestia's tile is ink in both themes; on dark it gets a hairline so it doesn't sink into the page. */
+/* Metis's tile is ink in both themes; on dark it gets a hairline so it doesn't sink into the page. */
 @media screen {
   :root[data-theme='dark'] .hx-metis {
     border-radius: 23%;

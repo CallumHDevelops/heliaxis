@@ -15,7 +15,7 @@ Press **Send** at or after 20:30 (UK time), or in the small hours before 07:00, 
 - Under the box: "It’s late, so this goes at 07:00 tomorrow." with **Send now instead** for anything that can’t wait.
 - Once sent, it waits in the chat as "🕐 Scheduled for 07:00 tomorrow". Change, send or cancel it like any scheduled message: see [Send a WhatsApp later](/admin/help/whatsapp/send-later). In the WhatsApp panel you’ll see "Scheduled for 07:00 tomorrow ✓".
 
-It covers typed messages and templates, from a chat, the WhatsApp panel or a job’s WhatsApp sheet, and WhatsApps Hestia drafted for you.
+It covers typed messages and templates, from a chat, the WhatsApp panel or a job’s WhatsApp sheet, and WhatsApps Metis drafted for you.
 
 ## What doesn’t wait
 

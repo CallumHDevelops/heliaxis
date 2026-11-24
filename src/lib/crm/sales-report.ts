@@ -5,7 +5,7 @@ import { adSpendFigures } from '@/lib/meta-ads';
 
 /**
  * The CRM's sales numbers for a period (by source and campaign, by person, the funnel) with Meta's ad spend beside them.
- * Shared by CRM → Reports (GET /api/crm/reports) and Hestia, so both always say the same thing.
+ * Shared by CRM → Reports (GET /api/crm/reports) and Metis, so both always say the same thing.
  */
 export async function salesReport(days: number, spending: ReturnType<typeof adSpendFigures>, adSpendOn: boolean) {
   const since = new Date(Date.now() - days * 86_400_000).toISOString();

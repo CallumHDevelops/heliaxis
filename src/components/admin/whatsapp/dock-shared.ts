@@ -148,7 +148,7 @@ const FOLDED_SECTIONS = [
   '/admin/help',
 ];
 /** The chat already fills these pages. */
-const HIDDEN_SECTIONS = ['/admin/enquiries/inbox', '/admin/crm/chats', '/admin/hestia'];
+const HIDDEN_SECTIONS = ['/admin/enquiries/inbox', '/admin/crm/chats', '/admin/metis'];
 /** Pages with no dock even though they sit under a section above (Unit S's offline survey shell). */
 const NO_DOCK = ['/admin/surveys/shell'];
 

@@ -2,7 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 
 type Msg = Anthropic.Beta.BetaMessageParam;
 
-/** What to show: the user's words and Hestia's replies (tool calls and thinking left out). */
+/** What to show: the user's words and Metis's replies (tool calls and thinking left out). */
 export function visible(messages: Msg[]) {
   const out: { role: 'user' | 'assistant'; text: string }[] = [];
   for (const m of messages) {

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AssistantAction } from '@/lib/assistant/tools';
 import { atWords } from '@/lib/whatsapp/schedule';
-import { HestiaIcon } from '@/components/admin/HestiaIcon';
+import { MetisIcon } from '@/components/admin/MetisIcon';
 import { useDictation } from '@/lib/assistant/useDictation';
 import { withLinks } from './links';
 import './assistant.css';
@@ -32,7 +32,7 @@ const STARTERS = [
   'Draft a WhatsApp chasing ',
 ];
 
-/** `initialText`: already in the box, not sent (/admin/assistant?q=…, e.g. "Ask Hestia" in Help). */
+/** `initialText`: already in the box, not sent (/admin/assistant?q=…, e.g. "Ask Metis" in Help). */
 export function AssistantView({ firstName, initialText = '' }: { firstName: string; initialText?: string }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [configured, setConfigured] = useState(true);
@@ -120,7 +120,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
     <div className="as">
       <header className="as-head">
         <div>
-          <h1><HestiaIcon size={36} /> Hestia</h1>
+          <h1><MetisIcon size={36} /> Metis</h1>
           <p>Tell me what happened and I’ll add the notes, tasks and drafts.</p>
         </div>
         {lines.length > 0 && (
@@ -132,7 +132,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
 
       {!configured && (
         <p className="as-banner">
-          Hestia switches on once <b>ANTHROPIC_API_KEY</b> is added in Vercel — it’s on your “From Claude” list on the
+          Metis switches on once <b>ANTHROPIC_API_KEY</b> is added in Vercel — it’s on your “From Claude” list on the
           dashboard.
         </p>
       )}
@@ -143,7 +143,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
         {loaded && !lines.length && (
           <div className="as-empty">
             <p>
-              {firstName ? `Hi ${firstName}, I’m Hestia. ` : 'I’m Hestia. '}Talk to me like you would a colleague in the van — I’ll sort it into the
+              {firstName ? `Hi ${firstName}, I’m Metis. ` : 'I’m Metis. '}Talk to me like you would a colleague in the van — I’ll sort it into the
               CRM. Nothing goes to a customer until you press Send.
             </p>
             <div className="as-starters">
@@ -162,7 +162,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
         )}
         {lines.map((l, i) => (
           <div key={i} className={`as-msg is-${l.role}${l.error ? ' is-error' : ''}`}>
-            {l.role === 'assistant' && <HestiaIcon size={22} className="as-avatar" />}
+            {l.role === 'assistant' && <MetisIcon size={22} className="as-avatar" />}
             <p>{l.role === 'assistant' ? withLinks(l.text) : l.text}</p>
             {l.actions && l.actions.length > 0 && (
               <ul className="as-actions">
@@ -178,8 +178,8 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
           </div>
         ))}
         {busy && (
-          <div className="as-msg is-assistant is-busy" aria-label="Hestia is working">
-            <HestiaIcon size={22} className="as-avatar" />
+          <div className="as-msg is-assistant is-busy" aria-label="Metis is working">
+            <MetisIcon size={22} className="as-avatar" />
             <span />
             <span />
             <span />
@@ -205,7 +205,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
               send();
             }
           }}
-          placeholder={listening ? 'Listening…' : 'Message Hestia'}
+          placeholder={listening ? 'Listening…' : 'Message Metis'}
           rows={text.length > 80 ? 4 : 1}
         />
         {canListen && (
@@ -231,7 +231,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
   );
 }
 
-/** Emails and WhatsApps Hestia wrote, waiting for a person to check and send. */
+/** Emails and WhatsApps Metis wrote, waiting for a person to check and send. */
 function Drafts({ drafts, onChange }: { drafts: Draft[]; onChange: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
   if (!drafts.length) return null;

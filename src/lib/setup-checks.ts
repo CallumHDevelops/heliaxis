@@ -492,7 +492,7 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     !(await has('design_projects')),
     sql('design-studio.sql', 'Lets the Design studio save your leaflets, cards and banners, and keep a library of printer templates.', 5)
   );
-  add(!assistant, sql('assistant.sql', 'Lets Hestia save her conversations and drafts.', 5, 'crm.sql'));
+  add(!assistant, sql('assistant.sql', 'Lets Metis save her conversations and drafts.', 5, 'crm.sql'));
   add(!notifications, sql('notifications.sql', 'The notification bell and phone notifications.', 6));
   // Social Monitoring: its menu item and page stay hidden until this has been run (src/lib/schema-ready.ts).
   add(
@@ -593,12 +593,12 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
 
   add(!env('ANTHROPIC_API_KEY'), {
     id: 'env-anthropic',
-    title: 'Add your Claude API key (switches Hestia on)',
-    detail: 'Hestia runs on Claude. Roughly 10–30p per message; a few pounds a month for normal use.',
+    title: 'Add your Claude API key (switches Metis on)',
+    detail: 'Metis runs on Claude. Roughly 10–30p per message; a few pounds a month for normal use.',
     steps: [
       'Open the [Claude Console](https://console.anthropic.com) and sign in (or sign up with your Heliaxis email).',
       '**Settings → Billing**: add a card and buy some credit ($10 lasts a long time). Turning on auto-reload stops it ever running out.',
-      '**Settings → API keys → Create key**, name it `Heliaxis Hestia`, then **Copy**. It starts `sk-ant-` and is only shown once.',
+      '**Settings → API keys → Create key**, name it `Heliaxis Metis`, then **Copy**. It starts `sk-ant-` and is only shown once.',
       ...VERCEL_STEPS,
     ],
     copies: [{ label: 'Key', value: 'ANTHROPIC_API_KEY' }],

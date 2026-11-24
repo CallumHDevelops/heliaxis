@@ -22,19 +22,19 @@ icon. Web changes reach the app on every deploy; you only need a new APK to chan
   down (`Notifications.dismiss`). Only builds from versionCode 3 get it (`DISMISS_FROM_APP_VERSION`
   in `src/lib/notify.ts`); older ones would show it as a blank notification. Built without
   `google-services.json`, the app falls back to Web Push shown through the `DelegationService`.
-- **Hestia widget** (from versionCode 6): a home-screen widget with today's Outlook calendar (and
-  tomorrow's first few), the emails Hestia says need you (urgent first) and your tasks and follow-ups.
+- **Metis widget** (from versionCode 6): a home-screen widget with today's Outlook calendar (and
+  tomorrow's first few), the emails Metis says need you (urgent first) and your tasks and follow-ups.
   `HestiaWidget.java` draws it, `HestiaWidgetService.java` fills its list. The phone never fetches
   anything: the site sends it as a `type: widget` data message (`src/lib/widget.ts`, small JSON from
   `src/lib/widget-shared.ts`, under Firebase's 4 KB) every 15 minutes from the mail job, at once when
-  Hestia sorts something new or a task changes, and whenever the app is opened. It's kept, so the
+  Metis sorts something new or a task changes, and whenever the app is opened. It's kept, so the
   widget shows the last one offline. Only phones on versionCode 6+ get them (`WIDGET_FROM_APP_VERSION`).
-  Add it: long-press the home screen → Widgets → Heliaxis → Hestia.
-- **Hestia in one tap** (from versionCode 7): long-press the app icon for **Talk to Hestia**, **New Hestia chat**
-  and **Last Hestia chat** (`res/xml/shortcuts.xml`; drag one to the Home Screen to pin it). They open Hestia's
-  links, `heliaxis://hestia/new` (`?voice=1` for the mic on), `heliaxis://hestia/last` and
-  `heliaxis://hestia/thread/{id}`, which `HestiaLinks.java` turns into her full-screen pages on the site
-  (`/admin/hestia/…`). The links carry ids only, aren't BROWSABLE (web pages can't fire them), and work whether
+  Add it: long-press the home screen → Widgets → Heliaxis → Metis.
+- **Metis in one tap** (from versionCode 7): long-press the app icon for **Talk to Metis**, **New Metis chat**
+  and **Last Metis chat** (`res/xml/shortcuts.xml`; drag one to the Home Screen to pin it). They open Metis's
+  links, `heliaxis://metis/new` (`?voice=1` for the mic on), `heliaxis://metis/last` and
+  `heliaxis://metis/thread/{id}`, which `MetisLinks.java` turns into her full-screen pages on the site
+  (`/admin/metis/…`). The links carry ids only, aren't BROWSABLE (web pages can't fire them), and work whether
   the app is closed, in the background or open. Signed out, the site's sign-in brings you back to the same page.
 - **Urgent emails** have their own high-priority channel (`email`) from versionCode 6; older builds
   show them under Other.

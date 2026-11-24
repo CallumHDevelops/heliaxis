@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The lines in the Hestia widget's list, from the last widget the site sent (HestiaWidget.saved):
+ * The lines in the Metis widget's list, from the last widget the site sent (HestiaWidget.saved):
  * Today (calendar), Needs you (emails, urgent first), Tasks, then Tomorrow.
  */
 public class HestiaWidgetService extends RemoteViewsService {
@@ -76,7 +76,7 @@ public class HestiaWidgetService extends RemoteViewsService {
                 lines.add(new Line(false, "", context.getString(R.string.widgetNoCalendar), "", "/admin", 0));
             }
 
-            // Needs you: Hestia's emails, the most important first.
+            // Needs you: Metis's emails, the most important first.
             JSONObject email = w.optJSONObject("e");
             JSONArray mails = email != null ? email.optJSONArray("i") : null;
             if (mails != null && mails.length() > 0) {

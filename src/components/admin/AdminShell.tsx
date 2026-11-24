@@ -429,7 +429,7 @@ export async function AdminShell({
         { href: '/admin/crm/reports', label: 'CRM reports', icon: icons.reports, show: can('crm'), section: 'Diary and insight' },
         { href: '/admin/crm/map', label: 'Leads map', icon: icons.reports, show: can('crm'), section: 'Diary and insight' },
         { href: '/admin/crm/settings', label: 'CRM settings', icon: icons.settings, show: can('crm'), section: 'Diary and insight' },
-        { href: '/admin/assistant', label: 'Hestia', icon: icons.metis, active: active === 'assistant', show: can('crm'), tab: true, section: 'Diary and insight' },
+        { href: '/admin/assistant', label: 'Metis', icon: icons.metis, active: active === 'assistant', show: can('crm'), tab: true, section: 'Diary and insight' },
       ],
     },
     {
@@ -608,9 +608,9 @@ export async function AdminShell({
             badge={waUnread}
           />
         )}
-        {/* Hestia one tap away for the office; people who only have RAMS (on site) keep RAMS here, and it is in More for everyone else. */}
+        {/* Metis one tap away for the office; people who only have RAMS (on site) keep RAMS here, and it is in More for everyone else. */}
         {can('crm') ? (
-          <TabLink href="/admin/assistant" label="Hestia" icon={icons.metis} active={active === 'assistant'} />
+          <TabLink href="/admin/assistant" label="Metis" icon={icons.metis} active={active === 'assistant'} />
         ) : (
           can('rams') && <TabLink href={RAMS_URL} label="RAMS" icon={icons.rams} active={false} />
         )}

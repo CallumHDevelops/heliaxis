@@ -1,41 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app icon's long-press menu (Android 7.1+). Each opens Hestia full-screen through her links
-     (HestiaLinks.java). On a Samsung, drag one onto the Home Screen to keep it there as its own icon. -->
+<!-- The app icon's long-press menu (Android 7.1+). Each opens Metis full-screen through her links
+     (MetisLinks.java). On a Samsung, drag one onto the Home Screen to keep it there as its own icon. -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
-        android:shortcutId="hestia_talk"
+        android:shortcutId="metis_talk"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_hestia_talk"
+        android:icon="@drawable/ic_shortcut_metis_talk"
         android:shortcutShortLabel="@string/shortcutTalkShort"
         android:shortcutLongLabel="@string/shortcutTalkLong">
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="uk.co.heliaxis.app"
             android:targetClass="uk.co.heliaxis.app.HeliaxisLauncherActivity"
-            android:data="heliaxis://hestia/new?voice=1" />
+            android:data="heliaxis://metis/new?voice=1" />
     </shortcut>
     <shortcut
-        android:shortcutId="hestia_new"
+        android:shortcutId="metis_new"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_hestia"
+        android:icon="@drawable/ic_shortcut_metis"
         android:shortcutShortLabel="@string/shortcutNewShort"
         android:shortcutLongLabel="@string/shortcutNewLong">
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="uk.co.heliaxis.app"
             android:targetClass="uk.co.heliaxis.app.HeliaxisLauncherActivity"
-            android:data="heliaxis://hestia/new" />
+            android:data="heliaxis://metis/new" />
     </shortcut>
     <shortcut
-        android:shortcutId="hestia_last"
+        android:shortcutId="metis_last"
         android:enabled="true"
-        android:icon="@drawable/ic_shortcut_hestia"
+        android:icon="@drawable/ic_shortcut_metis"
         android:shortcutShortLabel="@string/shortcutLastShort"
         android:shortcutLongLabel="@string/shortcutLastLong">
         <intent
             android:action="android.intent.action.VIEW"
             android:targetPackage="uk.co.heliaxis.app"
             android:targetClass="uk.co.heliaxis.app.HeliaxisLauncherActivity"
-            android:data="heliaxis://hestia/last" />
+            android:data="heliaxis://metis/last" />
     </shortcut>
 </shortcuts>

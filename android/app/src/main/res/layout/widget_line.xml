@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One line in the Hestia widget: a coloured mark (urgent, important), a time or due date, a title and a second line. -->
+<!-- One line in the Metis widget: a coloured mark (urgent, important), a time or due date, a title and a second line. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_line"
     android:layout_width="match_parent"

@@ -107,7 +107,7 @@ export default async function HelpArticlePage({ params }: Params) {
               <Link href={section.url}>All of {section.title}</Link>
               {viewer.metis && (
                 <>
-                  {' · '}Still stuck? <Link href={metisHref(`${article.title}: `)}>Ask Hestia</Link>
+                  {' · '}Still stuck? <Link href={metisHref(`${article.title}: `)}>Ask Metis</Link>
                 </>
               )}
             </p>

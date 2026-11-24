@@ -7,7 +7,7 @@ import { salesReport } from '@/lib/crm/sales-report';
 import { loadAssumptions } from '@/lib/social/assumptions';
 
 /**
- * What Hestia can tell the team about money and leads, read-only. Every figure comes from the same code as the reports on screen (the AI
+ * What Metis can tell the team about money and leads, read-only. Every figure comes from the same code as the reports on screen (the AI
  * costs page, CRM reports and the leads map), so she can't give a different answer from the page.
  */
 

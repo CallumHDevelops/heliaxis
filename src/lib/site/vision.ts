@@ -10,7 +10,7 @@ import type { Db } from './server';
 
 /**
  * Reading a label or data-badge photo with Claude (the same client, model and refusal fallback as
- * Hestia, src/lib/assistant/run.ts): serial, make, model and the ratings printed on it. The photo goes
+ * Metis, src/lib/assistant/run.ts): serial, make, model and the ratings printed on it. The photo goes
  * as base64 from storage, so no link to it leaves Supabase. The answer is structured output, checked
  * with zod again on the way back. A read is only ever a suggestion: nothing is saved into the answers
  * until a person taps ✓ or types over it. No ANTHROPIC_API_KEY: no reads (scanning and typing still work).

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 7 (no adaptive icons): a mic on a gold circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:pathData="M24,0a24,24 0,1 1,0 48a24,24 0,1 1,0 -48z" android:fillColor="@color/metisGold" />
+    <group android:translateX="10.8" android:translateY="10.8" android:scaleX="1.1" android:scaleY="1.1">
+        <path android:pathData="M10.5,3h3a1.5,1.5 0,0 1,1.5 1.5v9a3,3 0,0 1,-6 0v-9A1.5,1.5 0,0 1,10.5 3z" android:strokeColor="@color/metisInk" android:strokeWidth="1.9" />
+        <path android:pathData="M5.5,11a6.5,6.5 0,0 0,13 0M12,17.5V21" android:strokeColor="@color/metisInk" android:strokeWidth="1.9" android:strokeLineCap="round" />
+    </group>
+</vector>

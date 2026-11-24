@@ -9,7 +9,7 @@ import { searchPrepared, type HelpHit, type PreparedEntry } from './search';
 /**
  * The Help content (src/content/help), read once per server in production and on every request in
  * development (so an edited article shows on reload). next.config.ts bundles the files with the pages
- * under /admin/help, the search box's index (/api/help/search-index) and /api/assistant (Hestia's
+ * under /admin/help, the search box's index (/api/help/search-index) and /api/assistant (Metis's
  * search_help tool).
  */
 
@@ -56,7 +56,7 @@ export function searchHelpPage(q: string): { hits: HelpHit[]; close: HelpHit[] }
   return { hits: hits.map(slim), close: close.map(slim) };
 }
 
-/** For Hestia: the best 3 articles for a question, with their links and the passages that answer it. */
+/** For Metis: the best 3 articles for a question, with their links and the passages that answer it. */
 export function searchHelp(q: string, n = 3) {
   const { lib, prepared } = load();
   return searchLibrary(lib, prepared, q, n);

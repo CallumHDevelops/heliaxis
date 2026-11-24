@@ -22,10 +22,10 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * Hestia on the home screen: today's calendar, the emails that need you and your tasks, in a list that scrolls.
+ * Metis on the home screen: today's calendar, the emails that need you and your tasks, in a list that scrolls.
  *
  * The phone never fetches it: the site sends it as a Firebase data message ({ type: "widget", w: "<json>" }, see
- * src/lib/widget.ts) every 15 minutes, whenever Hestia has sorted something new, and whenever the app is opened.
+ * src/lib/widget.ts) every 15 minutes, whenever Metis has sorted something new, and whenever the app is opened.
  * It's kept in SharedPreferences, so the widget shows the last one straight away, even offline. Tapping a line opens
  * that page in the app; tapping the header opens the dashboard.
  */
@@ -34,7 +34,7 @@ public class HestiaWidget extends AppWidgetProvider {
     /** Older than this and the header says when it was last updated. */
     private static final long STALE_MS = 2 * 60 * 60 * 1000L;
 
-    /** A new widget from the site: keep it and redraw every Hestia widget on the home screens. */
+    /** A new widget from the site: keep it and redraw every Metis widget on the home screens. */
     static void save(Context context, @Nullable String json) {
         if (json == null || json.isEmpty()) return;
         try {

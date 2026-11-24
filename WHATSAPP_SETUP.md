@@ -131,7 +131,7 @@ Redeploy after adding them.
   until it goes, so cancelling it never leaves the chat unchased. If the customer writes first it
   stays scheduled and its author gets one push, replaced by "went at 07:00" once it goes; their new
   message puts the chat back in *Needs reply*. STOP cancels it and tells its author. A typed message
-  can only be scheduled inside the free 24h window: past it, the chat (and Hestia's draft card) offers
+  can only be scheduled inside the free 24h window: past it, the chat (and Metis's draft card) offers
   to send it now, pick an earlier time, or schedule a template. If the window has closed by the time
   it's due (they went quiet), it isn't sent: it shows as failed with the reason and its author is told.
   Documents from a job still go straight away (late at night the button says so).

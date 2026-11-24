@@ -44,7 +44,7 @@ final class Notifications {
         nm.createNotificationChannelsCompat(Arrays.asList(
                 channel("whatsapp", "WhatsApp messages", "Messages from customers and new WhatsApp leads", true),
                 channel("leads", "New leads", "New enquiries from the website, Meta ads and elsewhere", true),
-                channel("email", "Urgent emails", "Emails Hestia has spotted that need you straight away", true),
+                channel("email", "Urgent emails", "Emails Metis has spotted that need you straight away", true),
                 channel("tasks", "Tasks", "Tasks given to you, and tasks you set being done", false),
                 channel("jobs", "Customers & jobs", "Surveys booked, quotes accepted, deposits paid and next steps", false),
                 channel(GENERAL, "Other", "Everything else", false)));
