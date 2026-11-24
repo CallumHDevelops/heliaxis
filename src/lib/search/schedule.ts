@@ -56,6 +56,8 @@ export function plannedJobs(now = new Date()): Planned[] {
   // M3: opportunity scoring Monday 08:00; keyword research on the 1st, after the desktop run is posted.
   if (c.dow === 1 && at(8)) out.push({ kind: 'opportunity_scoring', dedupeKey: `opportunity_scoring:${c.date}`, payload: {} });
   if (c.dom === 1 && at(2)) out.push({ kind: 'keyword_research', dedupeKey: `keyword_research:${c.month}`, payload: {} });
+  // M4: the weekly auto-draft, Monday 09:00 after the planner scores (Cal, 24 Nov 2026).
+  if (c.dow === 1 && at(9)) out.push({ kind: 'auto_draft_weekly', dedupeKey: `auto_draft_weekly:${c.date}`, payload: {} });
   // M4: content measures daily (pages at day 14, 28, 56 and 90).
   if (at(9)) out.push({ kind: 'content_measures', dedupeKey: `content_measures:${c.date}`, payload: {} });
   // M6: AI-answer sampling on the 3rd.

@@ -1,4 +1,4 @@
-import { CHANNEL_LABEL } from '../channel';
+import { anyChannelLabel } from '../channel';
 import { unknownNumbers, type Delta } from '../maths';
 import type { Overview, PeriodKey, Tile } from '../metrics';
 
@@ -170,7 +170,7 @@ export type Table = { key: Section; title: string; source: string; columns: stri
 
 export const num = (v: number | null | undefined, digits = 1) => (v === null || v === undefined ? '–' : v.toLocaleString('en-GB', { maximumFractionDigits: digits }));
 const signed = (v: number | null | undefined, unit = '') => (v === null || v === undefined ? '–' : `${v > 0 ? '+' : ''}${num(v)}${unit}`);
-export const channelLabel = (c: string) => (c === 'untracked' ? 'Before tracking began' : (CHANNEL_LABEL as Record<string, string>)[c] ?? c);
+export const channelLabel = (c: string) => anyChannelLabel(c);
 
 export function reportTables(r: Pick<ReportRow, 'kind' | 'numbers'>): Table[] {
   const n = r.numbers;

@@ -7,6 +7,25 @@
 export const CHANNELS = ['paid_meta', 'paid_google', 'gbp', 'ai_assistant', 'organic_google', 'organic_bing', 'referral', 'direct'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
+/**
+ * Enquiries that never came through the website (no referrer to read): a phone call, an email, a WhatsApp message, or
+ * one typed into the CRM. Counted under their own label rather than "before tracking began".
+ */
+export const OFFLINE_SOURCE = /^(email|e-mail|whatsapp|whatsapp-import|phone|phone call|call|crm|walk-in|other)\b/i;
+export const OFFLINE_LABEL = 'Email, phone or WhatsApp';
+export const UNTRACKED_LABEL = 'Before tracking began';
+
+/** A row with no captured channel: Meta lead forms by their source, offline contacts by theirs, else untracked. */
+export function fallbackChannel(source: string | null | undefined): 'paid_meta' | 'offline' | 'untracked' {
+  const s = (source ?? '').trim();
+  if (/^meta/i.test(s)) return 'paid_meta';
+  if (OFFLINE_SOURCE.test(s)) return 'offline';
+  return 'untracked';
+}
+
+/** The label for any channel key, including the two fallbacks. */
+export const anyChannelLabel = (c: string) => (c === 'untracked' ? UNTRACKED_LABEL : c === 'offline' ? OFFLINE_LABEL : ((CHANNEL_LABEL as Record<string, string>)[c] ?? c));
+
 /** The channels Search counts as "organic enquiries" on the Overview. */
 export const ORGANIC_CHANNELS: Channel[] = ['organic_google', 'organic_bing', 'gbp', 'ai_assistant'];
 

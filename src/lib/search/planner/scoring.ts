@@ -42,6 +42,12 @@ export async function runOpportunityScoring(db: Db = createAdminClient()): Promi
     loadProof(db),
     db.from('seo_cluster').select('id, primary_keyword_id, score_inputs, status').limit(5000),
   ]);
+  // Every other business we know of by name (map-pack businesses and tracked rivals), to screen out searches for them.
+  const [{ data: biz }, { data: rivals }] = await Promise.all([
+    db.from('seo_business').select('name').eq('is_ours', false).limit(5000),
+    db.from('social_competitor').select('name').eq('is_self', false).limit(500),
+  ]);
+  const businessNames = [...((biz ?? []) as { name: string }[]), ...((rivals ?? []) as { name: string }[])].map((b) => b.name).filter(Boolean);
 
   const results = new Map(((resRes.data ?? []) as { keyword_id: number; our_pos: number | null; our_url: string | null }[]).map((r) => [r.keyword_id, r]));
   const top10 = new Map<number, string[]>();
@@ -54,7 +60,7 @@ export async function runOpportunityScoring(db: Db = createAdminClient()): Promi
   const tracked: TrackedRow[] = kws.map((k) => ({ ...k, our_pos: results.get(k.id)?.our_pos ?? null, our_url: results.get(k.id)?.our_url ?? null, top10: [...new Set(top10.get(k.id) ?? [])] }));
 
   const towns = [...proof.areas.flatMap((a) => a.towns), ...kws.map((k) => k.town ?? '')];
-  const cands = buildCandidates((poolRes.data ?? []) as PoolRow[], tracked, townMatchers(towns));
+  const cands = buildCandidates((poolRes.data ?? []) as PoolRow[], tracked, townMatchers(towns), { businessNames });
   const groups = groupCandidates(cands, settings.overlapUrls);
   const planned = groups.map((g) => planGroup(g, settings, proof));
 

@@ -74,6 +74,24 @@ export function isRelevantIdea(phrase: string): boolean {
   return !OFF_AREA.test(p) && !RETAIL_WORDS.test(p);
 }
 
+/**
+ * A search for another business by name ("the solar house cardiff", "heliex power"): not a page opportunity for us.
+ * True when a known business name (articles and company suffixes removed) appears whole inside the phrase.
+ */
+export function isOtherBusiness(phrase: string, names: string[]): boolean {
+  const p = ` ${normalisePhrase(phrase)} `;
+  for (const raw of names) {
+    const n = normalisePhrase(raw)
+      .replace(/\b(the|ltd|limited|llp|plc|uk|co|company|group)\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    // Too short to tell a name from an ordinary word ("solar", "eco").
+    if (n.length < 6 || (!n.includes(' ') && n.length < 8)) continue;
+    if (p.includes(` ${n} `)) return true;
+  }
+  return false;
+}
+
 /** Town names (from Settings › Target areas) to match against, longest first, with the Pembrokeshire Newport kept apart. */
 export function townMatchers(towns: string[]): { town: string; re: RegExp }[] {
   const out: { town: string; re: RegExp }[] = [];

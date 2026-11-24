@@ -7,18 +7,18 @@
  * from last month that was surveyed this week counts as surveyed for last month.
  */
 
-import { CHANNEL_LABEL, CHANNELS, ORGANIC_CHANNELS, type Channel } from '../channel';
+import { anyChannelLabel, CHANNELS, fallbackChannel, ORGANIC_CHANNELS, type Channel } from '../channel';
 import { isWonStage, stageIndex } from '@/lib/crm/stages';
 import { PAGE_BRIEFS } from '@/lib/cms/page-briefs';
 
 /* ── Channels ────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
-export type LeadChannel = Channel | 'untracked';
+export type LeadChannel = Channel | 'offline' | 'untracked';
 
 /** The order the channel table shows them in: organic first, then paid, then the rest. */
-export const FUNNEL_CHANNELS: LeadChannel[] = ['organic_google', 'organic_bing', 'gbp', 'ai_assistant', 'paid_meta', 'paid_google', 'referral', 'direct', 'untracked'];
+export const FUNNEL_CHANNELS: LeadChannel[] = ['organic_google', 'organic_bing', 'gbp', 'ai_assistant', 'paid_meta', 'paid_google', 'referral', 'direct', 'offline', 'untracked'];
 
-export const channelLabel = (c: string) => (c === 'untracked' ? 'Before tracking began' : ((CHANNEL_LABEL as Record<string, string>)[c] ?? c));
+export const channelLabel = (c: string) => anyChannelLabel(c);
 
 const isChannel = (c: unknown): c is Channel => typeof c === 'string' && (CHANNELS as readonly string[]).includes(c);
 
@@ -28,7 +28,7 @@ const isChannel = (c: unknown): c is Channel => typeof c === 'string' && (CHANNE
  */
 export function leadChannel(r: { channel: string | null; source: string | null }): LeadChannel {
   if (isChannel(r.channel)) return r.channel;
-  return /^meta/i.test(r.source ?? '') ? 'paid_meta' : 'untracked';
+  return fallbackChannel(r.source);
 }
 
 export const isOrganic = (c: LeadChannel) => (ORGANIC_CHANNELS as string[]).includes(c);
