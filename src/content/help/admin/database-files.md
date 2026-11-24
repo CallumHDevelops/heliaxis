@@ -24,7 +24,7 @@ Each file switches on one part of Heliaxis. The **From Claude** card only shows 
 | handover.sql | The handover pack: every document for the customer in one place, and uploads straight into their portal. | site-commissioning.sql |
 | merge.sql | Merging duplicate customers and their jobs. | customer-refs.sql |
 | deleted-customers.sql | Stops the Enquiries import bringing back customers you’ve deleted. | crm.sql |
-| assistant.sql | Lets Metis save her conversations and drafts. | crm.sql |
+| assistant.sql | Lets Hestia save her conversations and drafts. | crm.sql |
 | ad-spend.sql | Optional. Records which Meta ad each new lead came from, so Reports can put each ad’s spend beside its leads and sales. | |
 
 For what each Projects file shows on screen, see [What needs switching on](/admin/help/projects/what-needs-switching-on).

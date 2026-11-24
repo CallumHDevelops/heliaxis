@@ -4,7 +4,7 @@ import { canAccess, portalForPath, type PortalKey } from '@/lib/portals';
 
 /**
  * Who's reading Help, for what the pages offer them: any approved user can read every article; the
- * "Open this page" button shows only when they can open that page, Ask Metis only for CRM staff (Metis
+ * "Open this page" button shows only when they can open that page, Ask Hestia only for CRM staff (Hestia
  * lives in the CRM).
  */
 export async function helpViewer(nextPath: string) {

@@ -5,7 +5,7 @@
 // against when it goes; chasers counted from when it goes (and said against each way of sending); the
 // outbox never holding a message a person scheduled; a scheduled message only answering a chat when
 // written after their last message; and (from the source) what happens around it: Cancel that says
-// when it's too late, chasers left until it goes, STOP telling its author, Metis's Send now.
+// when it's too late, chasers left until it goes, STOP telling its author, Hestia's Send now.
 // Usage: node --experimental-strip-types scripts/test-wa-send-later.mjs
 import { readFileSync } from 'node:fs';
 import {
@@ -271,7 +271,7 @@ eq('Cancel says when it’s too late', [/const kind = await cancelQueued\(id\)/.
 const sw = src('src/app/sw.js/route.ts');
 eq('the notification button says what really happened', [sw.includes("d.kind === 'scheduled' ? 'Cancelled: that message won’t go'"), sw.includes('(d.error ||')], [true, true]);
 const metis = src('src/app/admin/assistant/AssistantView.tsx');
-eq('Metis offers Send now (free) when the window shuts before the morning', [/setShut\(!!res\?\.windowClosesAt/.test(metis), metis.includes('{ text: body, now: true }'), metis.includes('Send now (free)')], [true, true, true]);
+eq('Hestia offers Send now (free) when the window shuts before the morning', [/setShut\(!!res\?\.windowClosesAt/.test(metis), metis.includes('{ text: body, now: true }'), metis.includes('Send now (free)')], [true, true, true]);
 const sheet = src('src/app/admin/crm/[id]/RecordSheets.tsx');
 const job = src('src/app/api/crm/projects/[id]/route.ts');
 eq('the job’s WhatsApp sheet waits for the SQL like the chat does', [sheet.includes('ready: !!wa?.laterReady'), job.includes('lateRule: st.lateRule && laterReady')], [true, true]);

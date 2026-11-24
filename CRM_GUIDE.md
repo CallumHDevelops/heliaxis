@@ -11,7 +11,7 @@ In the Supabase SQL editor, in this order (each is safe to re-run):
    opportunity for every existing enquiry.
 2. `supabase/crm-v2.sql` — customer portal, documents, library, saved replies, email, reminders,
    lead routing, sequences, booking, quote acceptance, deposits.
-3. `supabase/assistant.sql` — Metis's (the assistant's) conversations and drafts.
+3. `supabase/assistant.sql` — Hestia's (the assistant's) conversations and drafts.
 4. `supabase/deleted-customers.sql` — so Enquiries → Import skips customers you've deleted (see section 8).
 5. `supabase/crm-v3.sql` — the new job stages, task reminders and WhatsApp permission records
    (section 10).
@@ -131,11 +131,11 @@ who actually buy.
 Website leads are matched by the ad click id, Meta lead-form leads by their lead id, and both by
 hashed email and phone.
 
-## 7. Metis, the assistant
+## 7. Hestia, the assistant
 
-**More → Metis** (or *Talk to Metis* on the dashboard). Type or tap the mic and say what happened,
+**More → Hestia** (or *Talk to Hestia* on the dashboard). Type or tap the mic and say what happened,
 e.g. "Just left Jane Smith in BS5, wants 10 panels and a battery, quote Friday, get Esther to send the
-EV guide". Metis adds notes, sets next steps, creates tasks (for you or a colleague) and writes
+EV guide". Hestia adds notes, sets next steps, creates tasks (for you or a colleague) and writes
 emails/WhatsApps as **drafts**. Nothing reaches a customer until someone checks the draft and presses Send.
 
 1. console.anthropic.com → API keys → **Create key** → Vercel `ANTHROPIC_API_KEY` → redeploy.
@@ -151,7 +151,7 @@ people (or **Select all**) and **Delete selected**. Everything about them goes: 
 timeline, WhatsApp chat, emails, opportunities with their tasks, photos, documents and signatures,
 and the notifications about them. It can't be undone. Anyone with a signed quote or a paid deposit is
 kept unless you tick to include them, and deleting more than 5 at once asks you to type DELETE.
-Metis forgets what she looked up about them, but what you said to her about them, and her replies,
+Hestia forgets what she looked up about them, but what you said to her about them, and her replies,
 stay in your past conversations.
 
 Deleted people aren't brought back by **Import** (Meta, CSV or WhatsApp chats): it lists them as

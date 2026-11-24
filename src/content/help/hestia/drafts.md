@@ -1,19 +1,19 @@
 ---
-title: Check and send Metis’s drafts
-summary: Open an email or WhatsApp Metis wrote, change it if you need to, then send it or throw it away.
+title: Check and send Hestia’s drafts
+summary: Open an email or WhatsApp Hestia wrote, change it if you need to, then send it or throw it away.
 order: 60
 keywords: drafts, draft email, draft WhatsApp, send draft, discard, drafts to check, scheduled, send now, late-night rule
-where: CRM › Metis
+where: CRM › Hestia
 path: /admin/assistant
 access: crm
 ---
-Every email and WhatsApp Metis writes waits at the top of her page under **… drafts to check**. Home also shows **Drafts** under **Needs you** while there are some waiting.
+Every email and WhatsApp Hestia writes waits at the top of her page under **… drafts to check**. Home also shows **Drafts** under **Needs you** while there are some waiting.
 
-![An open WhatsApp draft with Send, Customer and Discard](/help/metis/draft-open.jpg "An open draft: check it, change it, send it")
+![An open WhatsApp draft with Send, Customer and Discard](/help/hestia/draft-open.jpg "An open draft: check it, change it, send it")
 
 ## Send a draft
 
-1. Open Metis (**CRM › Metis**).
+1. Open Hestia (**CRM › Hestia**).
 2. Under **… drafts to check**, tap the draft. It says **Email** or **WhatsApp**, the customer, and the subject or the first words.
 3. Check who it’s to ("To …") and who it was written for.
 4. Change the subject or the message if you need to.
@@ -23,7 +23,7 @@ It says **Sent ✓** and leaves the list. Emails go from the job like any other 
 
 **Customer** opens the job. **Discard** throws the draft away.
 
-> **Watch out:** Your changes to a draft are only kept when you press **Send**. If you leave the page first, the draft goes back to what Metis wrote.
+> **Watch out:** Your changes to a draft are only kept when you press **Send**. If you leave the page first, the draft goes back to what Hestia wrote.
 
 ## WhatsApps late at night
 
@@ -35,4 +35,4 @@ If the customer’s free 24-hour window closes before then, the draft shows why 
 
 The draft shows the reason, for example "Not sent — check your connection." For a WhatsApp, **Open the chat** next to the reason takes you to their conversation in the WhatsApp inbox, so you can carry on there. The inbox needs Enquiries access: without it, the link takes you back to the dashboard, so open the customer’s page and use the green WhatsApp button instead.
 
-> **Good to know:** Drafts are shared. Anyone on the CRM can open, change and send a draft, whoever asked Metis to write it.
+> **Good to know:** Drafts are shared. Anyone on the CRM can open, change and send a draft, whoever asked Hestia to write it.

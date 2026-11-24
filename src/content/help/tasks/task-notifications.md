@@ -9,11 +9,11 @@ Task notifications go in the bell, and to your phone or computer if notification
 
 ## When you’re given a task
 
-When someone gives you a task, reassigns one to you on the Tasks page, or asks Metis to, you get "New task from" their name, with the task:
+When someone gives you a task, reassigns one to you on the Tasks page, or asks Hestia to, you get "New task from" their name, with the task:
 
 - From the Tasks page, it shows its deadline too, such as "Due Thu 23 Oct", and opens the Tasks page at that task, which is highlighted.
 - Added on a customer’s job (including from a WhatsApp chat), it shows the job’s name instead, and opens the job if you have CRM (the Tasks page if you don’t).
-- Made by Metis, it opens the job if it’s on one, otherwise the Tasks page.
+- Made by Hestia, it opens the job if it’s on one, otherwise the Tasks page.
 
 You aren’t told about tasks you give yourself. Giving someone a job’s task from that job’s **Tasks** card (**Snooze the task**, then **Whose task**) doesn’t tell them either.
 

@@ -1,4 +1,4 @@
-// Metis's mic (src/lib/assistant/dictation.ts): Chrome on Android hands back every in-between guess as a
+// Hestia's mic (src/lib/assistant/dictation.ts): Chrome on Android hands back every in-between guess as a
 // result of its own, which used to add up to "heyheyhey mattishey mattis…". Folding keeps what was said once.
 // Usage: node --experimental-strip-types scripts/test-dictation.mjs
 const { fixName, heard, joinSaid } = await import('../src/lib/assistant/dictation.ts');
@@ -16,7 +16,7 @@ const android = [
   'hey mattis a couple of', 'hey mattis a couple of things', 'hey mattis a couple of things then',
 ];
 eq('growing guesses fold into one sentence', heard(android), 'hey mattis a couple of things then');
-eq('…and the name is put right', fixName(heard(android)), 'hey Metis a couple of things then');
+eq('…and the name is put right', fixName(heard(['hey', 'hey hester', 'hey hester a couple of things then'])), 'hey Hestia a couple of things then');
 eq('a guess with the last word cut short', heard(['hey matt', 'hey mattis a']), 'hey mattis a');
 eq('an earlier, shorter guess after a longer one is dropped', heard(['send the quote to dave', 'send the']), 'send the quote to dave');
 eq('case and punctuation don’t stop a fold', heard(['Call Dave', 'call dave, tomorrow.']), 'call dave, tomorrow.');
@@ -36,11 +36,12 @@ eq('one sentence: a blank last result keeps the guess before', heard(['hey matti
 eq('one sentence: nothing heard', heard([], true), '');
 
 // ── The name ──
-eq('hey Mattis', fixName('hey mattis can you add a note'), 'hey Metis can you add a note');
-eq('Matisse first', fixName('Matisse, add a task for Esther'), 'Metis, add a task for Esther');
-eq('thanks, mattis', fixName('thanks, mattis'), 'thanks, Metis');
-eq('ok Mathis', fixName('OK Mathis'), 'OK Metis');
-eq('a customer called Mattis is left alone', fixName('add a note to John Mattis'), 'add a note to John Mattis');
+eq('hey Hester', fixName('hey hester can you add a note'), 'hey Hestia can you add a note');
+eq('Hesta first', fixName('Hesta, add a task for Esther'), 'Hestia, add a task for Esther');
+eq('thanks, hester', fixName('thanks, hester'), 'thanks, Hestia');
+eq('ok Fiesta', fixName('OK Fiesta'), 'OK Hestia');
+eq('a customer called Hester is left alone', fixName('add a note to John Hester'), 'add a note to John Hester');
+eq('Esther the colleague is left alone', fixName('Esther needs the battery guide'), 'Esther needs the battery guide');
 eq('a word that only starts the same is left alone', fixName('mattress delivery'), 'mattress delivery');
 
 // ── Joining what was in the box with what was said ──

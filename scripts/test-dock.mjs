@@ -86,7 +86,7 @@ eq('Users', home('/admin/users'), 'collapsed');
 eq('Setup keys', home('/admin/setup/env'), 'collapsed');
 eq('Setup guide', home('/admin/setup/guide/whatsapp'), 'collapsed');
 eq('Setup SQL', home('/admin/setup/sql/crm-v3.sql'), 'collapsed');
-eq('Metis', home('/admin/assistant'), 'collapsed');
+eq('Hestia', home('/admin/assistant'), 'collapsed');
 eq('SSO', home('/admin/sso'), 'collapsed');
 eq('Get the app', home('/admin/app'), 'collapsed');
 eq('Help', home('/admin/help'), 'collapsed');

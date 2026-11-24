@@ -28,7 +28,7 @@ export const ENV_GROUPS: EnvGroup[] = [
     ],
   },
   {
-    title: 'Metis (Claude)',
+    title: 'Hestia (Claude)',
     what: 'The assistant.',
     vars: [{ name: 'ANTHROPIC_API_KEY', secret: true, hint: 'console.anthropic.com → API keys' }],
   },

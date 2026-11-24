@@ -56,7 +56,25 @@ const nextConfig: NextConfig = {
       { source: '/auth/:path*', headers: sensitiveHeaders },
       // SAMEORIGIN, not DENY: the CMS previews pages in same-origin iframes.
       { source: '/admin/:path*', headers: [...sensitiveHeaders, { key: 'X-Frame-Options', value: 'SAMEORIGIN' }] },
+      // Hestia's mic (speech-to-text) on her own pages only. Later entries win, so this replaces the
+      // Permissions-Policy above there; every other staff page keeps the microphone blocked.
+      { source: '/admin/hestia/:path*', headers: [{ key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), payment=()' }] },
+      { source: '/admin/assistant', headers: [{ key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), payment=()' }] },
     ];
+  },
+  // Metis is now Hestia: her Help articles moved with her name.
+  async redirects() {
+    const moved: [string, string][] = [
+      ['', ''],
+      ['/the-metis-page', '/the-hestia-page'],
+      ['/what-metis-can-do', '/what-hestia-can-do'],
+      ['/what-metis-cant-do', '/what-hestia-cant-do'],
+      ['/what-metis-did', '/what-hestia-did'],
+      ['/drafts', '/drafts'],
+      ['/good-requests', '/good-requests'],
+      ['/use-the-mic', '/use-the-mic'],
+    ];
+    return moved.map(([from, to]) => ({ source: `/admin/help/metis${from}`, destination: `/admin/help/hestia${to}`, permanent: true }));
   },
   transpilePackages: ['heatmap.js'],
   // ProspectPV makes its print PDFs in headless Chromium. These stay out of the bundle (they are large and
@@ -66,7 +84,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/setup/file': ['./supabase/*.sql'],
     '/admin/setup/**': ['./supabase/*.sql', './*.md'],
-    // The Help articles (src/lib/help/server.ts): its pages, the search box's index, and Metis's
+    // The Help articles (src/lib/help/server.ts): its pages, the search box's index, and Hestia's
     // search_help tool (/api/assistant).
     '/admin/help': ['./src/content/help/**/*.md'],
     '/admin/help/**': ['./src/content/help/**/*.md'],

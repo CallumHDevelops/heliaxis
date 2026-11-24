@@ -1,12 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AssistantAction } from '@/lib/assistant/tools';
 import { atWords } from '@/lib/whatsapp/schedule';
-import { MetisIcon } from '@/components/admin/MetisIcon';
-import { fixName, heard, joinSaid } from '@/lib/assistant/dictation';
+import { HestiaIcon } from '@/components/admin/HestiaIcon';
+import { useDictation } from '@/lib/assistant/useDictation';
+import { withLinks } from './links';
 import './assistant.css';
+
+export { withLinks };
 
 type Line = { role: 'user' | 'assistant'; text: string; actions?: AssistantAction[]; error?: boolean };
 type Draft = {
@@ -29,76 +32,7 @@ const STARTERS = [
   'Draft a WhatsApp chasing ',
 ];
 
-/* Browser speech-to-text (Chrome / the Android app). Not in TypeScript's DOM types yet. */
-type Recognition = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((e: { error: string }) => void) | null;
-};
-/** A dictation in progress: `keep` — carry on to the next sentence; `live` — its words still go in the box. */
-type Mic = { r: Recognition; keep: boolean; live: boolean };
-function hush(m: Mic | null) {
-  if (!m) return;
-  m.keep = false;
-  m.live = false;
-  try {
-    m.r.abort();
-  } catch {}
-}
-/** Whether this browser has speech-to-text. False on the server, so the first render matches it. */
-const noSubscribe = () => () => {};
-function hasSpeech() {
-  const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
-  return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
-}
-function makeRecognition(): Recognition | null {
-  if (typeof window === 'undefined') return null;
-  const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
-  const C = w.SpeechRecognition || w.webkitSpeechRecognition;
-  return C ? new C() : null;
-}
-
-/**
- * Metis's words with the app's pages it names (/admin/…, e.g. a Help article) as links: a bare path, or
- * [words](/admin/…). Anything else stays text.
- */
-export function withLinks(text: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  const re = /\[([^\]\n]{1,120})\]\((\/admin(?:\/[^\s)]*)?)\)|(\/admin(?![\w-])(?:\/[^\s)\]]*)?)/g;
-  let at = 0;
-  for (const m of text.matchAll(re)) {
-    const start = m.index ?? 0;
-    let href = m[2] ?? m[3];
-    let label = m[1] ?? href;
-    let end = start + m[0].length;
-    // A bare path inside a longer address (https://…/admin/…) or a word is left as it is.
-    if (!m[2] && start > 0 && !/[\s(["'“‘]/.test(text[start - 1])) continue;
-    if (!m[2]) {
-      // A bare path: full stops, commas and closing quotes after it aren't part of it.
-      const tail = /[.,;:!?'"’”)]+$/.exec(href)?.[0] ?? '';
-      href = href.slice(0, href.length - tail.length);
-      label = href;
-      end -= tail.length;
-    }
-    if (start > at) out.push(text.slice(at, start));
-    out.push(
-      <Link key={start} href={href} className="as-link">
-        {label}
-      </Link>,
-    );
-    at = end;
-  }
-  if (at < text.length) out.push(text.slice(at));
-  return out;
-}
-
-/** `initialText`: already in the box, not sent (/admin/assistant?q=…, e.g. "Ask Metis" in Help). */
+/** `initialText`: already in the box, not sent (/admin/assistant?q=…, e.g. "Ask Hestia" in Help). */
 export function AssistantView({ firstName, initialText = '' }: { firstName: string; initialText?: string }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [configured, setConfigured] = useState(true);
@@ -107,9 +41,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
   const box = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [listening, setListening] = useState(false);
-  const canListen = useSyncExternalStore(noSubscribe, hasSpeech, () => false);
-  const mic = useRef<Mic | null>(null);
+  const { canListen, listening, toggle: listen, hush } = useDictation(text, setText);
   const end = useRef<HTMLDivElement>(null);
 
   const loadDrafts = useCallback(
@@ -137,9 +69,6 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
     end.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [lines, busy]);
 
-  // Leaving the page mid-dictation switches the mic off.
-  useEffect(() => () => hush(mic.current), []);
-
   // Arrived with a question in the box (?q=): the cursor at its end, ready to finish or send. The address
   // loses the ?q= so a reload doesn't put it back after it's sent.
   useEffect(() => {
@@ -152,64 +81,11 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
   }, [initialText]);
 
-  function listen() {
-    if (mic.current) {
-      mic.current.keep = false;
-      mic.current.r.stop();
-      return;
-    }
-    // Chrome on Android can't listen continuously (see dictation.ts), so there it hears one sentence at a time.
-    // Big Android tablets ask for desktop sites and call themselves Linux; a touchscreen gives them away.
-    const ua = navigator.userAgent;
-    const oneSentence = /Android/i.test(ua) || (/\bLinux\b/.test(ua) && !/CrOS/.test(ua) && navigator.maxTouchPoints > 0);
-    let said = text;
-    const m: Mic = { r: null as unknown as Recognition, keep: true, live: true };
-    const done = () => {
-      if (mic.current !== m) return; // already sent, or a newer dictation has the mic
-      mic.current = null;
-      setListening(false);
-    };
-    const begin = () => {
-      const r = makeRecognition();
-      if (!r) return done();
-      r.lang = 'en-GB';
-      r.continuous = !oneSentence;
-      r.interimResults = true;
-      let now = '';
-      r.onresult = (e) => {
-        if (!m.live) return;
-        now = heard(Array.from(e.results, (x) => x[0]?.transcript ?? ''), oneSentence);
-        setText(fixName(joinSaid(said, now)));
-      };
-      // Any error (no speech for a while, no permission, no signal) ends it; onend still runs.
-      r.onerror = () => {
-        m.keep = false;
-      };
-      r.onend = () => {
-        if (!m.live) return done();
-        said = joinSaid(said, now);
-        if (oneSentence && m.keep && now) begin();
-        else done();
-      };
-      m.r = r;
-      try {
-        r.start();
-      } catch {
-        done();
-      }
-    };
-    mic.current = m;
-    setListening(true);
-    begin();
-  }
-
   async function send(msg = text) {
     const t = msg.trim();
     if (!t || busy) return;
     // Sent: anything the mic hears after this mustn't put the words back in the box.
-    hush(mic.current);
-    mic.current = null;
-    setListening(false);
+    hush();
     setText('');
     setLines((l) => [...l, { role: 'user', text: t }]);
     setBusy(true);
@@ -244,7 +120,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
     <div className="as">
       <header className="as-head">
         <div>
-          <h1><MetisIcon size={36} /> Metis</h1>
+          <h1><HestiaIcon size={36} /> Hestia</h1>
           <p>Tell me what happened and I’ll add the notes, tasks and drafts.</p>
         </div>
         {lines.length > 0 && (
@@ -256,7 +132,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
 
       {!configured && (
         <p className="as-banner">
-          Metis switches on once <b>ANTHROPIC_API_KEY</b> is added in Vercel — it’s on your “From Claude” list on the
+          Hestia switches on once <b>ANTHROPIC_API_KEY</b> is added in Vercel — it’s on your “From Claude” list on the
           dashboard.
         </p>
       )}
@@ -267,7 +143,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
         {loaded && !lines.length && (
           <div className="as-empty">
             <p>
-              {firstName ? `Hi ${firstName}, I’m Metis. ` : 'I’m Metis. '}Talk to me like you would a colleague in the van — I’ll sort it into the
+              {firstName ? `Hi ${firstName}, I’m Hestia. ` : 'I’m Hestia. '}Talk to me like you would a colleague in the van — I’ll sort it into the
               CRM. Nothing goes to a customer until you press Send.
             </p>
             <div className="as-starters">
@@ -286,7 +162,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
         )}
         {lines.map((l, i) => (
           <div key={i} className={`as-msg is-${l.role}${l.error ? ' is-error' : ''}`}>
-            {l.role === 'assistant' && <MetisIcon size={22} className="as-avatar" />}
+            {l.role === 'assistant' && <HestiaIcon size={22} className="as-avatar" />}
             <p>{l.role === 'assistant' ? withLinks(l.text) : l.text}</p>
             {l.actions && l.actions.length > 0 && (
               <ul className="as-actions">
@@ -302,8 +178,8 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
           </div>
         ))}
         {busy && (
-          <div className="as-msg is-assistant is-busy" aria-label="Metis is working">
-            <MetisIcon size={22} className="as-avatar" />
+          <div className="as-msg is-assistant is-busy" aria-label="Hestia is working">
+            <HestiaIcon size={22} className="as-avatar" />
             <span />
             <span />
             <span />
@@ -329,7 +205,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
               send();
             }
           }}
-          placeholder={listening ? 'Listening…' : 'Message Metis'}
+          placeholder={listening ? 'Listening…' : 'Message Hestia'}
           rows={text.length > 80 ? 4 : 1}
         />
         {canListen && (
@@ -355,7 +231,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
   );
 }
 
-/** Emails and WhatsApps Metis wrote, waiting for a person to check and send. */
+/** Emails and WhatsApps Hestia wrote, waiting for a person to check and send. */
 function Drafts({ drafts, onChange }: { drafts: Draft[]; onChange: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
   if (!drafts.length) return null;

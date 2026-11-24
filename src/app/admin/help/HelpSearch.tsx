@@ -242,7 +242,7 @@ export function HelpSearch({
           <Results hits={hits} q={q} />
           {metis && (
             <p className="hp-after">
-              Not what you need? <Link href={metisHref(q)}>Ask Metis</Link> in your own words.
+              Not what you need? <Link href={metisHref(q)}>Ask Hestia</Link> in your own words.
             </p>
           )}
         </section>
@@ -254,7 +254,7 @@ export function HelpSearch({
             <li>Try the name on the button or menu, e.g. “templates” or “Opportunities”.</li>
             {metis && (
               <li>
-                <Link href={metisHref(q)}>Ask Metis</Link> in your own words.
+                <Link href={metisHref(q)}>Ask Hestia</Link> in your own words.
               </li>
             )}
           </ul>

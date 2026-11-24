@@ -1,19 +1,19 @@
 ---
-title: What Metis can’t do
-summary: The limits: Metis never sends to customers, and there are parts of the app she can’t reach.
+title: What Hestia can’t do
+summary: The limits: Hestia never sends to customers, and there are parts of the app she can’t reach.
 order: 30
-keywords: limits, can’t, cannot, send message, book survey, change stage, delete, prices, Metis mistakes
-where: CRM › Metis
+keywords: limits, can’t, cannot, send message, book survey, change stage, delete, prices, Hestia mistakes
+where: CRM › Hestia
 path: /admin/assistant
 access: crm
 ---
 ## She never contacts a customer
 
-Metis can’t send an email or a WhatsApp, and she can’t phone anyone. What she writes is saved as a draft for a person to check and send. If she ever seems to say a message has gone, it hasn’t: check **… drafts to check** on her page.
+Hestia can’t send an email or a WhatsApp, and she can’t phone anyone. What she writes is saved as a draft for a person to check and send. If she ever seems to say a message has gone, it hasn’t: check **… drafts to check** on her page.
 
 ## Things she can’t do
 
-Metis can only do the things listed in [What Metis can do](/admin/help/metis/what-metis-can-do). She can’t, for example:
+Hestia can only do the things listed in [What Hestia can do](/admin/help/hestia/what-hestia-can-do). She can’t, for example:
 
 - book, move or cancel a survey, or find survey times (use [Find a time](/admin/help/surveys/find-a-time));
 - move a job to another stage, mark it Won or Lost, or change its value, products or dates;
@@ -29,7 +29,7 @@ Metis can only do the things listed in [What Metis can do](/admin/help/metis/wha
 
 ## When she can’t answer
 
-- "Metis is busy right now — try again in a minute." Wait a moment and send it again.
+- "Hestia is busy right now — try again in a minute." Wait a moment and send it again.
 - "No connection — try again when you have signal." Your message didn’t reach her.
 - "Sorry — I can’t help with that one. Try rewording it." Say it a different way.
 - "That ran long — ask me again in smaller pieces." Split the request up.

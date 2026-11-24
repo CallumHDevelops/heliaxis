@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { CRM_BUCKET, DOCS_BUCKET, logActivity, thumbPath } from '@/lib/crm/server';
 import {
   deleteNotifications,
-  forgetInMetis,
+  forgetInHestia,
   leftoverFiles,
   removeFiles,
   rowsIn,
@@ -119,7 +119,7 @@ export async function deleteProject(
   if (error) return { ok: false, status: 500, error: error.message };
   if (!gone?.length) return { ok: false, status: 404, error: 'Not found' };
 
-  await forgetInMetis(db, [id], String(p.created_at ?? new Date(0).toISOString()));
+  await forgetInHestia(db, [id], String(p.created_at ?? new Date(0).toISOString()));
 
   // 4. Its files, plus anything uploaded without being saved. Only ever inside this job's own folders.
   const mine = (f: { bucket: string; path: string }) => {

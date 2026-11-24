@@ -45,6 +45,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="${hostName}" android:pathPrefix="/admin" />
             </intent-filter>
+
+            <!-- Hestia's links, heliaxis://hestia/new (?voice=1), /last and /thread/{id}: the app shortcuts and
+                 the widget open her full-screen (HestiaLinks). Not BROWSABLE: web pages can't fire them. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="heliaxis" android:host="hestia" />
+            </intent-filter>
         </activity>
 
         <!-- The app icon. Keeps the launcher's original name so icons already on people's Home
@@ -58,6 +66,8 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Long-press the icon: Talk to Hestia, New Hestia chat, Last Hestia chat (drag one to the Home Screen to pin it). -->
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <activity android:name="com.google.androidbrowserhelper.trusted.ManageDataLauncherActivity" android:exported="false">

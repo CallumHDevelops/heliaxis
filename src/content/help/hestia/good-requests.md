@@ -1,13 +1,13 @@
 ---
-title: Good things to ask Metis
+title: Good things to ask Hestia
 summary: Example requests that work well, from a quick look at your day to a full debrief after a visit.
 order: 50
 keywords: examples, prompts, what to say, ideas, debrief, after a meeting, voice note
-where: CRM › Metis
+where: CRM › Hestia
 path: /admin/assistant
 access: crm
 ---
-Say it the way you’d tell a colleague. One message can ask for several things: Metis does each one and lists them as chips under her reply.
+Say it the way you’d tell a colleague. One message can ask for several things: Hestia does each one and lists them as chips under her reply.
 
 ## Your day
 
@@ -32,11 +32,11 @@ Say it the way you’d tell a colleague. One message can ask for several things:
 - "Draft a WhatsApp chasing Jane Smith about her quote."
 - "Write an email to Mr Hughes thanking him for his time today and saying the quote will follow this week."
 
-Metis saves these as drafts. Open the draft at the top of her page, check it and press **Send**: see [Check and send Metis’s drafts](/admin/help/metis/drafts).
+Hestia saves these as drafts. Open the draft at the top of her page, check it and press **Send**: see [Check and send Hestia’s drafts](/admin/help/hestia/drafts).
 
 ## Getting better answers
 
 - Give a name and something else that narrows it down (a postcode, a town, the job) when the name is common.
 - Say who a task is for and when it’s due.
-- Give exact times and prices yourself. Metis won’t make them up.
+- Give exact times and prices yourself. Hestia won’t make them up.
 - If she’s got something wrong, just say so: "No, the other Jane Smith, in Newport."

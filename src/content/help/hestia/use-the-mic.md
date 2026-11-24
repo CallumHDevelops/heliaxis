@@ -1,17 +1,17 @@
 ---
-title: Talk to Metis with the mic
-summary: Use voice typing to tell Metis what happened, from your phone or the van.
+title: Talk to Hestia with the mic
+summary: Use voice typing to tell Hestia what happened, from your phone or the van.
 order: 40
-keywords: mic, microphone, voice, dictate, dictation, speech, talk, voice typing, Mattis, Matisse, misheard, Android
-where: CRM › Metis
+keywords: mic, microphone, voice, dictate, dictation, speech, talk, voice typing, Hester, Hesta, Fiesta, misheard, Android
+where: CRM › Hestia
 path: /admin/assistant
 access: crm
 ---
-The mic button sits next to the send arrow at the bottom of Metis’s page. It turns what you say into words in the message box.
+The mic button sits next to the send arrow at the bottom of Hestia’s page. It turns what you say into words in the message box.
 
 ## Use it
 
-1. Open Metis on your phone.
+1. Open Hestia on your phone.
 2. Tap the mic button. The first time, your phone asks if the app can use the microphone: allow it.
 3. Talk. An empty box says "Listening…", and your words appear as you speak.
 4. Tap the mic button again to stop.
@@ -29,6 +29,6 @@ Nothing is sent until you tap the arrow. Tapping it while the mic is still on st
 
 ## When it mishears her name
 
-Voice typing doesn’t know the name Metis, and often hears "Mattis" or "Matisse". When it comes at the start or after a greeting ("Hey Mattis, …"), the app changes it back to Metis in the box. Anywhere else, Metis knows voice typing mishears her name, so you don’t need to correct it.
+Voice typing doesn’t know the name Hestia, and often hears "Hester", "Hesta" or "Fiesta". When it comes at the start or after a greeting ("Hey Hester, …"), the app changes it back to Hestia in the box. Anywhere else, Hestia knows voice typing mishears her name, so you don’t need to correct it.
 
 > **Good to know:** The mic button only appears where the phone or browser offers voice typing, for example Chrome and the Android app. If you can’t see it, use the microphone key on your phone’s keyboard instead.

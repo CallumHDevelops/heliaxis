@@ -1,9 +1,9 @@
 /*
- * Turning the browser's speech-to-text results into the words that were said (Metis's mic button).
+ * Turning the browser's speech-to-text results into the words that were said (Hestia's mic button).
  *
  * Chrome on Android doesn't do continuous listening properly: rather than one result per sentence it
- * hands back each in-between guess as a result of its own — "hey", "hey", "hey mattis", "hey mattis a
- * couple"… — and adding those up gave "heyheyhey mattishey mattis a couple". So the phone listens one
+ * hands back each in-between guess as a result of its own — "hey", "hey", "hey hester", "hey hester a
+ * couple"… — and adding those up gave "heyheyhey hesterhey hester a couple". So the phone listens one
  * sentence at a time and starts again (AssistantView), and whatever comes back is folded here: a result
  * that only repeats or grows the one before it replaces it instead of being added on.
  */
@@ -48,13 +48,16 @@ export function heard(transcripts: string[], oneSentence = false): string {
   return out.join(' ');
 }
 
-/** Voice typing doesn't know the name: "hey Mattis" / "Matisse, can you…" are Metis. */
-const MISHEARD = 'mattis|matisse|mattys|mathis|matis|metis|mettis|metus|mattes';
+/**
+ * Voice typing doesn't know the name: "hey Hester" / "Hesta, can you…" are Hestia. "Esther" is left out on
+ * purpose: she's a colleague, and "Esther needs the guide" must stay as it is (the prompt tells Hestia).
+ */
+const MISHEARD = 'hestia|hester|hesta|hestier|hestea|hestiya|estia|hastia|fiesta';
 const GREETING = new RegExp(`\\b(hey|hi|hiya|hello|ok|okay|right|thanks|thank you|cheers|morning|evening)(,?\\s+)(?:${MISHEARD})\\b`, 'gi');
 const OPENING = new RegExp(`^(?:${MISHEARD})\\b`, 'i');
 
 export function fixName(s: string) {
-  return s.replace(GREETING, '$1$2Metis').replace(OPENING, 'Metis');
+  return s.replace(GREETING, '$1$2Hestia').replace(OPENING, 'Hestia');
 }
 
 /** Text already in the box, then what's been said, with one space between. */

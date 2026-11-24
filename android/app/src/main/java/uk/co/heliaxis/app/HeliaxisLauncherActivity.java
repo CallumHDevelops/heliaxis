@@ -125,10 +125,12 @@ public class HeliaxisLauncherActivity extends LauncherActivity {
         return null;
     }
 
+    /** The page to open: Hestia's links (heliaxis://hestia/…, see HestiaLinks) go to her pages on the site. */
     @Override
     protected Uri getLaunchingUrl() {
+        Uri link = getIntent() == null ? null : getIntent().getData();
         return Push.withToken(
-                super.getLaunchingUrl(),
+                HestiaLinks.isHestia(link) ? HestiaLinks.toSite(link) : super.getLaunchingUrl(),
                 Push.cachedToken(this),
                 NotificationManagerCompat.from(this).areNotificationsEnabled());
     }

@@ -100,7 +100,7 @@ export function bestHits(prepared: PreparedEntry[], q: string, n = 3): { hits: H
   return { hits, matched: !hits.length ? 'none' : hits[0].matched === terms ? 'all' : 'some' };
 }
 
-/** For Metis: the best articles for a question (bestHits), with the passages that answer it. */
+/** For Hestia: the best articles for a question (bestHits), with the passages that answer it. */
 export function searchLibrary(lib: HelpLibrary, prepared: PreparedEntry[], q: string, n = 3): { results: HelpAnswer[]; matched: 'all' | 'some' | 'none' } {
   const { hits, matched } = bestHits(prepared, q, n);
   const byUrl = new Map(allArticles(lib).map((a) => [a.url, a]));

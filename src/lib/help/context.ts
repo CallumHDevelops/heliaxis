@@ -6,7 +6,7 @@
 
 export const HELP_HOME = '/admin/help';
 
-/** Metis with this already in its box, not sent (/admin/assistant?q=…). */
+/** Hestia with this already in its box, not sent (/admin/assistant?q=…). */
 export const metisHref = (q = '') => (q.trim() ? `/admin/assistant?q=${encodeURIComponent(q.trim().slice(0, 500))}` : '/admin/assistant');
 
 /** Where a Help link goes from this page (from Help itself: Help's home). */

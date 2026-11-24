@@ -4,9 +4,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import { TOOLS, runTool, type Actor, type AssistantAction } from './tools';
 
 /**
- * Metis, the CRM assistant: a manual tool loop over the CRM tools. Runs on Claude Opus 5.5 with
+ * Hestia, the CRM assistant: a manual tool loop over the CRM tools. Runs on Claude Opus 5.5 with
  * server-side refusal fallbacks ("default"), so a false-positive decline is retried on
- * Anthropic's recommended fallback model instead of failing.
+ * Anthropic's recommended fallback model instead of failing. Each turn is streamed: `onEvent` gets
+ * her words as they come, a mark when she starts a new step, and each tool as it starts and what it did.
+ * A mid-stream fallback carries on in the same stream, so what was already shown stays.
  */
 
 export const ASSISTANT_MODEL = 'claude-opus-5-5';
@@ -29,9 +31,9 @@ function system(me: Actor) {
     hour: '2-digit',
     minute: '2-digit',
   });
-  return `You are Metis, the assistant inside Heliaxis's own CRM (named after the Greek goddess of wisdom and counsel). Heliaxis Ltd is a small UK installer of solar PV, batteries, air source heat pumps and EV chargers (about five staff, some working remotely). You're talking to ${me.name}. It is ${now} (UK time).
+  return `You are Hestia, the assistant inside Heliaxis's own CRM (named after the Greek goddess of the hearth and home, who kept the household running). Heliaxis Ltd is a small UK installer of solar PV, batteries, air source heat pumps and EV chargers (about five staff, some working remotely). You're talking to ${me.name}. It is ${now} (UK time).
 
-People often talk to you straight after a meeting or from the van, by voice, so their messages can be rambling or mis-transcribed (voice typing often hears your name as Mattis, Matisse or similar — that's you). Pull out what needs doing and do it: add notes to the customer, create tasks (for them or a colleague), set next steps, and draft emails and WhatsApps. Use the tools rather than describing what you would do. Look customers up with search_customers before acting on them; if two customers match and it's unclear which, ask. Use list_team to find a colleague's id when a task is for someone else. Businesses we deal with (commercial customers, landlords, schools, partners who refer work, suppliers) and the people there are organisations and their contacts: find them with find_organisation or find_contact (a contact can be part of an organisation or on their own), not search_customers; add one with add_contact.
+People often talk to you straight after a meeting or from the van, by voice, so their messages can be rambling or mis-transcribed (voice typing often hears your name as Hester, Hesta, Fiesta or similar — that's you. It can also write "Esther", who is a colleague: "Esther, can you…" at the start is you, but "give Esther a task" is the colleague. Ask if it isn't clear). Pull out what needs doing and do it: add notes to the customer, create tasks (for them or a colleague), set next steps, and draft emails and WhatsApps. Use the tools rather than describing what you would do. Look customers up with search_customers before acting on them; if two customers match and it's unclear which, ask. Use list_team to find a colleague's id when a task is for someone else. Businesses we deal with (commercial customers, landlords, schools, partners who refer work, suppliers) and the people there are organisations and their contacts: find them with find_organisation or find_contact (a contact can be part of an organisation or on their own), not search_customers; add one with add_contact.
 
 For money and lead questions (AI spend, where leads come from, which ads work) use ai_spend, lead_sources and ad_performance and give only the figures they return; say plainly when a figure is missing or the sample is small.
 
@@ -62,18 +64,28 @@ function afterFallback(content: Anthropic.Beta.BetaContentBlock[]) {
   return content.filter((b, i) => i > last || b.type === 'text');
 }
 
-export type AssistantResult = { messages: Msg[]; reply: string; actions: AssistantAction[] };
+/** `refused`: the last turn was declined, so any words already shown were replaced by `reply`. */
+export type AssistantResult = { messages: Msg[]; reply: string; actions: AssistantAction[]; refused?: boolean };
 
-export async function runAssistant(history: Msg[], text: string, me: Actor): Promise<AssistantResult> {
+/** What the chat shows while Hestia works: her words, a new paragraph, the tool she's using, what she did. */
+export type AssistantEvent =
+  | { t: 'text'; d: string }
+  | { t: 'step' }
+  | { t: 'tool'; name: string }
+  | { t: 'action'; a: AssistantAction };
+
+export async function runAssistant(history: Msg[], text: string, me: Actor, onEvent?: (e: AssistantEvent) => void): Promise<AssistantResult> {
   const client = new Anthropic();
   const messages: Msg[] = trim([...history, { role: 'user', content: text }]);
   const actions: AssistantAction[] = [];
   let reply = '';
+  let refused = false;
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const res = await client.beta.messages.create({
+    if (turn > 0) onEvent?.({ t: 'step' });
+    const stream = client.beta.messages.stream({
       model: ASSISTANT_MODEL,
-      max_tokens: 8000,
+      max_tokens: 16000,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'medium' },
       betas: ['server-side-fallback-2026-07-01'],
@@ -82,14 +94,18 @@ export async function runAssistant(history: Msg[], text: string, me: Actor): Pro
       tools: TOOLS.map((t) => ({ ...t, strict: true })) as Anthropic.Beta.BetaTool[],
       messages,
     });
+    if (onEvent) stream.on('text', (d) => onEvent({ t: 'text', d }));
+    const res = await stream.finalMessage();
 
     await recordAi('assistant', res.model, res.usage);
     if (res.stop_reason === 'refusal') {
       // Nothing from a refused turn is kept; the user can rephrase.
       reply = 'Sorry — I can’t help with that one. Try rewording it.';
+      refused = true;
       break;
     }
-    const content = afterFallback(res.content);
+    // Cut off mid tool call (max_tokens): that call can't run, and a history holding it couldn't be sent again.
+    const content = afterFallback(res.content).filter((b) => res.stop_reason !== 'max_tokens' || b.type !== 'tool_use');
     messages.push({ role: 'assistant', content: content as Anthropic.Beta.BetaContentBlockParam[] });
     const said = content
       .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === 'text')
@@ -108,12 +124,15 @@ export async function runAssistant(history: Msg[], text: string, me: Actor): Pro
     for (const c of calls) {
       let out: string;
       let isError = false;
+      onEvent?.({ t: 'tool', name: c.name });
+      const before = actions.length;
       try {
         out = await runTool(c.name, (c.input ?? {}) as Record<string, unknown>, me, actions);
       } catch (e) {
         out = e instanceof Error ? e.message : 'Failed';
         isError = true;
       }
+      for (const a of actions.slice(before)) onEvent?.({ t: 'action', a });
       results.push({ type: 'tool_result', tool_use_id: c.id, content: out, ...(isError ? { is_error: true } : {}) });
     }
     messages.push({ role: 'user', content: results });
@@ -124,5 +143,5 @@ export async function runAssistant(history: Msg[], text: string, me: Actor): Pro
   const last = messages[messages.length - 1];
   if (last.role === 'user' && typeof last.content !== 'string') messages.push({ role: 'assistant', content: reply || 'Done.' });
   if (last.role === 'user' && typeof last.content === 'string') messages.push({ role: 'assistant', content: reply });
-  return { messages, reply: reply || 'Done.', actions };
+  return { messages, reply: reply || 'Done.', actions, refused };
 }

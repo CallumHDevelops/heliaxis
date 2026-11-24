@@ -30,4 +30,12 @@
     <string name="widgetPreviewBadge">3 need you</string>
     <string name="widgetPreviewEvent">09:00  Survey: Sarah Davies</string>
     <string name="widgetPreviewTask">Call GoodWe about the inverter</string>
+
+    <!-- The app icon's long-press shortcuts to Hestia (res/xml/shortcuts.xml). Short labels: 10 characters or so. -->
+    <string name="shortcutTalkShort">Talk</string>
+    <string name="shortcutTalkLong">Talk to Hestia</string>
+    <string name="shortcutNewShort">Hestia</string>
+    <string name="shortcutNewLong">New Hestia chat</string>
+    <string name="shortcutLastShort">Last chat</string>
+    <string name="shortcutLastLong">Last Hestia chat</string>
 </resources>

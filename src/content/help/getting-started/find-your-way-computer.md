@@ -27,7 +27,7 @@ You only see the pages your account can open, so your menu may be shorter than a
 | **CRM** | **Opportunities**, **Organisations**, **Contacts**, **Surveys and diary** | CRM |
 | | **Enquiries**, **WhatsApp inbox**, **Smart replies & chasers**, **WhatsApp templates** | Enquiries |
 | | **WhatsApp chats** (instead of **WhatsApp inbox**) | CRM without Enquiries |
-| | **CRM reports**, **CRM settings**, **Metis** | CRM |
+| | **CRM reports**, **CRM settings**, **Hestia** | CRM |
 | **Operations** | **Projects** | CRM |
 | | **RAMS** | RAMS |
 | **Finance** | **Purchase orders** | CRM, once purchase-orders.sql has been run |

@@ -9,7 +9,7 @@ A review of every place the platform uses AI, written from the code as it stands
 | 1 | Proposal reader | Quote builder | Reads an uploaded OpenSolar PDF and copies out its figures | Claude Haiku (default) |
 | 2 | Introduction writer | Quote builder | Writes the quote's cover letter | Claude Haiku (default) |
 | 3 | "What is included" writer | Quote builder | Writes the formal scope paragraphs | Claude Haiku (default) |
-| 4 | Metis, the CRM assistant | Assistant page | Turns talk into tasks, notes, contacts and message drafts | Claude Opus 5.5 |
+| 4 | Hestia, the CRM assistant | Assistant page | Turns talk into tasks, notes, contacts and message drafts | Claude Opus 5.5 |
 | 5 | MCS certificate reader | Job documents | Reads the certificate number off an uploaded certificate | Claude Opus 5.5 |
 | 6 | Label and photo reader | Site commissioning forms | Reads serials, make, model and ratings off equipment photos | Claude Opus 5.5 |
 | 7 | Social comment sorting | Social monitoring | Classifies comments and reviews (type, severity, sentiment) | Claude Haiku (default) |
@@ -47,7 +47,7 @@ Worth saying clearly, because it is easy to assume otherwise. These are ordinary
 - **Shown as:** the spark animation while writing.
 - **Rough cost:** a fraction of a penny each time (rewrites cost again).
 
-### 4. Metis, the CRM assistant
+### 4. Hestia, the CRM assistant
 - **Does:** takes rambling or voice-typed messages after a meeting and creates tasks, notes, next steps, contacts and opportunities, drafts emails and WhatsApps, finds customers, shows "my day", and answers "how do I…" questions from the Help section.
 - **Tools it has (14):** add contact, add note, create opportunity, create task, draft email, draft WhatsApp, find contact, find organisation, get customer, list team, my day, search customers, search help, set next step.
 - **Hard limit:** it **cannot send anything to a customer**. Emails and WhatsApps are saved as drafts for a person to check and send.
@@ -110,7 +110,7 @@ The proposal reader has run successfully on a real OpenSolar file on the live si
 
 - **New:** `CMS → AI costs` shows this month, the last 120 days, the average cost of a quote with a proposal, a per-quote table (reading, introduction, What is included) and a by-feature table. It needs `supabase/ai-usage.sql` to be run once. It records the quote features, the MCS and label readers, the blog (Claude path) and the assistant.
 - **Existing:** the social features record to `social_usage` and are included on the same page. They also have their own report with a monthly cap.
-- **Also recorded now:** the CMS page generator and the blog when it runs through OpenRouter (priced as GPT-4o mini or GPT-4o from their token counts). Metis answers "how much have we spent on AI" from the same log.
+- **Also recorded now:** the CMS page generator and the blog when it runs through OpenRouter (priced as GPT-4o mini or GPT-4o from their token counts). Hestia answers "how much have we spent on AI" from the same log.
 
 ## Rough cost per use (estimates, to be replaced by real figures)
 

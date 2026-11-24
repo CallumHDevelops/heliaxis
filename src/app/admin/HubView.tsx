@@ -5,7 +5,7 @@ import { WeekAhead } from './WeekAhead';
 import { MetaLeadsPanel, TodoPanel } from './DashPanels';
 import { EmailConnect, EmailPanel } from './EmailPanel';
 import type { HomeMail } from '@/lib/mail/server';
-import { MetisIcon } from '@/components/admin/MetisIcon';
+import { HestiaIcon } from '@/components/admin/HestiaIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
 import { HubSearch } from '@/components/admin/GlobalSearch';
 import type { HubMetaLeads as MetaLeads } from './meta-leads';
@@ -112,7 +112,7 @@ export function HubView({
   week?: HubWeekDay[] | null;
   /** Setup jobs Claude has left (they tick themselves off): admins', or ones passed to this person. */
   setup?: FromClaudeProps;
-  /** Show the "Talk to Metis" bar. */
+  /** Show the "Talk to Hestia" bar. */
   assistant?: boolean;
   /** New Meta leads (Enquiries and CRM staff); null hides it. */
   metaLeads?: MetaLeads | null;
@@ -167,7 +167,7 @@ export function HubView({
               <li key={a.key}>
                 <Link href={a.href} className="hub-need">
                   <span className="hub-need-icon">
-                    {a.icon === 'whatsapp' ? <WaIcon /> : a.icon === 'metis' ? <MetisIcon size={38} className="hub-need-metis" /> : <Icon k={a.icon} />}
+                    {a.icon === 'whatsapp' ? <WaIcon /> : a.icon === 'metis' ? <HestiaIcon size={38} className="hub-need-metis" /> : <Icon k={a.icon} />}
                   </span>
                   <span className="hub-need-n">{a.n}</span>
                   <span className="hub-need-main">
@@ -198,9 +198,9 @@ export function HubView({
 
       {assistant && (
         <Link href="/admin/assistant" className="hub-claude">
-          <MetisIcon size={42} className="hub-claude-mark" />
+          <HestiaIcon size={42} className="hub-claude-mark" />
           <span className="hub-claude-main">
-            <b>Talk to Metis</b>
+            <b>Talk to Hestia</b>
             <small>Just finished a meeting? Say what happened — notes, tasks and drafts done for you.</small>
           </span>
           <span className="hub-claude-mic" aria-hidden="true">

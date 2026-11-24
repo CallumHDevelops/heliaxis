@@ -118,9 +118,11 @@ export async function middleware(request: NextRequest) {
 
   if (isAdminPath) {
     if (!user) {
+      // Back to the same page after signing in, its query too (Hestia's ?voice=1 from the app's Talk button).
       const url = request.nextUrl.clone();
       url.pathname = '/login';
-      url.searchParams.set('next', pathname);
+      url.search = '';
+      url.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(url);
     }
 

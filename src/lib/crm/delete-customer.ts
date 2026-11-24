@@ -11,13 +11,13 @@ import { aliasContacts } from './aliases';
 /**
  * Deleting a customer for good: the enquiry and everything about it. Their opportunities and
  * timeline, WhatsApp chat (and anything still waiting to send), emails, tasks on their
- * opportunities, Metis's drafts and what her lookups found about them, the notifications about
+ * opportunities, Hestia's drafts and what her lookups found about them, the notifications about
  * them, and their photos, documents and signatures in storage. Admins only (the routes check).
  *
  * The database goes first, in one statement: deleting the enquiry rows takes every row that
  * references them or their opportunities with it (on delete cascade in crm.sql, crm-v2.sql,
  * whatsapp.sql and assistant.sql). Only the notifications, which link by text, are deleted by hand,
- * just before, and Metis's conversations are cleared just after. Files go last, so a storage
+ * just before, and Hestia's conversations are cleared just after. Files go last, so a storage
  * hiccup never leaves a half-deleted customer on screen; a file that won't go is logged with its
  * path. Safe to run twice: someone already gone counts as gone.
  *
@@ -433,7 +433,7 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
 
   const gonePids = new Set(theirs.filter((p) => deleted.has(p.enquiry_id)).map((p) => p.id));
   const added = going.filter((c) => deleted.has(c.id)).map((c) => Date.parse(c.created_at)).filter(Number.isFinite);
-  await forgetInMetis(db, [...deleted, ...gonePids], new Date(Math.min(Date.now(), ...added)).toISOString());
+  await forgetInHestia(db, [...deleted, ...gonePids], new Date(Math.min(Date.now(), ...added)).toISOString());
   // The photos, voice notes and files they sent on WhatsApp (a folder per customer, whatsapp/media.ts).
   await removeFiles(db, await mediaFilesOf([...deleted]), out);
 
@@ -449,18 +449,18 @@ async function deleteSome(db: Db, ids: string[], includeSigned: boolean, out: De
 }
 
 /**
- * Metis keeps what her lookups returned in each conversation (assistant_threads), so a lookup that
+ * Hestia keeps what her lookups returned in each conversation (assistant_threads), so a lookup that
  * names them (by customer or opportunity id) is replaced, and she can't quote their details back.
  * Only conversations since the earliest of them was added can mention them. Not fatal: logged.
  */
-export async function forgetInMetis(db: Db, ids: string[], since: string) {
+export async function forgetInHestia(db: Db, ids: string[], since: string) {
   type Block = { type?: string; content?: unknown };
   type Message = { role: string; content: string | Block[] };
   const mentions = (b: Block) => b.type === 'tool_result' && ids.some((id) => JSON.stringify(b.content ?? '').includes(id));
   for (let from = 0; ; from += 50) {
     const { data, error, status } = await db.from('assistant_threads').select('id, messages').gte('updated_at', since).order('id').range(from, from + 49);
     if (error) {
-      if (!notThere({ error, status })) console.error('[delete-customer] Metis conversations not cleared:', error.message);
+      if (!notThere({ error, status })) console.error('[delete-customer] Hestia conversations not cleared:', error.message);
       return;
     }
     for (const t of data ?? []) {
@@ -470,7 +470,7 @@ export async function forgetInMetis(db: Db, ids: string[], since: string) {
         Array.isArray(m.content) ? { ...m, content: m.content.map((b) => (mentions(b) ? { ...b, content: '[Customer deleted]' } : b)) } : m
       );
       const r = await db.from('assistant_threads').update({ messages: cleared }).eq('id', t.id);
-      if (r.error) console.error('[delete-customer] Metis conversation not cleared:', r.error.message);
+      if (r.error) console.error('[delete-customer] Hestia conversation not cleared:', r.error.message);
     }
     if ((data?.length ?? 0) < 50) return;
   }

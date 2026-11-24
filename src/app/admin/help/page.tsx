@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { MetisIcon } from '@/components/admin/MetisIcon';
+import { HestiaIcon } from '@/components/admin/HestiaIcon';
 import { articlesForPath, cleanFrom, metisHref } from '@/lib/help/context';
 import { allArticles } from '@/lib/help/library';
 import { getHelp, getHelpIndexFile, searchHelpPage } from '@/lib/help/server';
@@ -18,7 +18,7 @@ const one = (v: string | string[] | undefined) => (typeof v === 'string' ? v : '
 
 /**
  * Help's home: Help for the page you came from (?from=), the search box (?q=, so a search can be linked)
- * and a card per section; Ask Metis for CRM staff.
+ * and a card per section; Ask Hestia for CRM staff.
  */
 export default async function HelpHome({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
@@ -88,10 +88,10 @@ export default async function HelpHome({ searchParams }: { searchParams: Promise
           )}
           {viewer.metis && (
             <Link href={metisHref()} className="hp-metis">
-              <MetisIcon size={40} />
+              <HestiaIcon size={40} />
               <span className="hp-metis__text">
-                <span className="hp-metis__title">Ask Metis</span>
-                <span className="hp-metis__sum">Ask in your own words. Metis answers from these guides and links the article it used.</span>
+                <span className="hp-metis__title">Ask Hestia</span>
+                <span className="hp-metis__sum">Ask in your own words. Hestia answers from these guides and links the article it used.</span>
               </span>
               <span className="hp-metis__go" aria-hidden="true">
                 →

@@ -25,7 +25,7 @@ A box with one row for each area where something is waiting, and a big number. R
 | --- | --- | --- |
 | **WhatsApp** | Chats with unread messages | Enquiries |
 | **CRM** | Follow-ups due today or earlier, on open jobs (everyone’s) | CRM |
-| **Drafts** | Drafts from Metis waiting to be sent | CRM |
+| **Drafts** | Drafts from Hestia waiting to be sent | CRM |
 | **Tasks** | Open tasks past their deadline (everyone’s) | Tasks |
 | **Enquiries** | New enquiries | Enquiries |
 | **Subcontractors** | Agreements to countersign and documents to review | Subcontractors |
@@ -35,9 +35,9 @@ A box with one row for each area where something is waiting, and a big number. R
 
 The newest leads from Meta that are still at New, with buttons to open, WhatsApp or call them. For Enquiries and CRM. See [New Meta leads on the dashboard](/admin/help/dashboard/new-meta-leads).
 
-## Talk to Metis
+## Talk to Hestia
 
-For CRM: a bar that opens Metis, the assistant. "Just finished a meeting? Say what happened — notes, tasks and drafts done for you." See [The Metis page](/admin/help/metis/the-metis-page).
+For CRM: a bar that opens Hestia, the assistant. "Just finished a meeting? Say what happened — notes, tasks and drafts done for you." See [The Hestia page](/admin/help/hestia/the-hestia-page).
 
 ## From Claude
 

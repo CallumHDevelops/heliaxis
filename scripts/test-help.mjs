@@ -14,7 +14,7 @@
 //     "templates", "ad spend"…) putting the obvious article first.
 //  6. Help for this page: an app path → the articles about it, a [id] placeholder for a record's page (on a
 //     dynamic route, and never offered on another page beside it); only /admin pages are accepted.
-//  7. Metis's search_help: at most three articles, each with its link and trimmed passages; questions
+//  7. Hestia's search_help: at most three articles, each with its link and trimmed passages; questions
 //     ("what does On hold mean") find the article about what they ask.
 //  8. Rendering: callouts, tables, figures with captions, heading ids and "On this page"; comments hidden.
 // It passes whatever content is there, as long as the content follows the rules.
@@ -370,7 +370,7 @@ eq('highlight: nothing to mark', highlightParts('Plain', ''), [{ text: 'Plain', 
       { slug: 'inbox-or-chats', title: 'WhatsApp inbox or WhatsApp chats? Who sees which', keywords: 'inbox, chats' },
       { slug: 'inbox', title: 'The WhatsApp inbox', keywords: 'messages' },
     ],
-    metis: [{ slug: 'what-metis-did', title: 'See what Metis did', body: 'Who sees what she changed.\n' }],
+    metis: [{ slug: 'what-hestia-did', title: 'See what Hestia did', body: 'Who sees what she changed.\n' }],
     team: [
       { slug: 'subcontractors-page', title: 'The Subcontractors page', keywords: 'subcontractor, firms' },
       { slug: 'subcontractor-page', title: 'A subcontractor’s page' },
@@ -449,12 +449,12 @@ eq('from: cleaned', [cleanFrom('/admin/crm#notes'), cleanFrom('/admin/crm?x=1'),
 }
 eq('help link: carries the page', helpHref('/admin/crm/1?tab=notes'), '/admin/help?from=%2Fadmin%2Fcrm%2F1%3Ftab%3Dnotes');
 eq('help link: from Help itself, Help home', [helpHref('/admin/help'), helpHref('/admin/help/crm/add'), helpHref('/admin/help?q=x')], ['/admin/help', '/admin/help', '/admin/help']);
-eq('Ask Metis link: the question in the box', [metisHref('add a template'), metisHref('  ')], ['/admin/assistant?q=add%20a%20template', '/admin/assistant']);
+eq('Ask Hestia link: the question in the box', [metisHref('add a template'), metisHref('  ')], ['/admin/assistant?q=add%20a%20template', '/admin/assistant']);
 for (const a of articles.filter((x) => x.path)) {
   ok(`this page: ${a.path} offers ${a.section}/${a.slug}`, articlesForPath(articles, sample(a.path)).includes(a));
 }
 
-// ── 7. Metis's search_help. ───────────────────────────────────────────────────────────────────────
+// ── 7. Hestia's search_help. ───────────────────────────────────────────────────────────────────────
 {
   const r = searchLibrary(F, FP, 'how do I get a whatsapp template approved');
   ok('metis: at most three articles', r.results.length > 0 && r.results.length <= 3, JSON.stringify(r).slice(0, 300));
@@ -486,7 +486,7 @@ for (const a of articles.filter((x) => x.path)) {
     const res = searchLibrary(lib, RP, a.title).results;
     ok(`metis: "${a.title}" → a Help link`, res.length > 0 && res.every((x) => x.url.startsWith('/admin/help/') && x.passages.length > 0));
   }
-  // The questions the tool's description and Metis's instructions give as examples, when their articles are here.
+  // The questions the tool's description and Hestia's instructions give as examples, when their articles are here.
   for (const [question, url] of [
     ['what does On hold mean', '/admin/help/customers/lost-and-on-hold'],
     ['how do I add a customer', '/admin/help/customers/add-a-customer'],

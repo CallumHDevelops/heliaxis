@@ -16,4 +16,7 @@
     <color name="widgetGoldSoft">#33F8BC1E</color>
     <color name="widgetUrgent">#B3261E</color>
     <color name="widgetOnUrgent">#FFFFFF</color>
+    <!-- Hestia's icon (app shortcuts): the brand's near-black and yellow, as public/assets/hestia.svg. -->
+    <color name="hestiaInk">#252422</color>
+    <color name="hestiaGold">#F5D724</color>
 </resources>

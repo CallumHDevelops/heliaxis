@@ -30,6 +30,12 @@ icon. Web changes reach the app on every deploy; you only need a new APK to chan
   Hestia sorts something new or a task changes, and whenever the app is opened. It's kept, so the
   widget shows the last one offline. Only phones on versionCode 6+ get them (`WIDGET_FROM_APP_VERSION`).
   Add it: long-press the home screen → Widgets → Heliaxis → Hestia.
+- **Hestia in one tap** (from versionCode 7): long-press the app icon for **Talk to Hestia**, **New Hestia chat**
+  and **Last Hestia chat** (`res/xml/shortcuts.xml`; drag one to the Home Screen to pin it). They open Hestia's
+  links, `heliaxis://hestia/new` (`?voice=1` for the mic on), `heliaxis://hestia/last` and
+  `heliaxis://hestia/thread/{id}`, which `HestiaLinks.java` turns into her full-screen pages on the site
+  (`/admin/hestia/…`). The links carry ids only, aren't BROWSABLE (web pages can't fire them), and work whether
+  the app is closed, in the background or open. Signed out, the site's sign-in brings you back to the same page.
 - **Urgent emails** have their own high-priority channel (`email`) from versionCode 6; older builds
   show them under Other.
 - **Updates**: the app opens `/admin?app=android-<versionCode>`; `AppRuntime` compares that with
