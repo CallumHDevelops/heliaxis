@@ -1303,8 +1303,11 @@ async function fileMail(ctx: Context, until: number): Promise<{ filed: number; m
     const q = db.from('mail_messages').select(cols).eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('rule.status', 'on').eq('rule.action', 'file');
     return box.filing ? q : q.not('rule.enquiry_id', 'is', null);
   };
-  // Only emails that could move: an approved folder (filing on), or marketing (marketing on). Oldest first.
-  const [toFile, toMarket, toMarketByRule] = await Promise.all([
+  // Only emails that could move: an approved folder (filing on), or marketing (marketing on). The last two days'
+  // first (so a notification is out of the Inbox within minutes, not after the backlog), then oldest first.
+  const recentSince = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const [recent, toFile, toMarket, toMarketByRule, loose] = await Promise.all([
+    box.filing || box.file_customers ? fileQuery().gte('at', recentSince).order('at', { ascending: false }).limit(100) : Promise.resolve({ data: [] }),
     box.filing || box.file_customers ? fileQuery().order('at').limit(500) : Promise.resolve({ data: [] }),
     box.marketing
       ? db.from('mail_messages').select('id, graph_id, conversation_id, at, marketing, rule:mail_rules(folder, status, action, never_marketing, enquiry_id)').eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('marketing', true).order('at').limit(200)
@@ -1312,11 +1315,15 @@ async function fileMail(ctx: Context, until: number): Promise<{ filed: number; m
     box.marketing
       ? db.from('mail_messages').select(cols).eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('rule.status', 'on').eq('rule.action', 'marketing').order('at').limit(200)
       : Promise.resolve({ data: [] }),
+    // Dealt-with emails from someone with no folder (a one-off sender on Gmail): Inbox › Filed, not left behind.
+    box.filing
+      ? db.from('mail_messages').select('id, graph_id, conversation_id, at, marketing').eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').is('rule_id', null).order('at', { ascending: false }).limit(200)
+      : Promise.resolve({ data: [] }),
   ]);
   const one = (r: unknown) => (Array.isArray(r) ? (r[0] ?? null) : r) as Cand['rule'];
   const seen = new Set<string>();
-  const cands: (Cand & { dest: 'file' | 'marketing' })[] = [];
-  for (const [list, dest] of [[toMarket.data, 'marketing'], [toMarketByRule.data, 'marketing'], [toFile.data, 'file']] as const) {
+  const cands: (Cand & { dest: 'file' | 'marketing' | 'filed' })[] = [];
+  for (const [list, dest] of [[toMarket.data, 'marketing'], [toMarketByRule.data, 'marketing'], [recent.data, 'file'], [toFile.data, 'file'], [loose.data, 'filed']] as const) {
     for (const m of (list ?? []) as unknown as Cand[]) {
       if (seen.has(m.id)) continue;
       seen.add(m.id);
@@ -1341,6 +1348,8 @@ async function fileMail(ctx: Context, until: number): Promise<{ filed: number; m
     if (m.dest === 'marketing') {
       // Never from anyone you've written to, or anyone you've said isn't marketing.
       if (!m.rule?.never_marketing && !t?.replied) dest = MARKETING_FOLDER;
+    } else if (m.dest === 'filed') {
+      if (t && readyToFile(t.state, m.at)) dest = FILED_FOLDER;
     } else if (m.rule && t && readyToFile(t.state, m.at)) {
       dest = m.rule.folder;
     }
