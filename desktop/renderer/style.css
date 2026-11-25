@@ -1,26 +1,26 @@
 :root {
-  --bg: #1c1c1e;
+  --bg: #0b0b0c;
   --panel: rgba(24, 24, 26, 0.82);
-  --text: #f3f3f3;
+  --text: #f3f3f1;
   --muted: #9a9a96;
   --line: rgba(255, 255, 255, 0.1);
-  --accent: AccentColor;
-  --accent-ink: AccentColorText;
-  --user: color-mix(in srgb, AccentColor 22%, transparent);
+  --accent: #f8bc1e;
+  --accent-ink: #1a1400;
+  --user: rgba(248, 188, 30, 0.16);
   --bot: rgba(255, 255, 255, 0.06);
   --err: #ff7a6b;
   color-scheme: dark;
 }
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f3f3f3;
+    --bg: #f6f5f1;
     --panel: rgba(255, 255, 255, 0.78);
-    --text: #1b1b1b;
+    --text: #17171a;
     --muted: #66665f;
     --line: rgba(0, 0, 0, 0.12);
-    --accent: AccentColor;
-    --accent-ink: AccentColorText;
-    --user: color-mix(in srgb, AccentColor 18%, transparent);
+    --accent: #e0a000;
+    --accent-ink: #1a1400;
+    --user: rgba(224, 160, 0, 0.18);
     --bot: rgba(0, 0, 0, 0.05);
     --err: #b3261e;
     color-scheme: light;
@@ -38,7 +38,7 @@ body {
 .bar { display: flex; align-items: center; gap: 4px; padding: 8px 12px; -webkit-app-region: drag; }
 .bar button { -webkit-app-region: no-drag; }
 .brand { font-weight: 600; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
-
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
 .grow { flex: 1; }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:disabled { opacity: 0.55; cursor: default; }
