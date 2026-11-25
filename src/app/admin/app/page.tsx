@@ -9,17 +9,20 @@ import { THEME_GROUP_LABEL } from '@/lib/theme/shared';
 import release from '../../../../public/app/version.json';
 import { readMetisRelease } from '@/lib/metis-release';
 import { AppDownload } from './AppDownload';
+import { DEVICES } from './device';
 import { MetisDesktop } from './MetisDesktop';
 import { SendToPhone } from './SendToPhone';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Phone app · Heliaxis',
+  title: 'Get the apps · Heliaxis',
   robots: { index: false, follow: false },
 };
 
-export default async function AppPage() {
+export default async function AppPage({ searchParams }: { searchParams: Promise<{ device?: string }> }) {
+  const { device } = await searchParams;
+  const initialDevice = DEVICES.find((d) => d.id === device)?.id ?? null;
   const { user, profile } = await getSessionProfile();
   const name = profile?.full_name || profile?.email || '';
   // The QR carries the same personal link as the email.
@@ -30,12 +33,15 @@ export default async function AppPage() {
   // This person's Light / Dark / Match phone (also in the avatar menu on every page).
   const { pref } = await themeContext();
   const metis = await readMetisRelease();
+  const signed = process.env.METIS_SIGNED === '1';
 
   return (
     <AdminShell active="app">
       <AppDownload
         release={release}
-        desktop={<MetisDesktop release={metis} signed={process.env.METIS_SIGNED === '1'} />}
+        initialDevice={initialDevice}
+        windows={<MetisDesktop os="windows" release={metis} signed={signed} />}
+        mac={<MetisDesktop os="mac" release={metis} signed={signed} />}
         appearance={
           <section className="ad-card ad-appearance" aria-labelledby="ad-appearance">
             <h2 id="ad-appearance">{THEME_GROUP_LABEL}</h2>

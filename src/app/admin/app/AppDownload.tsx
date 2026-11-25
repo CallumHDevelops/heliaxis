@@ -1,6 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { AndroidLogo, AppleLogo, WindowsLogo } from "./DeviceLogos";
+import { detectDevice, DEVICES, type Device } from "./device";
 
 type Release = {
   versionCode: number;
@@ -25,18 +27,23 @@ function installedVersion(): number | null {
   }
 }
 
-// iPadOS reports itself as a Mac, so check for touch too.
-const isIos = () =>
-  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const isHomeScreenApp = () =>
   (navigator as Navigator & { standalone?: boolean }).standalone === true ||
   matchMedia("(display-mode: standalone)").matches;
+
+const guessDevice = () => detectDevice(navigator.userAgent, navigator.maxTouchPoints);
+
+function Logo({ device }: { device: Device }) {
+  if (device === "windows") return <WindowsLogo />;
+  if (device === "android") return <AndroidLogo />;
+  return <AppleLogo />;
+}
 
 /** iPhone/iPad: no APK, the site itself installs from Safari's Share menu (/admin.webmanifest). */
 function IphoneSteps({ installed }: { installed: boolean }) {
   return (
     <section className="ad-card">
+      <h2 className="ad-first">Add Heliaxis to your iPhone or iPad</h2>
       {installed ? (
         <p className="ad-ok">
           You&apos;re using the Heliaxis app from your Home Screen.
@@ -73,33 +80,25 @@ function IphoneSteps({ installed }: { installed: boolean }) {
           add it again from the dashboard.
         </li>
         <li>Updates arrive by themselves. There&apos;s nothing to download.</li>
+        <li>
+          Metis is in the app too: open <b>Metis</b> from the menu.
+        </li>
       </ul>
     </section>
   );
 }
 
-export function AppDownload({
+function AndroidPanel({
   release,
+  installed,
+  onAndroid,
   sendToPhone,
-  appearance,
-  desktop,
 }: {
   release: Release;
+  installed: number | null;
+  onAndroid: boolean;
   sendToPhone?: React.ReactNode;
-  /** Light / Dark / Match phone for this person (the page's first card). */
-  appearance?: React.ReactNode;
-  /** Metis for Windows and Mac (a server-rendered card). */
-  desktop?: React.ReactNode;
 }) {
-  const android = useSyncExternalStore(
-    noop,
-    () => /android/i.test(navigator.userAgent),
-    () => true,
-  );
-  const ios = useSyncExternalStore(noop, isIos, () => false);
-  const homeScreen = useSyncExternalStore(noop, isHomeScreenApp, () => false);
-  const installed = useSyncExternalStore(noop, installedVersion, () => null);
-
   const upToDate = installed !== null && installed >= release.versionCode;
   const href = `${release.apk}?v=${release.versionCode}`;
   const size = release.sizeBytes
@@ -113,33 +112,15 @@ export function AppDownload({
     year: "numeric",
   });
 
-  if (ios) {
-    return (
-      <div className="ad-page">
-        <h1>Heliaxis for iPhone</h1>
-        <p className="ad-lede">
-          Add Heliaxis to your Home Screen and it works like an app: full
-          screen, its own icon, notifications and an unread count on the icon.
-        </p>
-        {appearance}
-        <IphoneSteps installed={homeScreen} />
-        <AppStyles />
-      </div>
-    );
-  }
-
   return (
-    <div className="ad-page">
-      <h1>Heliaxis for Android</h1>
-      <p className="ad-lede">
-        Your dashboard, Tasks and the other Heliaxis tools as an app on your
-        phone or tablet. Tasks keeps working offline and syncs when you&apos;re
-        back online.
-      </p>
-
-      {appearance}
-
+    <>
       <section className="ad-card">
+        <h2 className="ad-first">The Heliaxis app for Android</h2>
+        <p>
+          Your dashboard, Tasks and the other Heliaxis tools on your phone or
+          tablet. Tasks keeps working offline and syncs when you&apos;re back
+          online. Metis is in there too.
+        </p>
         <div className="ad-ver">
           <div>
             <b>Version {release.versionName}</b>
@@ -161,9 +142,9 @@ export function AppDownload({
             ? "Download update"
             : "Download the app"}
         </a>
-        {!android && (
+        {!onAndroid && (
           <p className="ad-hint">
-            You&apos;re not on an Android device — scan the code or email
+            You&apos;re not on an Android device. Scan the code or email
             yourself the link below to install it on your phone.
           </p>
         )}
@@ -182,13 +163,13 @@ export function AppDownload({
       {sendToPhone}
 
       <section className="ad-card">
-        <h2>Installing</h2>
+        <h2 className="ad-first">Installing</h2>
         <ol>
           <li>
             Tap <b>Download the app</b> and open the file when it finishes.
           </li>
           <li>
-            The first time, Android asks to allow installs from your browser —
+            The first time, Android asks to allow installs from your browser:
             tap <b>Settings</b>, turn on <b>Allow from this source</b>, then go
             back.
           </li>
@@ -200,7 +181,7 @@ export function AppDownload({
         <p>
           Most changes reach the app automatically. When a new version of the
           app itself is out, it shows an
-          <b> Update</b> banner — tap it, download, and tap <b>Install</b>. Your
+          <b> Update</b> banner: tap it, download, and tap <b>Install</b>. Your
           data stays as it is.
         </p>
         <h2>What works where</h2>
@@ -224,11 +205,87 @@ export function AppDownload({
           </p>
         )}
       </section>
+    </>
+  );
+}
 
-      {desktop}
+export function AppDownload({
+  release,
+  sendToPhone,
+  appearance,
+  windows,
+  mac,
+  initialDevice,
+}: {
+  release: Release;
+  sendToPhone?: React.ReactNode;
+  /** Light / Dark / Match phone for this person. */
+  appearance?: React.ReactNode;
+  /** Metis for Windows and for Mac (server-rendered panels). */
+  windows?: React.ReactNode;
+  mac?: React.ReactNode;
+  /** Start on this device instead of guessing (a link can say ?device=windows). */
+  initialDevice?: Device | null;
+}) {
+  const [picked, setPicked] = useState<Device | null>(initialDevice ?? null);
+  const guess = useSyncExternalStore(noop, guessDevice, () => null);
+  const device = picked ?? guess;
+  const installed = useSyncExternalStore(noop, installedVersion, () => null);
+  const homeScreen = useSyncExternalStore(noop, isHomeScreenApp, () => false);
+  const onAndroid = guess === "android";
 
-      <h2 className="ad-sub">On an iPhone or iPad?</h2>
-      <IphoneSteps installed={false} />
+  return (
+    <div className="ad-page">
+      <h1>Get the Heliaxis apps</h1>
+      <p className="ad-lede">Which device are you looking to install on?</p>
+
+      <div
+        className="ad-devices"
+        role="radiogroup"
+        aria-label="Choose your device"
+      >
+        {DEVICES.map((d) => {
+          const on = device === d.id;
+          return (
+            <button
+              key={d.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-controls="ad-panel"
+              className={`ad-device${on ? " is-on" : ""}`}
+              onClick={() => setPicked(d.id)}
+            >
+              <span className="ad-logo">
+                <Logo device={d.id} />
+              </span>
+              <span className="ad-dname">{d.name}</span>
+              <span className="ad-dcap">{d.caption}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div id="ad-panel" aria-live="polite">
+        {device === null && (
+          <section className="ad-card ad-pick">
+            <p>Pick your device above and I&apos;ll show you how to get set up.</p>
+          </section>
+        )}
+        {device === "windows" && windows}
+        {device === "mac" && mac}
+        {device === "ios" && <IphoneSteps installed={homeScreen} />}
+        {device === "android" && (
+          <AndroidPanel
+            release={release}
+            installed={installed}
+            onAndroid={onAndroid}
+            sendToPhone={sendToPhone}
+          />
+        )}
+      </div>
+
+      {appearance}
       <AppStyles />
     </div>
   );
@@ -237,11 +294,23 @@ export function AppDownload({
 function AppStyles() {
   return (
     <style>{`
-        .ad-page { max-width: 640px; color: var(--text); }
-        .ad-page h1 { font-size: 1.5rem; font-weight: 800; margin: 0; }
-        .ad-lede { color: var(--muted); margin: .35rem 0 1.25rem; line-height: 1.5; }
-        .ad-card { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 18px; margin-bottom: 16px; }
+        .ad-page { max-width: 760px; color: var(--text); }
+        .ad-page h1 { font-size: 1.6rem; font-weight: 800; margin: 0; }
+        .ad-lede { color: var(--muted); margin: .35rem 0 1.25rem; line-height: 1.5; font-size: 1.05rem; }
+        .ad-devices { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+        .ad-device { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; cursor: pointer; font: inherit; color: inherit;
+          background: var(--surface); border: 2px solid var(--border); border-radius: 10px; padding: 18px 8px 14px;
+          transition: border-color .12s, transform .12s, box-shadow .12s; }
+        .ad-device:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .ad-device:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+        .ad-device.is-on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+        .ad-logo { display: flex; height: 52px; align-items: center; justify-content: center; color: var(--text); margin-bottom: 6px; }
+        .ad-dname { font-weight: 800; font-size: 1.05rem; }
+        .ad-dcap { color: var(--muted); font-size: .8rem; }
+        .ad-pick p { margin: 0; }
+        .ad-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px; margin-bottom: 16px; }
         .ad-card h2 { font-size: 1rem; margin: 1.1rem 0 .4rem; }
+        .ad-card h2.ad-first, .ad-card > h2:first-child { margin-top: 0; font-size: 1.15rem; }
         .ad-card p, .ad-card li { color: var(--text-2); line-height: 1.55; font-size: .92rem; }
         .ad-card ol, .ad-card ul { padding-left: 1.2rem; margin: 0; }
         .ad-ver { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -251,12 +320,13 @@ function AppStyles() {
           font-weight: 700; padding: 4px 8px; border-radius: 2px; background: var(--warn-soft); color: var(--warn) !important; }
         .ad-status.is-ok { background: var(--ok-soft); color: var(--ok) !important; }
         .ad-btn { display: block; text-align: center; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 1rem;
-          padding: .85rem 1rem; border-radius: 2px; text-decoration: none; }
+          padding: .9rem 1rem; border-radius: 6px; text-decoration: none; }
         .ad-hint { font-size: .82rem !important; color: var(--muted) !important; margin: .75rem 0 0; overflow-wrap: anywhere; }
-        .ad-sub { font-size: 1.1rem; margin: 1.5rem 0 .6rem; }
         .ad-ok { color: var(--ok) !important; font-weight: 700; margin: 0; }
         .ad-appearance h2 { margin-top: 0; }
         .ad-appearance p { margin: 0 0 12px; }
+        @media (max-width: 560px) { .ad-devices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (prefers-reduced-motion: reduce) { .ad-device { transition: none; } .ad-device:hover { transform: none; } }
       `}</style>
   );
 }
