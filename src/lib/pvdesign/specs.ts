@@ -41,3 +41,39 @@ export const toInverterSpec = (s: Json): InverterSpec => ({
 });
 
 export const toBatterySpec = (s: Json): BatterySpec => ({ usableKwh: n(s, 'usable_kwh'), nominalV: n(s, 'nominal_v'), maxChargeKw: n(s, 'max_charge_kw'), maxDischargeKw: n(s, 'max_discharge_kw') });
+
+/** The datasheet figures a product may carry, by category (snake_case, as in supabase/price-book.sql). */
+export const SPEC_KEYS: Record<string, { num: string[]; bool: string[] }> = {
+  panel: { num: ['wp', 'voc', 'vmp', 'isc', 'imp', 'temp_coeff_voc_pct', 'temp_coeff_vmp_pct', 'width_mm', 'height_mm'], bool: [] },
+  inverter: { num: ['ac_kw', 'max_dc_v', 'mppt_min_v', 'mppt_max_v', 'mppt_count', 'max_input_current_a', 'max_isc_a', 'max_pv_kw', 'battery_min_v', 'battery_max_v', 'max_charge_kw', 'max_discharge_kw'], bool: ['off_grid_capable', 'generator_input'] },
+  battery: { num: ['usable_kwh', 'nominal_v', 'max_charge_kw', 'max_discharge_kw'], bool: [] },
+};
+
+/**
+ * Specs typed in by a person (as a JSON string) made safe to store: only figures this category uses, only real numbers
+ * and booleans. Anything else is dropped and reported, so a typo can't become a spec.
+ */
+export function parseSpecsJson(text: string | null | undefined, category: string): { specs: Record<string, number | boolean>; dropped: string[]; error?: string } {
+  const out: Record<string, number | boolean> = {};
+  const dropped: string[] = [];
+  if (!text?.trim()) return { specs: out, dropped };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { specs: out, dropped, error: 'specs_json is not valid JSON.' };
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { specs: out, dropped, error: 'specs_json must be a JSON object.' };
+  const allowed = SPEC_KEYS[category];
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (allowed?.num.includes(k) && typeof v === 'number' && Number.isFinite(v)) out[k] = v;
+    else if (allowed?.bool.includes(k) && typeof v === 'boolean') out[k] = v;
+    else dropped.push(k);
+  }
+  return { specs: out, dropped };
+}
+
+/** A SKU from a make and model: "Solis" + "S6-EH1P6K" gives "SOLIS-S6-EH1P6K". */
+export function skuFrom(make: string, model: string): string {
+  return `${make}-${model}`.toUpperCase().replace(/[^A-Z0-9._/-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
+}

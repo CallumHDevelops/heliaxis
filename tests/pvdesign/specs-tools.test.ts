@@ -1,7 +1,25 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { toBatterySpec, toInverterSpec, toPanelSize, toPanelSpec } from '@/lib/pvdesign/specs';
+import { parseSpecsJson, skuFrom, toBatterySpec, toInverterSpec, toPanelSize, toPanelSpec } from '@/lib/pvdesign/specs';
+
+describe('specs typed in by a person', () => {
+  it('keeps only real figures for the category and reports the rest', () => {
+    const r = parseSpecsJson('{"wp":400,"voc":"37.4","width_mm":1134,"colour":"black","off_grid_capable":true}', 'panel');
+    expect(r.specs).toEqual({ wp: 400, width_mm: 1134 });
+    expect(r.dropped.sort()).toEqual(['colour', 'off_grid_capable', 'voc']);
+  });
+  it('accepts inverter booleans, rejects bad JSON and non-objects', () => {
+    expect(parseSpecsJson('{"off_grid_capable":true,"ac_kw":6}', 'inverter').specs).toEqual({ off_grid_capable: true, ac_kw: 6 });
+    expect(parseSpecsJson('{nope', 'inverter').error).toBeTruthy();
+    expect(parseSpecsJson('[1]', 'inverter').error).toBeTruthy();
+    expect(parseSpecsJson(null, 'inverter').specs).toEqual({});
+  });
+  it('makes a safe SKU', () => {
+    expect(skuFrom('Solis', 'S6-EH1P6K (Plus)')).toBe('SOLIS-S6-EH1P6K-Plus'.toUpperCase());
+    expect(skuFrom('A b', 'c/d')).toMatch(/^[A-Z0-9._/-]+$/);
+  });
+});
 
 describe('datasheet spec mapping', () => {
   it('maps snake_case figures and turns anything missing or non-numeric into null (never a default)', () => {
@@ -29,11 +47,14 @@ describe('the design tools only calculate', () => {
   const root = path.resolve(__dirname, '../..');
   const src = readFileSync(path.join(root, 'src/lib/assistant/design-tools.ts'), 'utf8');
   const loader = readFileSync(path.join(root, 'src/lib/pvdesign/server.ts'), 'utf8');
-  it('never write to the database', () => {
-    for (const code of [src, loader]) {
-      expect(code).not.toMatch(/\.(insert|update|upsert|delete)\(/);
-      expect(code).not.toMatch(/\.rpc\(/);
-    }
+  it('read only, except save_product, which writes only to the price book and only for admins', () => {
+    expect(loader).not.toMatch(/\.(insert|update|upsert|delete)\(/);
+    const head = src.slice(0, src.indexOf("case 'save_product'"));
+    expect(head).not.toMatch(/\.(insert|update|upsert|delete)\(/);
+    const save = src.slice(src.indexOf("case 'save_product'"));
+    expect(save).toMatch(/prof\?\.role !== 'admin'/);
+    for (const m of save.matchAll(/\.from\('([a-z_]+)'\)/g)) expect(['profiles', 'price_book']).toContain(m[1]);
+    expect(src).not.toMatch(/\.delete\(|\.rpc\(/);
   });
   it('never import a sender', () => {
     expect(src).not.toMatch(/resend|ms365|whatsapp\/send|send-quote|send-document/);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { priceJob, scaffoldingCostPence, sellPriceOf, vatRateFor, type PriceBookItem, type PricingSettings } from '@/lib/pricing/price';
+import { applyOverrides, priceJob, scaffoldingCostPence, sellPriceOf, vatRateFor, type PriceBookItem, type PricingSettings } from '@/lib/pricing/price';
 
 const item = (o: Partial<PriceBookItem> & { sku: string }): PriceBookItem => ({ category: 'solar', make: 'Make', model: o.sku, unit: 'each', costPence: null, sellPence: null, active: true, ...o });
 const BOOK = new Map(
@@ -118,6 +118,39 @@ describe('priceJob', () => {
     expect(r.warnings.some((w) => /no cost/.test(w))).toBe(true);
   });
 
+  it('prices items the person gave us, and says so', () => {
+    const r = priceJob({ ...base, items: [], customItems: [{ description: '4G dongle', qty: 1, unitPence: 8000, costPence: 5000, category: 'comms' }] }, BOOK, SETTINGS);
+    expect(r.lines[0]).toMatchObject({ description: '4G dongle', unit_pence: 8000, fromUser: true, vat_rate: 20 });
+    expect(r.complete).toBe(true);
+    expect(r.warnings.some((w) => /you gave me/.test(w))).toBe(true);
+  });
+  it('a custom item with no usable price is still PRICE REQUIRED', () => {
+    const r = priceJob({ ...base, items: [], customItems: [{ description: 'Mystery box', qty: 1, unitPence: -1, costPence: null, category: 'other' }] }, BOOK, SETTINGS);
+    expect(r.complete).toBe(false);
+    expect(r.lines[0].description).toMatch(/^PRICE REQUIRED/);
+  });
+});
+
+describe('applyOverrides: what the person tells us fills gaps, never replaces HAP', () => {
+  const empty: PricingSettings = { ...SETTINGS, labourSellDayPence: null, scaffolding: { ...SETTINGS.scaffolding, ratePerM2Pence: null }, vat: { domestic: { default: null }, commercial: { default: null } } };
+  it('fills a missing labour rate, scaffolding price and VAT rate', () => {
+    const s = applyOverrides(empty, { labourSellDayPence: 50000, scaffoldingPence: 90000, vatPercent: 20 });
+    expect(s.labourSellDayPence).toBe(50000);
+    expect(scaffoldingCostPence(s.scaffolding, { widthM: 8, storeys: 2 })).toBe(90000);
+    expect(s.vat.domestic.default).toBe(20);
+    const r = priceJob({ ...base, items: [], installDays: 2, scaffolding: { widthM: 8, storeys: 2 } }, BOOK, s);
+    expect(r.complete).toBe(true);
+    expect(r.totals.net).toBe(100000 + 90000);
+  });
+  it('does not override figures HAP already has', () => {
+    const s = applyOverrides(SETTINGS, { labourSellDayPence: 1, scaffoldingPence: 1, vatPercent: 5 });
+    expect(s.labourSellDayPence).toBe(45000);
+    expect(s.scaffolding.fixedFeePence).toBeNull();
+    expect(s.vat.domestic.default).toBe(20);
+  });
+});
+
+describe('priceJob (continued)', () => {
   it('ignores zero or negative quantities', () => {
     expect(priceJob({ ...base, items: [{ sku: 'PANEL', qty: 0 }, { sku: 'PANEL', qty: -2 }] }, BOOK, SETTINGS).lines).toHaveLength(0);
   });

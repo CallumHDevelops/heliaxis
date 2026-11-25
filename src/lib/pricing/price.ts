@@ -31,8 +31,14 @@ export type PricingSettings = {
 };
 
 export type CustomerType = 'domestic' | 'commercial';
+/** A line the person told us the price of (not in the price book): used for this quote only unless a product is saved. */
+export type CustomItem = { description: string; qty: number; unitPence: number; costPence: number | null; category: string };
+/** Figures the person gave us when HAP's settings don't have them. */
+export type Overrides = { labourSellDayPence?: number | null; scaffoldingPence?: number | null; vatPercent?: number | null };
+
 export type PriceRequest = {
   items: { sku: string; qty: number }[];
+  customItems?: CustomItem[];
   installDays: number;
   customerType: CustomerType;
   scaffolding?: { widthM: number; storeys: number } | null;
@@ -40,7 +46,7 @@ export type PriceRequest = {
 
 export type Need = { kind: 'price' | 'vat' | 'labour_rate' | 'scaffolding_rate' | 'unknown_sku' | 'inactive_sku'; what: string };
 export type PriceResult = {
-  lines: (QuoteLine & { priceRequired?: boolean })[];
+  lines: (QuoteLine & { priceRequired?: boolean; fromUser?: boolean })[];
   needs: Need[];
   warnings: string[];
   totals: Totals;
@@ -80,12 +86,26 @@ export function sellPriceOf(item: PriceBookItem, markupPct: number | null): numb
   return null;
 }
 
+/** Settings with the person's own figures filled in where HAP has none. HAP's own settings always win. */
+export function applyOverrides(s: PricingSettings, o: Overrides | undefined): PricingSettings {
+  if (!o) return s;
+  const rule = (r: VatRule): VatRule => (r.default == null && num(o.vatPercent) && o.vatPercent >= 0 ? { ...r, default: o.vatPercent } : r);
+  const noScaffold = s.scaffolding.fixedFeePence == null && s.scaffolding.ratePerM2Pence == null;
+  return {
+    ...s,
+    labourSellDayPence: s.labourSellDayPence ?? (ok(o.labourSellDayPence) ? o.labourSellDayPence : null),
+    scaffolding: noScaffold && ok(o.scaffoldingPence) ? { ...s.scaffolding, fixedFeePence: o.scaffoldingPence } : s.scaffolding,
+    vat: { domestic: rule(s.vat.domestic), commercial: rule(s.vat.commercial) },
+  };
+}
+
 export function priceJob(req: PriceRequest, book: Map<string, PriceBookItem>, settings: PricingSettings): PriceResult {
   const lines: PriceResult['lines'] = [];
   const needs: Need[] = [];
   const warnings: string[] = [];
   const vatRule = settings.vat[req.customerType];
   let n = 0;
+  let userLines = 0;
   const id = () => `p${++n}`;
 
   const vatOr0 = (category: string, what: string) => {
@@ -120,6 +140,20 @@ export function priceJob(req: PriceRequest, book: Map<string, PriceBookItem>, se
     lines.push({ id: id(), description: label, detail: sku, qty, unit_pence: sell, vat_rate: vat, cost_pence: cost, mode: 'manual', markup: 0 });
   }
 
+  // Items the person priced for us.
+  for (const c of req.customItems ?? []) {
+    if (!(c.qty > 0) || !c.description.trim()) continue;
+    if (!ok(c.unitPence)) {
+      needs.push({ kind: 'price', what: `${c.description} has no price` });
+      lines.push({ id: id(), description: `${PRICE_REQUIRED}: ${c.description}`, qty: c.qty, unit_pence: 0, vat_rate: 0, cost_pence: 0, mode: 'manual', markup: 0, priceRequired: true });
+      continue;
+    }
+    const vat = vatOr0(c.category || 'other', c.description);
+    userLines += 1;
+    if (c.costPence == null) warnings.push(`${c.description} has no cost, so its margin can't be checked.`);
+    lines.push({ id: id(), description: c.description.trim(), detail: 'Price given by you', qty: c.qty, unit_pence: c.unitPence, vat_rate: vat, cost_pence: c.costPence ?? 0, mode: 'manual', markup: 0, fromUser: true });
+  }
+
   // Labour: install days x the day rate.
   if (req.installDays > 0) {
     const vat = vatOr0('labour', 'installation labour');
@@ -145,6 +179,7 @@ export function priceJob(req: PriceRequest, book: Map<string, PriceBookItem>, se
     }
   }
 
+  if (userLines) warnings.push(`${userLines} line${userLines === 1 ? ' uses a price' : 's use prices'} you gave me, not the price book.`);
   const totals = totalsOf({ intro: '', terms: '', blocks: [{ id: 'b', type: 'items', heading: '', lines }] });
   const costPence = lines.reduce((sum, l) => sum + Math.round(l.qty * l.cost_pence), 0);
   const marginPct = totals.net > 0 ? Math.round(((totals.net - costPence) / totals.net) * 1000) / 10 : null;

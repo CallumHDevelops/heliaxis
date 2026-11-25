@@ -187,7 +187,7 @@ async function project(id: string) {
 
 export async function runTool(name: string, input: Input, me: Actor, actions: AssistantAction[]): Promise<string> {
   if (LOOKUP_NAMES.has(name)) return runLookup(name, input, me);
-  if (DESIGN_NAMES.has(name)) return runDesignTool(name, input);
+  if (DESIGN_NAMES.has(name)) return runDesignTool(name, input, me);
   const db = createAdminClient();
   switch (name) {
     case 'search_customers': {

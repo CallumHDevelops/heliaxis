@@ -2,14 +2,16 @@ import 'server-only';
 import type Anthropic from '@anthropic-ai/sdk';
 import { checkDesign } from '@/lib/pvdesign/check';
 import { layoutPanels } from '@/lib/pvdesign/layout';
-import { loadBook, loadSettings, searchBook, type BookRow } from '@/lib/pvdesign/server';
-import { toBatterySpec, toInverterSpec, toPanelSize, toPanelSpec } from '@/lib/pvdesign/specs';
-import { priceJob } from '@/lib/pricing/price';
+import { BOOK_NOT_READY, loadBook, loadSettings, searchBook, type BookRow } from '@/lib/pvdesign/server';
+import { parseSpecsJson, skuFrom, toBatterySpec, toInverterSpec, toPanelSize, toPanelSpec } from '@/lib/pvdesign/specs';
+import { applyOverrides, priceJob } from '@/lib/pricing/price';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
  * The calculating tools. Metis decides what to ask for; these do the arithmetic (panel layout, string sizing, prices,
- * VAT, totals) in tested code from the price book and HAP's settings. They never write anything and never invent a
- * figure: a missing spec or price comes back as such.
+ * VAT, totals) in tested code from the price book and HAP's settings. They never invent a figure: a missing spec or
+ * price comes back as such, and Metis asks the person. The only tool that writes is save_product (admins only), and
+ * only with figures the person has given.
  */
 
 const str = { type: 'string' } as const;
@@ -53,12 +55,35 @@ export const DESIGN_TOOLS: Anthropic.Tool[] = [
       customer_type: { type: 'string', enum: ['domestic', 'commercial'] },
       scaffolding_width_m: nullable('Width of the scaffolded elevation in metres, or null if no scaffolding.', 'number'),
       scaffolding_storeys: { type: ['integer', 'null'], description: 'Storeys to scaffold, or null if none.' },
+      custom_items: {
+        type: 'array',
+        description: 'Items NOT in the price book that the user has given you a price for. Only use figures the user actually told you.',
+        items: obj({ description: str, qty: num, unit_price_gbp: num, cost_gbp: nullable('What it costs Heliaxis each, if the user said, else null.', 'number'), category: { type: 'string', enum: CATS } }),
+      },
+      labour_day_gbp: nullable('The sell price per install day, only if the user told you and HAP has none set.', 'number'),
+      scaffolding_gbp: nullable('The scaffolding price, only if the user told you and HAP has none set.', 'number'),
+      vat_percent: nullable('VAT per cent, only if the user told you and HAP has no rate set.', 'number'),
+    }),
+  },
+  {
+    name: 'save_product',
+    description: 'Add a product to the price book, or fill in missing figures on an existing one, using only prices and datasheet figures the USER has just told you. Admins only. Never save a figure you were not given. Existing prices are never overwritten with blanks.',
+    input_schema: obj({
+      sku: nullable('Existing or new SKU, or null to make one from make and model.'),
+      category: { type: 'string', enum: CATS },
+      make: str,
+      model: str,
+      sell_price_gbp: nullable('Sell price each, ex VAT, in pounds, or null.', 'number'),
+      cost_gbp: nullable('Cost each in pounds, or null.', 'number'),
+      specs_json: nullable('Datasheet figures as a JSON object with snake_case keys, e.g. {"wp":400,"voc":37.4}, or null.'),
+      datasheet_url: nullable('Link to the datasheet, or null.'),
     }),
   },
 ];
 
 export const DESIGN_NAMES = new Set(DESIGN_TOOLS.map((t) => t.name));
 
+const poundsOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 100) : null);
 const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const gbp = (pence: number) => `£${(pence / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -70,7 +95,7 @@ function product(rows: Map<string, BookRow>, sku: string, category: BookRow['cat
   return r;
 }
 
-export async function runDesignTool(name: string, input: Record<string, unknown>): Promise<string> {
+export async function runDesignTool(name: string, input: Record<string, unknown>, me?: { id: string; name: string }): Promise<string> {
   switch (name) {
     case 'find_product': {
       const r = await searchBook(s(input.query), s(input.category) || null);
@@ -159,10 +184,15 @@ export async function runDesignTool(name: string, input: Record<string, unknown>
       const { pricing } = await loadSettings();
       const w = n(input.scaffolding_width_m);
       const st = n(input.scaffolding_storeys);
+      const customItems = (Array.isArray(input.custom_items) ? input.custom_items : [])
+        .map((c) => c as Record<string, unknown>)
+        .filter((c) => s(c.description) && (n(c.qty) ?? 0) > 0)
+        .map((c) => ({ description: s(c.description), qty: n(c.qty) as number, unitPence: poundsOrNull(c.unit_price_gbp) ?? -1, costPence: poundsOrNull(c.cost_gbp), category: CATS.includes(s(c.category)) ? s(c.category) : 'other' }));
+      const priced = applyOverrides(pricing, { labourSellDayPence: poundsOrNull(input.labour_day_gbp), scaffoldingPence: poundsOrNull(input.scaffolding_gbp), vatPercent: n(input.vat_percent) });
       const r = priceJob(
-        { items, installDays: Math.max(0, n(input.install_days) ?? 0), customerType: input.customer_type === 'commercial' ? 'commercial' : 'domestic', scaffolding: w != null && w > 0 && st != null && st > 0 ? { widthM: w, storeys: st } : null },
+        { items, customItems, installDays: Math.max(0, n(input.install_days) ?? 0), customerType: input.customer_type === 'commercial' ? 'commercial' : 'domestic', scaffolding: w != null && w > 0 && st != null && st > 0 ? { widthM: w, storeys: st } : null },
         book.rows,
-        pricing
+        priced
       );
       return JSON.stringify({
         complete: r.complete,
@@ -173,8 +203,43 @@ export async function runDesignTool(name: string, input: Record<string, unknown>
         margin_percent: r.marginPct,
         needs: r.needs,
         warnings: r.warnings,
-        note: r.complete ? undefined : 'Tell the user exactly what is missing. Do not fill a gap with a guess.',
+        note: r.complete ? undefined : 'Ask the user, in ONE message, for each missing price or rate listed in needs (say which item and what you need: sell price, and cost if they know it). Do not fill a gap with a guess. Then call price_quote again with their figures.',
       });
+    }
+
+    case 'save_product': {
+      if (!me) return 'Not signed in.';
+      const db = createAdminClient();
+      const { data: prof } = await db.from('profiles').select('role, status').eq('id', me.id).maybeSingle();
+      if (prof?.role !== 'admin' || prof?.status !== 'approved') return 'Only a HAP admin can change the price book. I have used the price just for this quote; ask an admin to add the product so it is there next time.';
+      const category = s(input.category);
+      if (!CATS.includes(category)) return 'Unknown category.';
+      const make = s(input.make).slice(0, 80);
+      const model = s(input.model).slice(0, 120);
+      if (!make || !model) return 'A product needs a make and a model.';
+      const sku = (s(input.sku) || skuFrom(make, model)).slice(0, 60);
+      if (!/^[A-Za-z0-9._/-]{2,60}$/.test(sku)) return 'That SKU has characters that are not allowed (letters, digits and . _ / - only).';
+      const parsed = parseSpecsJson(s(input.specs_json) || null, category);
+      if (parsed.error) return parsed.error;
+      const sell = poundsOrNull(input.sell_price_gbp);
+      const cost = poundsOrNull(input.cost_gbp);
+      const datasheet = s(input.datasheet_url) || null;
+      const { data: existing, error: readErr } = await db.from('price_book').select('id, specs').eq('sku', sku).maybeSingle();
+      if (readErr) return /does not exist|schema cache|PGRST205|42P01/i.test(readErr.message) ? BOOK_NOT_READY : `Couldn't read the price book: ${readErr.message}`;
+      if (existing) {
+        // Fill in what was given; never blank out something already there.
+        const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (sell != null) patch.sell_pence = sell;
+        if (cost != null) patch.cost_pence = cost;
+        if (datasheet) patch.datasheet_url = datasheet;
+        if (Object.keys(parsed.specs).length) patch.specs = { ...((existing.specs as Record<string, unknown>) ?? {}), ...parsed.specs };
+        const { error } = await db.from('price_book').update(patch).eq('id', existing.id);
+        if (error) return `Not saved: ${error.message}`;
+      } else {
+        const { error } = await db.from('price_book').insert({ sku, category, make, model, specs: parsed.specs, sell_pence: sell, cost_pence: cost, datasheet_url: datasheet, created_by: me.id });
+        if (error) return `Not saved: ${error.message}`;
+      }
+      return JSON.stringify({ saved: true, sku, updated_existing: !!existing, ignored_spec_keys: parsed.dropped, note: 'Saved to the price book, so it will be found next time.' });
     }
   }
   return `Unknown tool ${name}`;
