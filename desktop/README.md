@@ -79,12 +79,16 @@ HAP's **App** page (`/admin/app`) has a *Metis for your computer* card that read
 The files are not in the site (the installer is about 100 MB): they live in a public storage folder, and a new version is just a
 new upload, never a new deploy.
 
-1. Make a public Supabase Storage bucket called `metis-desktop` (raise its file size limit above the installer's size).
-2. Build, then upload: set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in your terminal and run `npm run publish`
-   (installers first, the `latest*.yml` files last). The workflow's *publish* step does the same from GitHub.
-3. In Vercel set `METIS_UPDATE_URL` to `https://<project>.supabase.co/storage/v1/object/public/metis-desktop`. That one address
+1. The files go in a public **Vercel Blob** store (`metis-desktop-releases`), because Supabase Storage caps uploads at 50 MB on
+   the free plan and the installer is about 100 MB. Copy the store's token from Vercel → Storage → metis-desktop-releases →
+   `.env.local` (`BLOB_READ_WRITE_TOKEN`).
+2. Build, then upload: set `BLOB_READ_WRITE_TOKEN` in your terminal and run `npm run publish` (installers first, the
+   `latest*.yml` files last). The workflow's *publish* step does the same from GitHub with the token as a repository secret.
+   (If your Supabase plan allows big files you can publish there instead with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.)
+3. `METIS_UPDATE_URL` in Vercel is the folder the files are in, e.g.
+   `https://<store>.public.blob.vercel-storage.com/metis-desktop`; the script prints it when it finishes. That one address
    feeds the App page download **and** the in-app auto-update. Set `METIS_SIGNED=1` once the installers are signed, to hide the
-   "not code-signed" note.
+   "not code-signed" note. Changing an environment variable needs a redeploy to take effect.
 
 ## Auto-update
 

@@ -7,7 +7,7 @@ name: Metis Desktop
 #   Windows signing:  WIN_CSC_LINK (base64 .pfx), WIN_CSC_KEY_PASSWORD
 #   Mac signing:      MAC_CSC_LINK (base64 Developer ID Application .p12), MAC_CSC_KEY_PASSWORD
 #   Mac notarising:   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
-#   Publishing:       SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   (uploads the release for HAP and auto-update)
+#   Publishing:       BLOB_READ_WRITE_TOKEN   (uploads the release for HAP and auto-update)
 # With no secrets the apps are unsigned: Windows shows a SmartScreen warning and macOS asks you to right-click > Open.
 
 on:
@@ -78,7 +78,7 @@ jobs:
         with: { node-version: 22 }
       - uses: actions/download-artifact@v4
         with: { path: desktop/dist, merge-multiple: true }
+      - run: npm ci
       - run: node scripts/publish.mjs
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
