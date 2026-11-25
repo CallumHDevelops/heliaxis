@@ -348,9 +348,9 @@ export function EstimatorSettingsForm({ initial }: { initial: EstimatorSettings 
       </section>
 
       <section className="qb-card">
-        <b>Government scheme banner (off until the official logo pack is in)</b>
+        <b>Warm Homes Loan Scheme banner</b>
         <p className="crm-muted" style={{ margin: '0 0 10px' }}>
-          Shown once under the system cards. Use only the logo file the scheme sent you and the wording its branding guidelines allow; no rates or loan amounts here. The logo can be a full https:// address or a file in the site&rsquo;s /assets/ folder.
+          Shown once under the system cards. Use only the logo file the scheme sent you and the wording its branding guidelines allow; no rates or loan amounts here. Until the official logo is added it shows our own &ldquo;Finance through the Warm Homes Loan Scheme&rdquo; badge. The logo can be a full https:// address or a file in the site&rsquo;s /assets/ folder.
         </p>
         <div className="est-grid">
           <div className="est-field">

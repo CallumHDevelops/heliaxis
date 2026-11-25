@@ -101,9 +101,9 @@ describe('V4: trust details in the settings', () => {
 });
 
 describe('V4: the government scheme banner', () => {
-  it('starts off, with the WHLS wording ready', () => {
+  it('starts on (Heliaxis is WHLS approved), with the WHLS wording', () => {
     const s = cleanSettings({});
-    expect(s.scheme.on).toBe(false);
+    expect(s.scheme.on).toBe(true);
     expect(s.scheme.wording).toMatch(/Warm Homes Loan Scheme/);
   });
   it('cannot be switched on without wording', () => {

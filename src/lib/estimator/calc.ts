@@ -165,8 +165,8 @@ export const DEFAULT_SETTINGS: EstimatorSettings = {
     { name: 'SSIP', number: '', url: 'https://ssip.org.uk' },
   ],
   reviews: { on: false, source: 'Google', rating: 0, count: 0, url: '' },
-  // Heliaxis is WHLS approved; off until the official logo pack and its wording rules are in.
-  scheme: { on: false, name: 'Warm Homes Loan Scheme', wording: 'Heliaxis is an approved Warm Homes Loan Scheme installer.', logoUrl: '', link: '' },
+  // Heliaxis is WHLS approved: shown with our own "Finance through the Warm Homes Loan Scheme" badge until the official logo is added.
+  scheme: { on: true, name: 'Warm Homes Loan Scheme', wording: 'Heliaxis is an approved Warm Homes Loan Scheme installer. Ask us about spreading the cost through the scheme.', logoUrl: '', link: '' },
 };
 
 /** Settings from storage or a request, each number kept within a sensible range, the rest defaulted. */

@@ -85,6 +85,10 @@
 .est-v4-scheme img{flex:none;height:48px;width:auto;max-width:180px;object-fit:contain}
 .est-v4-scheme p{margin:0;font-size:.92rem;line-height:1.5;color:var(--ink)}
 .est-v4-scheme a{color:var(--ink);font-weight:600;text-underline-offset:3px}
+.est-v4-badge{flex:none;display:inline-flex;align-items:center;gap:12px;padding:10px 16px 10px 12px;background:var(--ink);color:var(--paper);border-radius:2px;border-left:3px solid var(--solar)}
+.est-v4-badge__t{display:grid;gap:1px;line-height:1.1}
+.est-v4-badge__t small{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--solar)}
+.est-v4-badge__t b{font-family:var(--display);font-weight:800;font-size:1rem;letter-spacing:-.005em}
 @media(max-width:600px){.est-v4-scheme{flex-direction:column;align-items:flex-start;gap:10px}}
 
 /* Accreditations with their numbers, each linked to its public register. */
