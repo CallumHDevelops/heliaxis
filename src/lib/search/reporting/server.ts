@@ -103,7 +103,7 @@ async function snapshot(o: { kind: ReportKind; period: Period; filters?: Filters
   if (o.period.compareStart < addDaysIso(weekOf(o.period.end).start, -24 * 7)) {
     const before = await rangeValues(o.period.compareStart, o.period.compareEnd, filters, db);
     ov.tiles = ov.tiles.map((t) => ({ ...t, delta: delta(t.delta.now, t.key in before.values ? before.values[t.key] : null, t.lowerIsBetter) }));
-    ov.leads = [...CHANNELS, 'untracked' as const]
+    ov.leads = [...CHANNELS, 'offline' as const, 'untracked' as const]
       .map((ch) => ({ channel: ch, now: ov.leads.find((l) => l.channel === ch)?.now ?? 0, before: before.leads.get(ch) ?? 0 }))
       .filter((l) => l.now || l.before);
   }

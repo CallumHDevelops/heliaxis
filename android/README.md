@@ -22,6 +22,16 @@ icon. Web changes reach the app on every deploy; you only need a new APK to chan
   down (`Notifications.dismiss`). Only builds from versionCode 3 get it (`DISMISS_FROM_APP_VERSION`
   in `src/lib/notify.ts`); older ones would show it as a blank notification. Built without
   `google-services.json`, the app falls back to Web Push shown through the `DelegationService`.
+- **Hestia widget** (from versionCode 6): a home-screen widget with today's Outlook calendar (and
+  tomorrow's first few), the emails Hestia says need you (urgent first) and your tasks and follow-ups.
+  `HestiaWidget.java` draws it, `HestiaWidgetService.java` fills its list. The phone never fetches
+  anything: the site sends it as a `type: widget` data message (`src/lib/widget.ts`, small JSON from
+  `src/lib/widget-shared.ts`, under Firebase's 4 KB) every 15 minutes from the mail job, at once when
+  Hestia sorts something new or a task changes, and whenever the app is opened. It's kept, so the
+  widget shows the last one offline. Only phones on versionCode 6+ get them (`WIDGET_FROM_APP_VERSION`).
+  Add it: long-press the home screen → Widgets → Heliaxis → Hestia.
+- **Urgent emails** have their own high-priority channel (`email`) from versionCode 6; older builds
+  show them under Other.
 - **Updates**: the app opens `/admin?app=android-<versionCode>`; `AppRuntime` compares that with
   `public/app/version.json` and shows an Update banner (or a must-update screen).
 - **Download**: `/admin/app` (open to every approved user).

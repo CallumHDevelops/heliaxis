@@ -14,6 +14,7 @@ import { collectGridScans, startGridScans } from './local/grid-run';
 import { importBusinessProfile } from './local/gbp';
 import { runKeywordResearch, runOpportunityScoring } from './planner';
 import { runContentMeasures } from './studio/measure-job';
+import { AUTO_BY, runAutoDraftFollowUp, runAutoDraftWeekly } from './studio/auto';
 import { runAiSamplingStep, startAiSampling } from './ai/sampler';
 import { runHealthChecks, runIndexChecks } from './health/server';
 import { buildMonthlyReport, sendReport } from './reporting/server';
@@ -111,6 +112,12 @@ async function runOne(job: Job, db: Db, until: number): Promise<Outcome> {
     case 'content_measures':
       await runContentMeasures(db);
       return 'done';
+    case 'auto_draft_weekly':
+      await runAutoDraftWeekly(db);
+      return 'done';
+    case 'auto_draft_followup':
+      await runAutoDraftFollowUp(db);
+      return 'done';
 
     // ── M6 AI answers ──
     case 'ai_sample_start':
@@ -150,6 +157,9 @@ async function queueWhileOpen(db: Db) {
   ]);
   if (grids) await queueJob('grid_collect', `grid_collect:${slot}`, {}, db);
   if (ai) await queueJob('ai_sample_step', `ai_sample_step:${slot}`, {}, db);
+  // Auto-started pages waiting for their proof pack: check hourly, so a completed pack is drafted within the hour.
+  const { count: waiting } = await db.from('seo_content').select('id', { count: 'exact', head: true }).eq('created_by', AUTO_BY).in('status', ['proof', 'draft']);
+  if (waiting) await queueJob('auto_draft_followup', `auto_draft_followup:${slot.slice(0, 13)}`, {}, db);
 }
 
 /** Pick up a collect job by DataForSEO task id (the pingback), claiming it so the dispatcher can't run it at the same time. */

@@ -8,4 +8,12 @@
     <color name="splashBackground">#211F18</color>
     <!-- Tint for the small icon on native notifications (dark gold reads on light and dark shades). -->
     <color name="notificationAccent">#C77F04</color>
+    <!-- The Hestia widget, light (values-night has the dark ones). The site's own theme colours. -->
+    <color name="widgetBackground">#FFFDF8</color>
+    <color name="widgetInk">#211F18</color>
+    <color name="widgetMuted">#6B6557</color>
+    <color name="widgetGold">#A86B03</color>
+    <color name="widgetGoldSoft">#33F8BC1E</color>
+    <color name="widgetUrgent">#B3261E</color>
+    <color name="widgetOnUrgent">#FFFFFF</color>
 </resources>

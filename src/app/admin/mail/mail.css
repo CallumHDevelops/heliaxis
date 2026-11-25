@@ -1,0 +1,559 @@
+/* My email (/admin/mail). Built on the CRM's tokens and buttons (crm.css); only the layout is here. */
+
+.mx {
+  max-width: 1100px;
+  margin: 0 auto;
+  color: var(--text);
+}
+.mx-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1rem;
+}
+.mx-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.25rem;
+  font-size: 1.6rem;
+}
+.mx-head p {
+  margin: 0;
+}
+.mx-pad {
+  padding: 1rem 0;
+}
+.mx-hint {
+  margin: 0 0 0.9rem;
+  font-size: 0.9rem;
+}
+
+/* Tabs: as on a job's page. */
+.mx-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mx-tabs::-webkit-scrollbar {
+  display: none;
+}
+.mx-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  min-height: 44px;
+  margin-bottom: -1px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mx-tabs button.on {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+.mx-tabs em {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-style: normal;
+  font-size: 0.78rem;
+}
+.mx-tabs em.hot {
+  background: var(--danger);
+  color: var(--on-solid);
+}
+
+/* The lists. */
+.mx-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.mx-list li + li {
+  border-top: 1px solid var(--border);
+}
+.mx-row {
+  display: flex;
+  gap: 0.8rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 0;
+  border-left: 4px solid transparent;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mx-row:hover,
+.mx-row:focus-visible {
+  background: var(--surface-2);
+}
+.mx-row.is-urgent {
+  border-left-color: var(--danger);
+}
+.mx-row.is-high {
+  border-left-color: var(--accent);
+}
+.mx-av {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgb(var(--accent-rgb) / 0.2);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.mx-row__b {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.mx-row__h {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.mx-row__h b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mx-row__h .crm-muted {
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mx-row__h time {
+  margin-left: auto;
+  flex: none;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+.mx-row__s {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mx-row__p {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.mx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.mx-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+.mx-chip.is-urgent {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--on-solid);
+}
+.mx-chip.is-high {
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.25);
+}
+.mx-chip.is-draft {
+  border-color: var(--ok);
+  background: rgb(var(--ok-rgb) / 0.12);
+}
+.mx-chip.is-new {
+  border-color: var(--accent);
+}
+.mx-chip.is-due {
+  border-color: var(--warn);
+}
+.mx-chip.is-quiet {
+  color: var(--muted);
+}
+
+/* One conversation. */
+.mx-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+.mx-sheet__subject {
+  margin: 0;
+}
+.mx-why {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0.7rem 0.9rem;
+  border-left: 4px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+.mx-why.is-urgent {
+  border-left-color: var(--danger);
+}
+.mx-why.is-high {
+  border-left-color: var(--accent);
+}
+.mx-convo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.mx-msg {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.mx-msg.is-out {
+  margin-left: 2rem;
+  background: var(--surface-2);
+}
+.mx-msg header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+.mx-msg time {
+  color: var(--muted);
+}
+.mx-msg p {
+  margin: 0.3rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.93rem;
+}
+.mx-reply h3,
+.mx-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+.mx-draftbox {
+  position: relative;
+}
+.mx-draftbox .qb-spark {
+  position: absolute;
+  inset: 0;
+}
+.mx-steer {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.mx-steer .crm-input {
+  flex: 1;
+}
+.mx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+.mx-actions__end {
+  margin-left: auto;
+}
+.crm-btn.is-on {
+  border-color: var(--accent);
+  background: rgb(var(--accent-rgb) / 0.18);
+}
+.mx-warn {
+  margin: 0.4rem 0 0;
+  color: var(--warn);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.mx-err {
+  margin: 0.4rem 0;
+  color: var(--danger);
+  font-weight: 600;
+}
+.mx-ok {
+  margin: 0.4rem 0;
+  color: var(--ok);
+  font-weight: 600;
+}
+
+/* Cards (connect, add to CRM, settings). */
+.mx-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.mx-card p {
+  margin: 0 0 0.6rem;
+}
+.mx-connect {
+  max-width: 680px;
+}
+.mx-connect ul {
+  margin: 0 0 0.8rem;
+  padding-left: 1.2rem;
+}
+.mx-connect li {
+  margin: 0.25rem 0;
+}
+.mx-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.mx-grid3 label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.mx-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  max-width: 760px;
+}
+.mx-settings textarea {
+  margin-bottom: 0.5rem;
+}
+.mx-toggle {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.mx-toggle .crm-btn {
+  flex: none;
+  min-width: 64px;
+}
+
+/* Folders. */
+.mx-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 0.8rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: rgb(var(--accent-rgb) / 0.12);
+}
+.mx-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.8rem;
+}
+.mx-search {
+  flex: 1;
+  min-width: 12rem;
+}
+.mx-rules td {
+  vertical-align: middle;
+}
+.mx-rules td small {
+  display: block;
+}
+.mx-rules .crm-input {
+  min-width: 11rem;
+  padding: 0.4rem 0.55rem;
+}
+
+@media (max-width: 640px) {
+  .mx-grid3 {
+    grid-template-columns: 1fr;
+  }
+  .mx-steer {
+    flex-direction: column;
+  }
+  .mx-msg.is-out {
+    margin-left: 0.8rem;
+  }
+  .mx-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .mx-actions__end {
+    margin-left: 0;
+  }
+}
+
+/* Settings › Your writing style. */
+.mx-style textarea {
+  margin-bottom: 0.4rem;
+  font-size: 0.9rem;
+}
+.mx-examples {
+  margin-top: 0.6rem;
+  max-height: 22rem;
+}
+.mx-examples .mx-msg.is-out {
+  margin-left: 0;
+}
+
+/* Settings › Your signature: shown as it is in Outlook (on white, as in an email). */
+.mx-sigpreview {
+  margin: 0 0 0.4rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #000;
+  overflow-x: auto;
+}
+
+/* Hestia's notes: tone and opportunities. */
+.mx-chip.is-hot {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.mx-chip.is-opp {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.mx-why__opp {
+  margin-top: 4px;
+  color: var(--ok);
+}
+.mx-why__opp b {
+  color: var(--text);
+}
+
+/* To reply: No reply needed on each row, and where it went (with Undo). */
+.mx-li {
+  display: flex;
+  align-items: center;
+}
+.mx-li .mx-row {
+  flex: 1;
+  min-width: 0;
+}
+.mx-quick {
+  flex: none;
+  display: flex;
+  gap: 0.4rem;
+  margin-right: 0.8rem;
+}
+.crm-btn.mx-del {
+  color: var(--danger);
+}
+.mx-dest {
+  margin: 0.4rem 0 0;
+}
+.mx-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.6rem 0.7rem 0.6rem 1rem;
+  border-radius: 10px;
+  background: var(--inverse);
+  color: var(--on-solid);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+.mx-toast span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .mx-li {
+    flex-wrap: wrap;
+  }
+  .mx-li .mx-row {
+    flex: 1 1 100%;
+  }
+  .mx-quick {
+    margin: 0 0.8rem 0.7rem auto;
+  }
+}
+
+/* Attachments on a reply. */
+.mx-attach {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.mx-attach__row,
+.mx-attach__pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.mx-attach__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.mx-attach__list li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0;
+  font-size: 0.9rem;
+}
+
+/* Files attached to an email they sent. */
+.mx-files {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0 0;
+  border-top: 1px solid var(--border);
+}
+.mx-files li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0;
+  font-size: 0.9rem;
+}
+
+/* A conversation: wider than the CRM's other sheets, so emails read comfortably. */
+.crm-sheet-box--wide:has(.mx-sheet) {
+  width: min(1180px, 96vw);
+  max-width: min(1180px, 96vw);
+}
+.mx-sheet .mx-convo {
+  max-height: 56vh;
+}

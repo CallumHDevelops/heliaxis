@@ -360,3 +360,16 @@
     max-width: 34%;
   }
 }
+
+/* A customer who may be there twice (same email, number or name). */
+.gs-dupe {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(var(--accent-rgb) / 0.25);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+}

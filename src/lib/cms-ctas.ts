@@ -132,17 +132,48 @@ export const splitForCtas = (html: string) => splitCmsPage(html, { ctas: true })
 /**
  * The testimonials block taken out of a published page. The CMS seeded it with sample quotes ("Sarah M.") under an
  * "illustrative" note; a review that is not real must not be shown (DMCC Act 2024), and until the Customer stories
- * feature exists no testimonial is shown at all. An empty marker is left in its place so the homepage's "survey" band
- * still lands where the block was; LIVE_FIXES_CSS hides the empty wrapper.
+ * feature exists no testimonial is shown at all, except a block the editor filled from the facts sheet's approved ones (it
+ * carries data-approved). An empty marker is left in its place so the homepage's "survey" band still lands where the block
+ * was; LIVE_FIXES_CSS hides the empty wrapper.
  */
 export function withoutTestimonials(html: string): string {
   let out = html;
-  for (let i = 0; i < 10; i++) {
-    const at = tagStart(out, /class="(?:[^"]*\s)?pv-testi(?:\s[^"]*)?"/);
+  let from = 0;
+  const marker = /class="(?:[^"]*\s)?pv-testi(?:\s[^"]*)?"/g;
+  for (let i = 0; i < 20; i++) {
+    marker.lastIndex = from;
+    const m = marker.exec(out);
+    if (!m) break;
+    const at = out.lastIndexOf('<', m.index);
+    const end = at < 0 ? -1 : elementEnd(out, at);
+    if (end < 0) break;
+    // A block filled from the facts sheet's approved testimonials is marked data-approved and stays.
+    if (/^<[^>]*\bdata-approved="1"/.test(out.slice(at, end))) {
+      from = end;
+      continue;
+    }
+    out = out.slice(0, at) + '<div class="pv-testi-removed"></div>' + out.slice(end);
+    from = at;
+  }
+  return out;
+}
+
+/**
+ * The hero rating row the editor used to fill in with sample figures: "4.9", "Google & Trustpilot", "1200+ installs across South
+ * Wales". Four published pages still carry it. Those figures were never verified, so the row is taken off the live page until real
+ * ones are entered (a row with any other figures is left alone). Republishing from the editor removes it for good.
+ */
+export function withoutSampleRating(html: string): string {
+  let out = html;
+  let from = 0;
+  for (let i = 0; i < 20; i++) {
+    const at = out.indexOf('<div class="rating">', from);
     if (at < 0) break;
     const end = elementEnd(out, at);
     if (end < 0) break;
-    out = out.slice(0, at) + '<div class="pv-testi-removed"></div>' + out.slice(end);
+    const el = out.slice(at, end);
+    if (/>\s*4\.9\s*</.test(el) && /Trustpilot|installs across South Wales|>\s*1200\s*</.test(el)) out = out.slice(0, at) + out.slice(end);
+    else from = end;
   }
   return out;
 }

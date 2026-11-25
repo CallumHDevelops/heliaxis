@@ -1,6 +1,6 @@
 import { CtaBand, QuoteForm, ScrollReveal, TALK_LINKS } from '@/components/home';
 import { QuoteDrawer } from './QuoteDrawer';
-import { fixDeadQuoteLinks, freshenLogo, hasQuoteButtons, hasQuoteTarget, splitCmsPage, withoutTestimonials } from '@/lib/cms-ctas';
+import { fixDeadQuoteLinks, freshenLogo, hasQuoteButtons, hasQuoteTarget, splitCmsPage, withoutSampleRating, withoutTestimonials } from '@/lib/cms-ctas';
 
 /**
  * A published CMS page on the live website. Shows the page as published, with the current logo, and (without
@@ -9,7 +9,7 @@ import { fixDeadQuoteLinks, freshenLogo, hasQuoteButtons, hasQuoteTarget, splitC
  * a quote drawer (and link to /free-solar-quote without JavaScript). `display: contents` keeps the pieces laying out as one page.
  */
 export function CmsBody({ html, className, ctas = false }: { html: string; className?: string; ctas?: boolean }) {
-  const clean = withoutTestimonials(freshenLogo(html));
+  const clean = withoutSampleRating(withoutTestimonials(freshenLogo(html)));
   const parts = splitCmsPage(clean, { ctas, quote: true });
   const hasQuote = parts.some((p) => typeof p !== 'string' && 'quote' in p);
   // "#quote" buttons only work where there is a quote form on the page. Elsewhere they open the quote drawer (and link to the quote page without JavaScript).

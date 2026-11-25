@@ -99,6 +99,24 @@
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="general" />
 
+        <!-- The Hestia widget: today's calendar, the emails that need you and your tasks on the home screen.
+             Filled in by the site's data messages (type "widget"), not by polling. -->
+        <receiver
+            android:name=".HestiaWidget"
+            android:exported="false"
+            android:label="@string/widgetName">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/hestia_widget_info" />
+        </receiver>
+        <service
+            android:name=".HestiaWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
         <!-- Fallback when the app is built without Firebase: Chrome shows the site's Web Push
              notifications as this app's notifications. -->
         <service

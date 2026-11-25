@@ -867,6 +867,35 @@ export async function setupTodos(preloaded?: SetupAssign): Promise<SetupTodo[]> 
     order: 14,
     optional: true,
   });
+  // My email (src/lib/mail): your own mailbox sorted, replies drafted. Needs Microsoft 365 connected first.
+  const ms365 = env('MS_TENANT_ID', 'MS_CLIENT_ID', 'MS_CLIENT_SECRET', 'MS_MAILBOX');
+  const mailSql = ms365 && (await has('mail_threads', 'needs_reply'));
+  add(
+    ms365 && !mailSql,
+    sql('mail-sort.sql', 'My email: your own mailbox sorted for you. What needs a reply (most important first) with a draft to check, new customers spotted, and every email filed into a folder per company or customer once you’ve dealt with it.', 14, 'organisations.sql')
+  );
+  add(mailSql, {
+    id: 'mail-cron',
+    title: 'My email: switch on its every-two-minutes job',
+    detail: 'Every two minutes this reads new emails, works out which need a reply, writes the drafts and files what’s been dealt with. Without it, My email stays empty.',
+    steps: [
+      'Tap **Open Supabase**, copy the block below, replace `YOUR_CRON_SECRET` with your `CRON_SECRET` from Vercel (Settings → Environment Variables), paste it into a new query and tap **Run**.',
+      'Run the **Check** block. You should see **mail-sort** with `*/2 * * * *` and **active** = true. Then tick this.',
+      'Then open **CRM › My email** and tap **Connect**.',
+    ],
+    copies: [
+      {
+        label: 'Switch on',
+        value:
+          "select cron.schedule('mail-sort', '*/2 * * * *', $$ select net.http_get(url := 'https://heliaxis.co.uk/api/cron/mail', headers := jsonb_build_object('Authorization', 'Bearer YOUR_CRON_SECRET'), timeout_milliseconds := 60000); $$);",
+      },
+      { label: 'Check', value: 'select jobname, schedule, active from cron.job;' },
+    ],
+    href: sqlEditor(),
+    hrefLabel: 'Open Supabase',
+    order: 14,
+    manual: true,
+  });
   add(socialSql, {
     id: 'social-cron',
     title: 'Social monitoring: switch on its every-minute job',

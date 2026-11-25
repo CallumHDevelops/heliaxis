@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { balancedAt, fixDeadQuoteLinks, freshenLogo, hasQuoteButtons, hasQuoteTarget, splitCmsPage, splitForCtas, withoutTestimonials } from '@/lib/cms-ctas';
+import { balancedAt, fixDeadQuoteLinks, freshenLogo, hasQuoteButtons, hasQuoteTarget, splitCmsPage, splitForCtas, withoutSampleRating, withoutTestimonials } from '@/lib/cms-ctas';
 
 /** The shape the CMS really publishes: one outer page wrapper, one spacing wrapper per block. */
 const wrap = (b: string) => `<div style="padding:0">${b}</div>`;
@@ -112,5 +112,33 @@ describe('live fixes: testimonials and dead quote links', () => {
     );
     expect(hasQuoteButtons('<a class="btn" href="#quote">A</a>')).toBe(true);
     expect(hasQuoteButtons('<a href="/#quote">C</a><a data-href="#quote">D</a>')).toBe(false);
+  });
+});
+
+describe('live fix: the sample hero rating row', () => {
+  // Exactly what the editor published while it filled in sample figures (hero rating row switched on).
+  const sample = '<div class="rating"><div class="r"><span class="big">4.9</span><span class="stars">★★★★★</span><span>Google &amp; Trustpilot</span></div><div class="r"><span class="big"><span>1200</span>+</span><span>installs across South Wales</span></div></div>';
+  const real = '<div class="rating"><div class="r"><span class="big">4.8</span><span class="stars">★★★★★</span><span>Google reviews</span></div></div>';
+
+  it('removes the made-up row and nothing around it', () => {
+    const html = `<div class="pv-hero"><h1>Hi</h1><p class="microtrust">Free survey</p>${sample}<div class="cbtns"><a href="#quote">Go</a></div></div>`;
+    expect(withoutSampleRating(html)).toBe('<div class="pv-hero"><h1>Hi</h1><p class="microtrust">Free survey</p><div class="cbtns"><a href="#quote">Go</a></div></div>');
+  });
+
+  it('leaves a row with real figures alone, and removes only the sample one when both appear', () => {
+    expect(withoutSampleRating(`<div>${real}</div>`)).toBe(`<div>${real}</div>`);
+    expect(withoutSampleRating(`<div>${sample}${real}${sample}</div>`)).toBe(`<div>${real}</div>`);
+    expect(withoutSampleRating('<p>No rating here</p>')).toBe('<p>No rating here</p>');
+  });
+});
+
+describe('live fix: approved testimonials stay', () => {
+  it('keeps a block marked data-approved and still removes an unmarked one', () => {
+    const approved = '<div class="pv-testi" data-approved="1"><div class="wrap"><p>Real quote</p></div></div>';
+    const sample = '<div class="pv-testi"><div class="wrap"><p>Made up</p></div></div>';
+    const out = withoutTestimonials(`<div>${sample}${approved}${sample}</div>`);
+    expect(out).toContain('Real quote');
+    expect(out).not.toContain('Made up');
+    expect(out.match(/pv-testi-removed/g)?.length).toBe(2);
   });
 });

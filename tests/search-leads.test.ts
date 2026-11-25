@@ -119,7 +119,7 @@ describe('leads and the funnel', () => {
   it('splits by channel, every channel listed, against the previous period', () => {
     const before = buildLeads({ enquiries: [enq('x', { channel: 'organic_google' }), enq('y', { channel: 'gbp' })], projects: [] });
     const f = channelFunnel(leads, before);
-    expect(f.rows.map((r) => r.channel)).toEqual(['organic_google', 'organic_bing', 'gbp', 'ai_assistant', 'paid_meta', 'paid_google', 'referral', 'direct', 'untracked']);
+    expect(f.rows.map((r) => r.channel)).toEqual(['organic_google', 'organic_bing', 'gbp', 'ai_assistant', 'paid_meta', 'paid_google', 'referral', 'direct', 'offline', 'untracked']);
     const g = f.rows.find((r) => r.channel === 'organic_google')!;
     expect(g.now).toEqual({ enquiries: 2, surveys: 2, quotes: 1, won: 1, value: 10000 });
     expect(g.before.enquiries).toBe(1);

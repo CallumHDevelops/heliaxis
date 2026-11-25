@@ -35,6 +35,8 @@ export type SearchPerson = {
   jobs: SearchJob[];
   /** Jobs they have beyond those listed. */
   more: number;
+  /** Other customers who look like the same person (/api/search): the same email, number or name. */
+  dupes?: { name: string; ref: string | null; why?: string }[];
 };
 
 /** What was typed, made safe to put in a filter: characters that would change its meaning come out (spec 1). Up to 80 characters. */

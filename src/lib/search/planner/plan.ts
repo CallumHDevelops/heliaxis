@@ -12,6 +12,8 @@ import {
   wordsKey,
   type PageType,
   type Service,
+  isOtherBusiness,
+  isRelevantIdea,
 } from './words';
 
 /**
@@ -49,7 +51,7 @@ const SERVICES: Service[] = ['solar', 'battery', 'heat_pump', 'ev', 'infrared', 
 const asService = (s: string | null | undefined): Service | null => (SERVICES.includes(s as Service) ? (s as Service) : s === 'heatpump' ? 'heat_pump' : null);
 
 /** Merge pool rows and tracked searches into one candidate per phrase (plurals folded). */
-export function buildCandidates(pool: PoolRow[], tracked: TrackedRow[], matchers: { town: string; re: RegExp }[]): Candidate[] {
+export function buildCandidates(pool: PoolRow[], tracked: TrackedRow[], matchers: { town: string; re: RegExp }[], opts: { businessNames?: string[] } = {}): Candidate[] {
   const by = new Map<string, Candidate & { rawIntent: string | null; ours: boolean }>();
   const get = (phrase: string) => {
     const key = foldPhrase(phrase);
@@ -84,8 +86,10 @@ export function buildCandidates(pool: PoolRow[], tracked: TrackedRow[], matchers
   }
 
   for (const r of pool) {
-    // Searches for our own name are not page opportunities.
+    // Searches for our own name, for another business by name, or off-topic searches Google matched us to (from ranked
+    // keywords and Search Console, which skip the ideas filter) are not page opportunities.
     if (!r.keyword || BRAND.test(r.keyword)) continue;
+    if (!isRelevantIdea(r.keyword) || isOtherBusiness(r.keyword, opts.businessNames ?? [])) continue;
     const c = get(r.keyword);
     if (!c.sources.includes(r.source)) c.sources.push(r.source);
     if (r.source === 'gsc') {

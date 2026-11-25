@@ -1,0 +1,1396 @@
+import 'server-only';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { msConfigured } from '@/lib/ms365';
+import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
+import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, childFolders, deleteFolderIfEmpty, folderMessages, getReplyTo, listFolders, moveToDeleted, wellKnownFolderIds, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type FileToAttach, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
+import {
+  addressOf,
+  companyDomain,
+  domainFromText,
+  domainOf,
+  guessLabel,
+  isPersonalDomain,
+  looksAutomated,
+  looksLikeMarketing,
+  MARKETING_FOLDER,
+  markFor,
+  readyToFile,
+  endAtSignOff,
+  belongsTo,
+  isSendingService,
+  customerFolder,
+  clearAwayTo,
+  FILED_FOLDER,
+  isHestiaFolder,
+  groupForOrgType,
+  companyFolder,
+  textToHtml,
+  cidsIn,
+  pickFont,
+  pickSignature,
+  threadState,
+  type ThreadState,
+} from './shared';
+
+/**
+ * My email, the job (every two minutes, /api/cron/mail). For each connected mailbox:
+ *  1. Reads new emails (inbox and sent), and on the first runs works back through the whole inbox and the last six
+ *     months of sent emails, a page at a time.
+ *  2. Matches each person to a folder rule: a CRM customer by their address (Customers/Jane Smith), an organisation
+ *     or a company by its domain (Suppliers/GoodWe). Companies not in the CRM get a suggested rule, named by the
+ *     writing assistant, that waits for the mailbox's owner to approve it in Email › Folders.
+ *  3. Works out, for each conversation, whether it needs a reply and how much it matters, and marks it in Outlook
+ *     ("Urgent" and flagged, or "Needs reply"); the marks come off once it's dealt with.
+ *  4. Learns how the owner writes from their sent emails, and drafts each reply in that style.
+ *  5. Once filing is on, moves the emails of dealt-with conversations into their folders, and marketing into
+ *     Marketing (once that is on). None of your emails are ever deleted (only the app's own untouched Outlook
+ *     drafts, once they're no longer needed). CRM customers' emails are noted on their record.
+ * Each step stops when the time is up and carries on next run.
+ */
+
+type Db = ReturnType<typeof createAdminClient>;
+type Box = {
+  id: string;
+  user_id: string;
+  address: string;
+  filing: boolean;
+  file_customers: boolean;
+  auto_approve: boolean;
+  clear_old_folders: boolean;
+  marketing: boolean;
+  drafts: boolean;
+  scan_before: string | null;
+  sent_before: string | null;
+  live_since: string | null;
+  sign_off: string;
+  signature: string | null;
+  signature_html: string | null;
+  signature_locked: boolean;
+  signature_images: InlineImage[] | null;
+  signature_at: string | null;
+  reply_font: string | null;
+  highlight: boolean;
+  outlook_drafts: boolean;
+  categories_ready: boolean;
+  style: string | null;
+  style_examples: { to: string; text: string }[] | null;
+  style_at: string | null;
+  style_edited: boolean;
+};
+const BOX_COLS = 'id, user_id, address, filing, file_customers, auto_approve, clear_old_folders, marketing, drafts, sign_off, signature, signature_html, signature_locked, signature_images, signature_at, reply_font, scan_before, sent_before, live_since, highlight, outlook_drafts, categories_ready, style, style_examples, style_at, style_edited';
+type Rule = {
+  id: string;
+  kind: 'domain' | 'address';
+  match: string;
+  label: string;
+  folder: string;
+  action: 'file' | 'marketing' | 'leave';
+  status: 'suggested' | 'on' | 'off';
+  never_marketing: boolean;
+  enquiry_id: string | null;
+  organisation_id: string | null;
+  contact_id: string | null;
+};
+type Org = { id: string; name: string; type: string | null };
+
+// Your style is learnt once this much of your Sent folder has been read (the whole folder is read, to know what's answered).
+const STYLE_AFTER_DAYS = 180;
+const TRIAGE_AT_ONCE = 4;
+const ALERT_WITHIN_HOURS = 48;
+const PAGES_PER_RUN = 6;
+const TRIAGE_PER_RUN = 16;
+const DRAFTS_PER_RUN = 3;
+const MOVES_PER_RUN = 50;
+
+const RULE_COLS = 'id, kind, match, label, folder, action, status, never_marketing, enquiry_id, organisation_id, contact_id';
+
+export type BoxResult = { userId: string; address: string; read: number; named: number; styled: boolean; triaged: number; marked: number; outlookDrafts: number; drafted: number; filed: number; marketing: number; error?: string };
+
+export async function runMailSort(o: { until: number }): Promise<BoxResult[]> {
+  if (!msConfigured()) return [];
+  const db = createAdminClient();
+  const { data: boxes, error } = await db.from('mail_boxes').select(BOX_COLS).order('created_at');
+  if (error || !boxes?.length) return [];
+  const out: BoxResult[] = [];
+  for (const b of boxes as Box[]) {
+    if (Date.now() > o.until) break;
+    out.push(await runBox(db, b, o.until));
+  }
+  return out;
+}
+
+/** One mailbox, start to finish. Never throws: the error is saved on the mailbox for Email › Settings. */
+export async function runBox(db: Db, box: Box, until: number): Promise<BoxResult> {
+  const res: BoxResult = { userId: box.user_id, address: box.address, read: 0, named: 0, styled: false, triaged: 0, marked: 0, outlookDrafts: 0, drafted: 0, filed: 0, marketing: 0 };
+  const started = new Date().toISOString();
+  try {
+    const ctx = await Context.load(db, box);
+    // Folders from before they lived inside the Inbox (and before your own were used): brought up to date.
+    await tidyRules(ctx).catch(() => null);
+    await rehomeServices(ctx).catch(() => null);
+    res.read = await readMail(ctx, until);
+    if (Date.now() < until) res.named = await nameNewCompanies(ctx);
+    if (Date.now() < until) res.triaged = await triage(ctx, until);
+    // Marks (and unmarks) in Outlook straight after sorting, so urgent emails show on your phone within minutes.
+    // Your signature and font, copied from your latest sent emails (weekly, so a change in Outlook comes through).
+    if (signatureDue(box) && Date.now() < until - 20_000) await learnSignature(db, box).catch(() => null);
+    if (Date.now() < until) res.marked = await highlight(ctx, until);
+    if (Date.now() < until) res.outlookDrafts = await syncOutlookDrafts(ctx, until);
+    // Your style, once six months of sent emails have been read (and again every 30 days, unless you edited it).
+    if (styleDue(box) && Date.now() < until - 25_000) res.styled = await learnFromSent(ctx);
+    if (box.drafts && Date.now() < until) res.drafted = await draftReplies(ctx, until);
+    if ((box.filing || box.file_customers || box.marketing) && Date.now() < until) Object.assign(res, await fileMail(ctx, until));
+    // You asked Hestia to take over your old folders: emptied into hers, then removed once empty.
+    if (box.clear_old_folders && Date.now() < until - 8_000) await emptyOldFolders(ctx, until).catch(() => null);
+    await db.from('mail_boxes').update({ last_run_at: started, last_error: null }).eq('id', box.id);
+  } catch (e) {
+    res.error = e instanceof Error ? e.message : 'failed';
+    await db.from('mail_boxes').update({ last_run_at: started, last_error: res.error.slice(0, 500) }).eq('id', box.id);
+  }
+  return res;
+}
+
+/* ── What the run knows: the rules, the CRM's organisations, the owner's name ── */
+
+export class Context {
+  rules = new Map<string, Rule>();
+  byId = new Map<string, Rule>();
+  orgByDomain = new Map<string, Org>();
+  folders = new Map<string, string>();
+  /** Your own folders (top of the mailbox and inside the Inbox), to file into instead of making new ones. */
+  existing: { path: string; name: string; id: string }[] = [];
+  /** Paths of yours that the app didn't make: never saved as the app's, never removed. */
+  yours = new Set<string>();
+  ownDomain: string;
+  owner = '';
+  private crmCache = new Map<string, Rule | null>();
+  touchedConversations = new Set<string>();
+
+  private constructor(
+    public db: Db,
+    public box: Box
+  ) {
+    this.ownDomain = companyDomain(domainOf(box.address));
+  }
+
+  static async load(db: Db, box: Box) {
+    const c = new Context(db, box);
+    const [rules, { data: orgs }, { data: folders }, { data: me }] = await Promise.all([
+      allRules(db, box.id),
+      db.from('organisations').select('id, name, type, email, website'),
+      db.from('mail_folders').select('path, graph_id').eq('box_id', box.id),
+      db.from('profiles').select('full_name, email').eq('id', box.user_id).maybeSingle(),
+    ]);
+    for (const r of rules) c.remember(r);
+    for (const o of orgs ?? []) {
+      for (const d of [domainFromText(o.email as string | null), domainFromText(o.website as string | null)]) {
+        if (d && !isPersonalDomain(d) && !c.orgByDomain.has(d)) c.orgByDomain.set(d, { id: o.id as string, name: o.name as string, type: (o.type as string | null) ?? null });
+      }
+    }
+    for (const f of folders ?? []) c.folders.set(f.path as string, f.graph_id as string);
+    // Only folders you made: ones the app made before (Suppliers, Partners… at the top) aren't "yours" to file into.
+    const appMade = new Set((folders ?? []).map((f) => f.graph_id as string));
+    c.existing = (await listFolders(box.address).catch(() => [])).filter((f) => !appMade.has(f.id));
+    for (const f of c.existing) {
+      if (!c.folders.has(f.path)) {
+        c.folders.set(f.path, f.id);
+        c.yours.add(f.path);
+      }
+    }
+    c.owner = String(me?.full_name || me?.email || '').split(/[\s@]/)[0] || 'Callum';
+    return c;
+  }
+
+  /** Hestia's folder for a company or person: inside the Inbox under its group (Inbox › Suppliers › GoodWe). */
+  folderFor(name: string, group: string = 'Other'): string {
+    return companyFolder(name, group);
+  }
+
+  remember(r: Rule) {
+    this.rules.set(`${r.kind}:${r.match}`, r);
+    this.byId.set(r.id, r);
+  }
+
+  /** The rule for someone, made if there isn't one yet. Null for a stranger on Gmail and the like. */
+  async ruleFor(address: string, name: string | null): Promise<Rule | null> {
+    const a = addressOf(address);
+    if (!a || !a.includes('@') || a === addressOf(this.box.address)) return null;
+    const own = this.rules.get(`address:${a}`);
+    if (own) return own;
+    const dom = companyDomain(domainOf(a));
+    const personal = isPersonalDomain(dom);
+    if (!personal) {
+      const d = this.rules.get(`domain:${dom}`);
+      if (d) return d;
+    }
+    if (this.crmCache.has(a)) return this.crmCache.get(a) ?? null;
+    const made = await this.makeRule(a, dom, personal, name);
+    this.crmCache.set(a, made);
+    return made;
+  }
+
+  private async makeRule(a: string, dom: string, personal: boolean, name: string | null): Promise<Rule | null> {
+    const db = this.db;
+    // A customer in the CRM: their own folder, on straight away.
+    const { data: enq } = await db.from('enquiries').select('id, name, customer_ref').ilike('email', a).order('created_at', { ascending: false }).limit(1);
+    if (enq?.[0]) {
+      const label = String(enq[0].name || name || a);
+      // Inbox › Customers › "Sarah Davies (HX-0069)": tied to their record by its reference.
+      return this.insert({ kind: 'address', match: a, label, folder: customerFolder(label, enq[0].customer_ref as string | null), status: 'on', source: 'crm', named: true, enquiry_id: enq[0].id as string });
+    }
+    // A contact in the CRM: their organisation's folder (by domain), or their own.
+    const { data: con } = await db.from('crm_contacts').select('id, name, organisation_id').ilike('email', a).limit(1);
+    if (con?.[0]) {
+      const orgId = con[0].organisation_id as string | null;
+      const { data: org } = orgId ? await db.from('organisations').select('id, name, type').eq('id', orgId).maybeSingle() : { data: null };
+      if (org && !personal) {
+        return this.insert({ kind: 'domain', match: dom, label: org.name as string, folder: this.folderFor(org.name as string, groupForOrgType(org.type as string)), status: 'on', source: 'crm', named: true, organisation_id: org.id as string });
+      }
+      const label = String(con[0].name || name || a);
+      return this.insert({ kind: 'address', match: a, label, folder: this.folderFor(org ? (org.name as string) : label, org ? groupForOrgType(org.type as string) : 'Other'), status: 'on', source: 'crm', named: true, contact_id: con[0].id as string, organisation_id: org?.id ?? null });
+    }
+    if (personal) return null;
+    // An organisation in the CRM with this domain.
+    const org = this.orgByDomain.get(dom);
+    if (org) return this.insert({ kind: 'domain', match: dom, label: org.name, folder: this.folderFor(org.name, groupForOrgType(org.type)), status: 'on', source: 'crm', named: true, organisation_id: org.id });
+    // The team.
+    if (dom === this.ownDomain) return this.insert({ kind: 'domain', match: dom, label: 'Heliaxis team', folder: 'Inbox/Team', status: this.box.auto_approve ? 'on' : 'suggested', source: 'scan', named: true });
+    // A company we don't know yet: suggested, to be named and approved.
+    const label = guessLabel(dom);
+    return this.insert({ kind: 'domain', match: dom, label, folder: this.folderFor(label), status: 'suggested', source: 'scan', named: false });
+  }
+
+  private async insert(r: Partial<Rule> & { kind: Rule['kind']; match: string; label: string; folder: string; status: Rule['status']; source: string; named: boolean }): Promise<Rule> {
+    const row = { box_id: this.box.id, action: 'file', ...r };
+    // Never over one that's already there (yours to change): if it exists, that one is used.
+    const { data, error } = await this.db.from('mail_rules').upsert(row, { onConflict: 'box_id,kind,match', ignoreDuplicates: true }).select(RULE_COLS);
+    if (error) throw new Error(error.message);
+    let rule = (data?.[0] as Rule | undefined) ?? null;
+    if (!rule) {
+      const { data: had } = await this.db.from('mail_rules').select(RULE_COLS).eq('box_id', this.box.id).eq('kind', r.kind).eq('match', r.match).maybeSingle();
+      rule = (had as Rule | null) ?? null;
+    }
+    if (!rule) throw new Error('Couldn’t save a folder rule');
+    this.remember(rule);
+    return rule;
+  }
+}
+
+/* ── 1. Reading ─────────────────────────────────────────────────────────────── */
+
+async function readMail(ctx: Context, until: number): Promise<number> {
+  const { db, box } = ctx;
+  const startedAt = new Date().toISOString();
+  let read = 0;
+  // New since the last run (five minutes' overlap: an email can arrive with an earlier time than the last read).
+  const since = new Date(Date.parse(box.live_since ?? startedAt) - 5 * 60_000).toISOString().replace(/\.\d+Z$/, 'Z');
+  for (const [folder, direction] of [['inbox', 'in'], ['sentitems', 'out']] as const) {
+    // A busy few minutes: keep going back a page at a time until the page isn't full.
+    let page = await listFolder(box.address, folder, { since });
+    for (let i = 0; i < 5; i++) {
+      read += await ingest(ctx, page, direction);
+      const oldest = page.at(-1);
+      const at = oldest && (direction === 'in' ? oldest.receivedDateTime : oldest.sentDateTime);
+      if (page.length < 50 || !at) break;
+      page = await listFolder(box.address, folder, { since, before: at });
+    }
+  }
+  await db.from('mail_boxes').update({ live_since: startedAt }).eq('id', box.id);
+
+  // The first read, working back a page at a time: the whole inbox and the whole Sent folder.
+  let pages = 0;
+  let scanBefore = box.scan_before;
+  let sentBefore = box.sent_before;
+  while (pages < PAGES_PER_RUN && Date.now() < until - 15_000 && (scanBefore || sentBefore)) {
+    pages++;
+    // Whichever is further behind goes next, so both work back through time together (and recent inbox emails can
+    // be sorted, knowing what you've answered, without waiting for years of sent emails).
+    if (sentBefore && (!scanBefore || sentBefore >= scanBefore)) {
+      const page = await listFolder(box.address, 'sentitems', { before: sentBefore });
+      read += await ingest(ctx, page, 'out');
+      const oldest = page.at(-1)?.sentDateTime;
+      sentBefore = page.length && oldest ? oldest : null;
+    } else if (scanBefore) {
+      const page = await listFolder(box.address, 'inbox', { before: scanBefore });
+      read += await ingest(ctx, page, 'in');
+      scanBefore = page.length ? (page.at(-1)?.receivedDateTime ?? null) : null;
+    }
+    await db
+      .from('mail_boxes')
+      .update({ scan_before: scanBefore, sent_before: sentBefore, ...(scanBefore || sentBefore ? {} : { scan_done_at: new Date().toISOString() }) })
+      .eq('id', box.id);
+  }
+  ctx.box.scan_before = scanBefore;
+  ctx.box.sent_before = sentBefore;
+  await refreshThreads(ctx);
+  return read;
+}
+
+/** Saves a page of emails (ones already saved are skipped), each with its folder rule. */
+async function ingest(ctx: Context, page: GMessage[], direction: 'in' | 'out'): Promise<number> {
+  if (!page.length) return 0;
+  const { db, box } = ctx;
+  const me = addressOf(box.address);
+  const rows = [];
+  for (const m of page) {
+    const from = addressOf(m.from?.emailAddress?.address);
+    const to = [...(m.toRecipients ?? []), ...(m.ccRecipients ?? [])].map((r) => addressOf(r.emailAddress?.address)).filter(Boolean);
+    const other = direction === 'in' ? from : to.find((a) => a !== me);
+    if (!other || !m.conversationId) continue;
+    // Sent through Xero, Stripe and the like: it belongs with the business behind it (its Reply-To), not the service.
+    const owner = direction === 'in' ? belongsTo(from, m.replyTo?.[0]?.emailAddress?.address) : other;
+    // Sent to yourself, or to the team only: kept, but with no rule.
+    const rule = await ctx.ruleFor(owner, direction === 'in' ? (m.from?.emailAddress?.name ?? null) : (m.toRecipients?.[0]?.emailAddress?.name ?? null));
+    const at = (direction === 'in' ? m.receivedDateTime : m.sentDateTime) || new Date().toISOString();
+    rows.push({
+      box_id: box.id,
+      graph_id: m.id,
+      internet_id: m.internetMessageId ?? null,
+      conversation_id: m.conversationId,
+      direction,
+      from_address: from || null,
+      from_name: m.from?.emailAddress?.name ?? null,
+      to_addresses: to.slice(0, 20),
+      subject: m.subject ?? null,
+      preview: (m.bodyPreview ?? '').slice(0, 300),
+      at,
+      marketing: direction === 'in' && looksLikeMarketing(m.internetMessageHeaders) && !rule?.never_marketing && !rule?.enquiry_id,
+      automated: direction === 'in' && looksAutomated(from, m.internetMessageHeaders),
+      rule_id: rule?.id ?? null,
+      place: direction === 'in' ? 'inbox' : 'sent',
+    });
+  }
+  if (!rows.length) return 0;
+  const { data: added, error } = await db
+    .from('mail_messages')
+    .upsert(rows, { onConflict: 'box_id,graph_id', ignoreDuplicates: true })
+    .select('graph_id, rule_id, at');
+  if (error) throw new Error(error.message);
+  for (const r of rows) ctx.touchedConversations.add(r.conversation_id);
+
+  // Each rule's count and latest email, for Email › Folders.
+  const perRule = new Map<string, { n: number; last: string }>();
+  for (const a of added ?? []) {
+    if (!a.rule_id) continue;
+    const p = perRule.get(a.rule_id as string) ?? { n: 0, last: a.at as string };
+    p.n++;
+    if (String(a.at) > p.last) p.last = a.at as string;
+    perRule.set(a.rule_id as string, p);
+  }
+  for (const [id, p] of perRule) {
+    const { data: cur } = await db.from('mail_rules').select('messages, last_at').eq('id', id).maybeSingle();
+    await db
+      .from('mail_rules')
+      .update({ messages: Number(cur?.messages ?? 0) + p.n, last_at: !cur?.last_at || p.last > String(cur.last_at) ? p.last : cur.last_at })
+      .eq('id', id);
+  }
+
+  await noteOnCrm(ctx, page, direction, new Set((added ?? []).map((a) => a.graph_id as string)));
+  return added?.length ?? 0;
+}
+
+/**
+ * A CRM customer's emails go on their record (their timeline), both ways: what they sent you and your replies. Only
+ * customers in the CRM; once each (crm_emails.graph_id is unique). When a customer emails you, their automatic
+ * follow-ups stop, as they do when they reply to hello@.
+ */
+async function noteOnCrm(ctx: Context, page: GMessage[], direction: 'in' | 'out', added: Set<string>) {
+  const { db, box } = ctx;
+  const me = addressOf(box.address);
+  const rows: Record<string, unknown>[] = [];
+  const emailedUs = new Set<string>();
+  for (const m of page) {
+    if (!added.has(m.id) || !m.internetMessageId) continue;
+    const from = addressOf(m.from?.emailAddress?.address);
+    const other = direction === 'in' ? from : [...(m.toRecipients ?? []), ...(m.ccRecipients ?? [])].map((r) => addressOf(r.emailAddress?.address)).find((a) => a && a !== me);
+    if (!other) continue;
+    const rule = ctx.rules.get(`address:${other}`);
+    if (!rule?.enquiry_id) continue;
+    const at = (direction === 'in' ? m.receivedDateTime : m.sentDateTime) || new Date().toISOString();
+    rows.push({
+      enquiry_id: rule.enquiry_id,
+      graph_id: m.internetMessageId,
+      direction,
+      subject: m.subject ?? null,
+      body: (m.bodyPreview ?? '').slice(0, 4000),
+      from_address: direction === 'in' ? other : box.address,
+      to_address: direction === 'in' ? box.address : other,
+      at,
+    });
+    if (direction === 'in' && Date.now() - Date.parse(at) < 86_400_000) emailedUs.add(rule.enquiry_id);
+  }
+  if (rows.length) {
+    // On their current job too (the latest still going, else the latest), as replies to hello@ are.
+    const jobs = await currentJobs(db, [...new Set(rows.map((r) => r.enquiry_id as string))]);
+    for (const r of rows) r.project_id = jobs.get(r.enquiry_id as string) ?? null;
+    await db.from('crm_emails').upsert(rows, { onConflict: 'graph_id', ignoreDuplicates: true });
+  }
+  for (const id of emailedUs) {
+    await db.from('crm_projects').update({ sequence_stopped_at: new Date().toISOString() }).eq('enquiry_id', id).is('sequence_stopped_at', null);
+  }
+}
+
+/** Each customer's current job: the latest one still going (not complete or lost), else their latest. */
+async function currentJobs(db: Db, enquiryIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!enquiryIds.length) return out;
+  const { data } = await db.from('crm_projects').select('id, enquiry_id, stage, created_at').in('enquiry_id', enquiryIds).order('created_at', { ascending: false }).limit(200);
+  for (const id of enquiryIds) {
+    const theirs = (data ?? []).filter((p) => p.enquiry_id === id);
+    const job = theirs.find((p) => p.stage !== 'complete' && p.stage !== 'lost') ?? theirs[0];
+    if (job) out.set(id, job.id as string);
+  }
+  return out;
+}
+
+/**
+ * A conversation's emails on the customer's record, now: for someone just added to the CRM from Hestia (their
+ * earlier emails were read before they were a customer). Once each.
+ */
+export async function noteThreadOnCrm(db: Db, box: Pick<Box, 'id' | 'address'>, conversationId: string, enquiryId: string): Promise<void> {
+  const { data: msgs } = await db.from('mail_messages').select('internet_id, direction, from_address, to_addresses, subject, preview, at').eq('box_id', box.id).eq('conversation_id', conversationId);
+  const jobs = await currentJobs(db, [enquiryId]);
+  const rows = (msgs ?? [])
+    .filter((m) => m.internet_id)
+    .map((m) => ({
+      enquiry_id: enquiryId,
+      project_id: jobs.get(enquiryId) ?? null,
+      graph_id: m.internet_id,
+      direction: m.direction,
+      subject: m.subject,
+      body: m.preview,
+      from_address: m.direction === 'in' ? m.from_address : box.address,
+      to_address: m.direction === 'in' ? box.address : ((m.to_addresses as string[] | null)?.[0] ?? null),
+      at: m.at,
+    }));
+  if (rows.length) await db.from('crm_emails').upsert(rows, { onConflict: 'graph_id', ignoreDuplicates: true });
+}
+
+/**
+ * "No reply needed": the conversation's emails still in the Inbox are stored, never deleted: in their folder (Inbox ›
+ * Customers › Name (HX-…), a company's), Marketing, or Inbox › Filed. With { delete: true } ("Delete"), to Deleted
+ * Items instead. Your own folders are used as they are (they're known with their ids). Emails you've already moved
+ * yourself are left where they are. Undo with putBack().
+ */
+export async function clearAway(db: Db, box: Pick<Box, 'id' | 'address'>, conversationId: string, o: { delete?: boolean } = {}): Promise<{ filed: number; deleted: number; folder: string | null }> {
+  const { data: msgs } = await db
+    .from('mail_messages')
+    .select('id, graph_id, rule:mail_rules(folder, status, action)')
+    .eq('box_id', box.id)
+    .eq('conversation_id', conversationId)
+    .eq('place', 'inbox')
+    .eq('direction', 'in');
+  const list = (msgs ?? []).map((m) => ({ ...m, rule: (Array.isArray(m.rule) ? m.rule[0] : m.rule) as { folder: string; status: string; action: string } | null }));
+  const out = { filed: 0, deleted: 0, folder: null as string | null };
+  if (!list.length) return out;
+  const { data: saved } = await db.from('mail_folders').select('path, graph_id').eq('box_id', box.id);
+  const known = new Map((saved ?? []).map((f) => [f.path as string, f.graph_id as string]));
+  const yours = new Set<string>();
+  for (const f of await listFolders(box.address).catch(() => [])) {
+    if (!known.has(f.path)) {
+      known.set(f.path, f.id);
+      yours.add(f.path);
+    }
+  }
+  const before = new Set(known.keys());
+  const inbox = await inboxId(box.address);
+  const now = new Date().toISOString();
+  for (const m of list) {
+    try {
+      if ((await getParentFolder(box.address, m.graph_id as string)) !== inbox) {
+        await db.from('mail_messages').update({ place: 'elsewhere' }).eq('id', m.id);
+        continue;
+      }
+      if (o.delete) {
+        await moveToDeleted(box.address, m.graph_id as string);
+        await db.from('mail_messages').update({ place: 'deleted', filed_at: now, file_error: null }).eq('id', m.id);
+        out.deleted++;
+      } else {
+        // Stored, never deleted: its folder, Marketing, or Inbox › Filed.
+        const folder = clearAwayTo(m.rule);
+        await moveMessage(box.address, m.graph_id as string, await ensureFolder(box.address, folder, known));
+        await db.from('mail_messages').update({ place: 'filed', filed_at: now, filed_folder: folder, file_error: null }).eq('id', m.id);
+        out.filed++;
+        out.folder = folder;
+      }
+    } catch (e) {
+      await db.from('mail_messages').update({ file_error: (e instanceof Error ? e.message : 'failed').slice(0, 300) }).eq('id', m.id);
+    }
+  }
+  // Folders the app just made (not yours) are remembered as the app's.
+  const made = [...known].filter(([path]) => !before.has(path) && !yours.has(path)).map(([path, graph_id]) => ({ box_id: box.id, path, graph_id }));
+  if (made.length) await db.from('mail_folders').upsert(made, { onConflict: 'box_id,path', ignoreDuplicates: true });
+  return out;
+}
+
+/** Undo "No reply needed": what it moved in the last day goes back to the Inbox. Returns how many. */
+export async function putBack(db: Db, box: Pick<Box, 'id' | 'address'>, conversationId: string): Promise<number> {
+  const since = new Date(Date.now() - 86_400_000).toISOString();
+  const { data: msgs } = await db
+    .from('mail_messages')
+    .select('id, graph_id')
+    .eq('box_id', box.id)
+    .eq('conversation_id', conversationId)
+    .in('place', ['filed', 'deleted'])
+    .gte('filed_at', since);
+  let n = 0;
+  for (const m of msgs ?? []) {
+    try {
+      await moveMessage(box.address, m.graph_id as string, 'inbox');
+      await db.from('mail_messages').update({ place: 'inbox', filed_at: null }).eq('id', m.id);
+      n++;
+    } catch {
+      // gone for good (emptied from Deleted Items): nothing to put back
+    }
+  }
+  return n;
+}
+
+/**
+ * A customer's conversation into their folder straight away (when you say no reply needed, or send from the app),
+ * rather than on the next run. Only CRM customers' approved folders, and only emails still in the Inbox. Returns how
+ * many moved.
+ */
+export async function fileThreadNow(db: Db, box: Pick<Box, 'id' | 'address' | 'filing' | 'file_customers'>, conversationId: string): Promise<number> {
+  const { data: msgs } = await db
+    .from('mail_messages')
+    .select('id, graph_id, rule:mail_rules!inner(folder, status, action, enquiry_id)')
+    .eq('box_id', box.id)
+    .eq('conversation_id', conversationId)
+    .eq('place', 'inbox')
+    .eq('direction', 'in');
+  const list = (msgs ?? []).map((m) => ({ ...m, rule: (Array.isArray(m.rule) ? m.rule[0] : m.rule) as { folder: string; status: string; action: string; enquiry_id: string | null } }));
+  const ok = list.filter((m) => m.rule?.status === 'on' && m.rule.action === 'file' && (box.filing || (box.file_customers && m.rule.enquiry_id)));
+  if (!ok.length) return 0;
+  const { data: saved } = await db.from('mail_folders').select('path, graph_id').eq('box_id', box.id);
+  const known = new Map((saved ?? []).map((f) => [f.path as string, f.graph_id as string]));
+  const before = known.size;
+  const inbox = await inboxId(box.address);
+  let n = 0;
+  for (const m of ok) {
+    try {
+      if ((await getParentFolder(box.address, m.graph_id as string)) !== inbox) {
+        await db.from('mail_messages').update({ place: 'elsewhere' }).eq('id', m.id);
+        continue;
+      }
+      const folderId = await ensureFolder(box.address, m.rule.folder, known);
+      await moveMessage(box.address, m.graph_id as string, folderId);
+      await db.from('mail_messages').update({ place: 'filed', filed_at: new Date().toISOString(), filed_folder: m.rule.folder, file_error: null }).eq('id', m.id);
+      n++;
+    } catch (e) {
+      await db.from('mail_messages').update({ file_error: (e instanceof Error ? e.message : 'failed').slice(0, 300) }).eq('id', m.id);
+    }
+  }
+  if (known.size !== before) {
+    const rows = [...known].map(([path, graph_id]) => ({ box_id: box.id, path, graph_id }));
+    await db.from('mail_folders').upsert(rows, { onConflict: 'box_id,path', ignoreDuplicates: true });
+  }
+  return n;
+}
+
+/** Brings each touched conversation's row up to date from its emails. */
+async function refreshThreads(ctx: Context) {
+  const { db, box } = ctx;
+  const ids = [...ctx.touchedConversations];
+  ctx.touchedConversations.clear();
+  for (let i = 0; i < ids.length; i += 25) {
+    const chunk = ids.slice(i, i + 25);
+    const [{ data: msgs }, { data: existing }] = await Promise.all([
+      db.from('mail_messages').select('graph_id, conversation_id, direction, from_address, from_name, to_addresses, subject, at, marketing, automated, rule_id').eq('box_id', box.id).in('conversation_id', chunk).order('at'),
+      db.from('mail_threads').select('conversation_id, needs_reply, triaged_for, done_at, enquiry_id').eq('box_id', box.id).in('conversation_id', chunk),
+    ]);
+    const prior = new Map((existing ?? []).map((t) => [t.conversation_id as string, t]));
+    const rows = chunk.map((cid) => {
+      const list = (msgs ?? []).filter((m) => m.conversation_id === cid);
+      const ins = list.filter((m) => m.direction === 'in');
+      const outs = list.filter((m) => m.direction === 'out');
+      const lastIn = ins.at(-1);
+      const lastOut = outs.at(-1);
+      const last = list.at(-1);
+      const ruleId = (lastIn?.rule_id ?? last?.rule_id ?? null) as string | null;
+      const rule = ruleId ? ctx.byId.get(ruleId) : undefined;
+      const p = prior.get(cid);
+      const marketing = ins.length > 0 && ins.every((m) => m.marketing) && !outs.length;
+      const state: ThreadState = threadState({
+        marketing,
+        lastInAt: (lastIn?.at as string) ?? null,
+        lastOutAt: (lastOut?.at as string) ?? null,
+        doneAt: (p?.done_at as string) ?? null,
+        triagedFor: (p?.triaged_for as string) ?? null,
+        needsReply: (p?.needs_reply as boolean | null) ?? null,
+      });
+      return {
+        box_id: box.id,
+        conversation_id: cid,
+        subject: (last?.subject as string) ?? null,
+        who_address: (lastIn?.from_address as string) ?? ((lastOut?.to_addresses as string[] | null)?.[0] ?? null),
+        who_name: (lastIn?.from_name as string) ?? rule?.label ?? null,
+        rule_id: ruleId,
+        enquiry_id: rule?.enquiry_id ?? (p?.enquiry_id as string | null) ?? null,
+        organisation_id: rule?.organisation_id ?? null,
+        contact_id: rule?.contact_id ?? null,
+        messages: list.length,
+        last_in_at: (lastIn?.at as string) ?? null,
+        last_out_at: (lastOut?.at as string) ?? null,
+        last_in_graph_id: (lastIn?.graph_id as string) ?? null,
+        marketing,
+        automated: !!lastIn?.automated,
+        state,
+        updated_at: new Date().toISOString(),
+      };
+    });
+    const { error } = await db.from('mail_threads').upsert(rows, { onConflict: 'box_id,conversation_id' });
+    if (error) throw new Error(error.message);
+  }
+}
+
+/* ── Your old folders ───────────────────────────────────────────────────── */
+
+const OLD_MOVES_PER_RUN = 60;
+
+/**
+ * Your own folders (at the top and inside the Inbox, and the folders inside them), emptied into Hestia's: each email
+ * to its company's or customer's folder, or Inbox › Filed, then the folder removed once it's completely empty. Never
+ * Outlook's own folders (Drafts, Sent, Deleted Items, Archive…), never Hestia's, and never an email deleted.
+ */
+async function emptyOldFolders(ctx: Context, until: number): Promise<void> {
+  const { db, box } = ctx;
+  const wellKnown = await wellKnownFolderIds(box.address);
+  const { data: made } = await db.from('mail_folders').select('graph_id').eq('box_id', box.id);
+  const hestias = new Set([...(made ?? []).map((f) => f.graph_id as string), ...[...ctx.folders].filter(([p]) => !ctx.yours.has(p)).map(([, id]) => id)]);
+  // Never a folder Hestia files into, or one holding hers (a "Suppliers" of yours she reused for Inbox › Suppliers › …).
+  const inUse = [...ctx.byId.values()].map((r) => r.folder).concat([FILED_FOLDER, MARKETING_FOLDER]);
+  const hosts = (path: string) => inUse.some((f) => f === path || f.startsWith(`${path}/`));
+  const old = ctx.existing.filter((f) => !wellKnown.has(f.id) && !hestias.has(f.id) && !hosts(f.path));
+  if (!old.length) return;
+  const me = addressOf(box.address);
+  let moves = 0;
+
+  // One folder at a time, its own folders first (a folder can only go once nothing is inside it).
+  const empty = async (id: string, depth: number): Promise<boolean> => {
+    if (depth > 4 || moves >= OLD_MOVES_PER_RUN || Date.now() > until - 6_000) return false;
+    for (const c of await childFolders(box.address, id)) {
+      if (hestias.has(c.id)) return false; // one of Hestia's inside it: this folder stays
+      if (!(await empty(c.id, depth + 1))) return false;
+    }
+    for (;;) {
+      if (moves >= OLD_MOVES_PER_RUN || Date.now() > until - 6_000) return false;
+      const page = await folderMessages(box.address, id, 25);
+      if (!page.length) break;
+      for (const m of page) {
+        const sentByYou = addressOf(m.from) === me;
+        const owner = sentByYou ? (m.to.find((a) => addressOf(a) !== me) ?? '') : belongsTo(m.from, m.replyTo);
+        const rule = owner ? await ctx.ruleFor(owner, sentByYou ? null : m.fromName) : null;
+        const destId = await ensureFolder(box.address, clearAwayTo(rule), ctx.folders);
+        if (destId === id) return false; // already where it belongs: leave this folder as it is
+        await moveMessage(box.address, m.id, destId);
+        moves++;
+      }
+      await saveFolders(ctx);
+    }
+    return deleteFolderIfEmpty(box.address, id);
+  };
+
+  for (const f of old) {
+    if (moves >= OLD_MOVES_PER_RUN || Date.now() > until - 6_000) break;
+    if (await empty(f.id, 0)) {
+      ctx.folders.delete(f.path);
+      ctx.yours.delete(f.path);
+    }
+  }
+}
+
+/* ── Keeping the folders tidy ───────────────────────────────────────────── */
+
+/**
+ * Brings every rule into Hestia's own structure, then moves anything already filed to match:
+ *  - customers: Inbox › Customers › "Name (HX-0069)";
+ *  - companies and contacts in the CRM: Inbox › <their group> › Name;
+ *  - Hestia's suggestions elsewhere (your old folders, the app's old top-level ones): named again into hers.
+ * Then removes folders the app made that nothing uses any more, once they're empty. Your own folders are never touched.
+ */
+async function tidyRules(ctx: Context): Promise<void> {
+  const { db } = ctx;
+  // Everything not in Hestia's own structure is sorted again, rules you edited before included (you asked for hers).
+  const old = [...ctx.byId.values()].filter((r) => r.action === 'file' && !r.enquiry_id && !isHestiaFolder(r.folder));
+  const customers = [...ctx.byId.values()].filter((r) => r.enquiry_id && !r.folder.startsWith('Inbox/Customers/'));
+  if (!old.length && !customers.length) {
+    await rehome(ctx);
+    return cleanFolders(ctx);
+  }
+  const refs = new Map<string, string | null>();
+  const ids = [...new Set(customers.map((r) => r.enquiry_id!))];
+  if (ids.length) {
+    const { data } = await db.from('enquiries').select('id, customer_ref').in('id', ids);
+    for (const e of data ?? []) refs.set(e.id as string, (e.customer_ref as string | null) ?? null);
+  }
+  const orgIds = [...new Set(old.map((r) => r.organisation_id).filter((x): x is string => !!x))];
+  const orgType = new Map<string, string | null>();
+  if (orgIds.length) {
+    const { data } = await db.from('organisations').select('id, type').in('id', orgIds);
+    for (const o of data ?? []) orgType.set(o.id as string, (o.type as string | null) ?? null);
+  }
+  const moved = new Map<string, string>(); // rule id → its new folder
+  for (const r of customers) moved.set(r.id, customerFolder(r.label, refs.get(r.enquiry_id!) ?? null));
+  for (const r of old) {
+    if (r.status === 'suggested' && !r.organisation_id && !r.contact_id) {
+      // Hestia's suggestion: she names it again, into her own structure.
+      await db.from('mail_rules').update({ named: false, source: 'scan', updated_at: new Date().toISOString() }).eq('id', r.id);
+    } else moved.set(r.id, ctx.folderFor(r.label, r.organisation_id ? groupForOrgType(orgType.get(r.organisation_id)) : 'Other'));
+  }
+  for (const [id, folder] of moved) {
+    if (ctx.byId.get(id)?.folder === folder) {
+      moved.delete(id);
+      continue;
+    }
+    await db.from('mail_rules').update({ folder, updated_at: new Date().toISOString() }).eq('id', id);
+    const r = ctx.byId.get(id);
+    if (r) r.folder = folder;
+  }
+  await rehome(ctx);
+  await cleanFolders(ctx);
+}
+
+/**
+ * Emails already filed follow their rule when its folder changes (a customer's moved inside the Inbox, a suggestion
+ * renamed onto one of your folders). Only to settled folders: inside the Inbox, or one of yours. 50 a run.
+ */
+async function rehome(ctx: Context): Promise<void> {
+  const { db, box } = ctx;
+  const settled = isHestiaFolder;
+  const { data: filed } = await db
+    .from('mail_messages')
+    .select('id, graph_id, filed_folder, rule:mail_rules!inner(folder, action)')
+    .eq('box_id', box.id)
+    .eq('place', 'filed')
+    .eq('rule.action', 'file')
+    .limit(1000);
+  const todo = (filed ?? [])
+    .map((m) => ({ ...m, rule: (Array.isArray(m.rule) ? m.rule[0] : m.rule) as { folder: string } }))
+    .filter((m) => m.rule && settled(m.rule.folder) && m.filed_folder !== m.rule.folder)
+    .slice(0, 50);
+  if (!todo.length) return;
+  for (const m of todo) {
+    try {
+      await moveMessage(box.address, m.graph_id as string, await ensureFolder(box.address, m.rule.folder, ctx.folders));
+      await db.from('mail_messages').update({ filed_folder: m.rule.folder, file_error: null }).eq('id', m.id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'failed';
+      await db.from('mail_messages').update(/not found|ErrorItemNotFound/i.test(msg) ? { place: 'elsewhere', file_error: msg.slice(0, 300) } : { file_error: msg.slice(0, 300) }).eq('id', m.id);
+    }
+  }
+  await saveFolders(ctx);
+}
+
+/**
+ * Emails read before Hestia knew about Xero and the like were put with the service ("Xero"): each is checked once for
+ * the business behind it (its Reply-To) and put with them instead. Without one, it has no rule (No reply needed then
+ * stores it in Inbox › Filed). 30 a run.
+ */
+async function rehomeServices(ctx: Context): Promise<void> {
+  const { db, box } = ctx;
+  const services = [...ctx.byId.values()].filter((r) => r.kind === 'domain' && isSendingService(r.match));
+  if (!services.length) return;
+  const { data: msgs } = await db
+    .from('mail_messages')
+    .select('id, graph_id, conversation_id, from_name')
+    .eq('box_id', box.id)
+    .eq('direction', 'in')
+    .in('rule_id', services.map((r) => r.id))
+    .limit(30);
+  for (const m of msgs ?? []) {
+    const reply = await getReplyTo(box.address, m.graph_id as string).catch(() => null);
+    const owner = reply ? belongsTo(`x@${services[0].match}`, reply) : null;
+    const rule = owner && !isSendingService(domainOf(owner)) ? await ctx.ruleFor(owner, (m.from_name as string | null) ?? null) : null;
+    await db.from('mail_messages').update({ rule_id: rule?.id ?? null }).eq('id', m.id);
+    ctx.touchedConversations.add(m.conversation_id as string);
+  }
+}
+
+/** Folders the app made that no rule uses any more: removed once empty (the deepest first). Never yours. */
+async function cleanFolders(ctx: Context): Promise<void> {
+  const { db, box } = ctx;
+  const { data: made } = await db.from('mail_folders').select('path, graph_id').eq('box_id', box.id);
+  const inUse = [...ctx.byId.values()].map((r) => r.folder);
+  const keep = (path: string) => path === MARKETING_FOLDER || path === FILED_FOLDER || inUse.some((f) => f === path || f.startsWith(`${path}/`));
+  const unused = (made ?? []).filter((f) => !keep(f.path as string)).sort((a, b) => String(b.path).split('/').length - String(a.path).split('/').length);
+  for (const f of unused.slice(0, 10)) {
+    if (await deleteFolderIfEmpty(box.address, f.graph_id as string)) {
+      await db.from('mail_folders').delete().eq('box_id', box.id).eq('path', f.path);
+      ctx.folders.delete(f.path as string);
+    }
+  }
+}
+
+/* ── 2. Naming the companies ─────────────────────────────────────────────── */
+
+async function nameNewCompanies(ctx: Context): Promise<number> {
+  const { db, box } = ctx;
+  const { data: rules } = await db.from('mail_rules').select('id, match').eq('box_id', box.id).eq('kind', 'domain').eq('named', false).order('messages', { ascending: false }).limit(30);
+  if (!rules?.length) return 0;
+  const samples = [];
+  for (const r of rules) {
+    const { data: msgs } = await db.from('mail_messages').select('from_name, subject').eq('rule_id', r.id).eq('direction', 'in').order('at', { ascending: false }).limit(6);
+    samples.push({
+      domain: r.match as string,
+      names: [...new Set((msgs ?? []).map((m) => String(m.from_name || '')).filter(Boolean))],
+      subjects: [...new Set((msgs ?? []).map((m) => String(m.subject || '')).filter(Boolean))],
+    });
+  }
+  const named = await nameDomains(samples);
+  if (!named.length) return 0;
+  let n = 0;
+  for (const r of rules) {
+    const hit = named.find((x) => x.domain.toLowerCase() === String(r.match));
+    if (!hit) {
+      // Left out of the answer: keep the tidied domain as its name rather than ask again every run.
+      await db.from('mail_rules').update({ named: true, folder: ctx.folderFor(guessLabel(r.match as string)), ...(box.auto_approve ? { status: 'on' } : {}) }).eq('id', r.id).eq('named', false);
+      continue;
+    }
+    const marketingOnly = hit.marketing_only;
+    await db
+      .from('mail_rules')
+      .update({
+        label: hit.name || guessLabel(r.match as string),
+        // Hestia's own: inside the Inbox under its group (Inbox › Suppliers › GoodWe).
+        folder: marketingOnly ? MARKETING_FOLDER : ctx.folderFor(hit.name || guessLabel(r.match as string), hit.group),
+        // You asked for her folders to be used as they come: approved as she names them.
+        ...(box.auto_approve ? { status: 'on' as const } : {}),
+        action: marketingOnly ? 'marketing' : 'file',
+        named: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', r.id)
+      .eq('named', false); // not if you renamed it meanwhile
+    n++;
+  }
+  return n;
+}
+
+/* ── 3. Needs a reply? And the draft ─────────────────────────────────────── */
+
+/** The conversation as the writing assistant sees it: the latest email from them in full, the rest as previews. */
+async function threadForAi(ctx: Context, t: { conversation_id: string; subject: string | null; who_name: string | null; who_address: string | null; enquiry_id: string | null; rule_id: string | null; last_in_graph_id: string | null }): Promise<ThreadForAi> {
+  const { db, box } = ctx;
+  const { data: msgs } = await db.from('mail_messages').select('graph_id, direction, at, preview').eq('box_id', box.id).eq('conversation_id', t.conversation_id).order('at').limit(40);
+  const list = (msgs ?? []).slice(-5);
+  const messages: ThreadForAi['messages'] = [];
+  for (const m of list) {
+    let text = String(m.preview || '');
+    // The full text of the latest email from them, and of the last thing you sent (for the tone).
+    if (m.graph_id === t.last_in_graph_id || m === list.filter((x) => x.direction === 'out').at(-1)) {
+      text = await messageText(box.address, m.graph_id as string).then((r) => r.text || text).catch(() => text);
+    }
+    messages.push({ from: m.direction === 'in' ? 'them' : 'me', at: String(m.at), text });
+  }
+  return { subject: t.subject || '(no subject)', who: [t.who_name, t.who_address].filter(Boolean).join(' '), inCrm: await crmLine(ctx, t), messages };
+}
+
+/** One line about who they are in the CRM, for the writing assistant. */
+async function crmLine(ctx: Context, t: { enquiry_id: string | null; rule_id: string | null }): Promise<string | null> {
+  const { db } = ctx;
+  if (t.enquiry_id) {
+    const [{ data: c }, { data: jobs }] = await Promise.all([
+      db.from('enquiries').select('name, postcode').eq('id', t.enquiry_id).maybeSingle(),
+      db.from('crm_projects').select('title, stage, next_step').eq('enquiry_id', t.enquiry_id).order('created_at', { ascending: false }).limit(3),
+    ]);
+    if (c) {
+      const j = (jobs ?? []).map((p) => `${p.title || 'Job'} (stage: ${p.stage}${p.next_step ? `, next step: ${p.next_step}` : ''})`).join('; ');
+      return `Customer in the CRM: ${c.name}${c.postcode ? `, ${c.postcode}` : ''}.${j ? ` Jobs: ${j}.` : ' No job yet.'}`;
+    }
+  }
+  const rule = t.rule_id ? ctx.byId.get(t.rule_id) : undefined;
+  if (rule?.organisation_id) return `Organisation in the CRM: ${rule.label} (folder ${rule.folder}).`;
+  if (rule) return `From ${rule.label} (folder ${rule.folder}), not in the CRM.`;
+  return null;
+}
+
+const THREAD_COLS = 'id, conversation_id, subject, who_name, who_address, enquiry_id, rule_id, last_in_at, last_in_graph_id, last_out_at, done_at, marketing, automated, alerted_at';
+
+async function triage(ctx: Context, until: number): Promise<number> {
+  const { db, box } = ctx;
+  // Everything in the inbox, newest first. While your sent emails are still being read, only conversations as recent
+  // as what's been read so far: an older one might look unanswered when the reply just hasn't been read yet.
+  let q = db.from('mail_threads').select(THREAD_COLS).eq('box_id', box.id).eq('state', 'new');
+  if (box.sent_before) q = q.gte('last_in_at', box.sent_before);
+  const { data: todo } = await q.order('last_in_at', { ascending: false }).limit(TRIAGE_PER_RUN);
+  let n = 0;
+  const list = (todo ?? []) as unknown as TriageThread[];
+  // A few at once, so a full inbox is through in hours rather than days.
+  for (let i = 0; i < list.length; i += TRIAGE_AT_ONCE) {
+    if (Date.now() > until - 15_000) break;
+    const done = await Promise.all(list.slice(i, i + TRIAGE_AT_ONCE).map((t) => triageOne(ctx, t).catch(() => false)));
+    n += done.filter(Boolean).length;
+  }
+  return n;
+}
+
+type TriageThread = {
+  id: string;
+  conversation_id: string;
+  subject: string | null;
+  who_name: string | null;
+  who_address: string | null;
+  enquiry_id: string | null;
+  rule_id: string | null;
+  last_in_at: string | null;
+  last_in_graph_id: string | null;
+  last_out_at: string | null;
+  done_at: string | null;
+  marketing: boolean;
+  automated: boolean;
+  alerted_at?: string | null;
+};
+
+async function triageOne(ctx: Context, t: TriageThread): Promise<boolean> {
+  const { db } = ctx;
+  const now = new Date().toISOString();
+  const thread = await threadForAi(ctx, t);
+  const r = await triageThread(thread, ctx.owner);
+  const stateFor = (needsReply: boolean) => threadState({ marketing: !!t.marketing, lastInAt: t.last_in_at, lastOutAt: t.last_out_at, doneAt: t.done_at, triagedFor: t.last_in_at, needsReply });
+  if (!r) {
+    // Hestia couldn't sort it (or isn't set up): it goes on To reply unsorted, so nothing is missed.
+    await db.from('mail_threads').update({ needs_reply: true, priority: null, summary: null, why: 'Not sorted automatically: have a look.', triaged_for: t.last_in_at, state: stateFor(true), updated_at: now }).eq('id', t.id);
+    return false;
+  }
+  const needsReply = r.needs_reply && !r.injection_suspected;
+  // A system address can't be replied to: if it needs anything, it's something to do.
+  const actionOnly = needsReply && (r.action_only || t.automated);
+  const prospect = r.kind === 'prospect' && !t.enquiry_id ? { name: r.prospect_name || t.who_name || '', phone: r.prospect_phone || '', postcode: r.prospect_postcode || '' } : null;
+  await db
+    .from('mail_threads')
+    .update({
+      needs_reply: needsReply,
+      action_only: actionOnly,
+      priority: r.priority,
+      kind: r.kind,
+      tone: r.tone,
+      summary: r.summary || null,
+      why: r.why || null,
+      due: r.due || null,
+      opportunity: r.opportunity || null,
+      prospect,
+      triaged_for: t.last_in_at,
+      state: stateFor(needsReply),
+      updated_at: now,
+    })
+    .eq('id', t.id);
+  // Urgent and recent: straight to your phone (once per email).
+  const recent = t.last_in_at && Date.now() - Date.parse(t.last_in_at) < ALERT_WITHIN_HOURS * 3_600_000;
+  if (needsReply && r.priority === 'urgent' && recent && !(t.alerted_at && t.last_in_at && t.alerted_at >= t.last_in_at)) {
+    const { notify } = await import('@/lib/notify');
+    await notify({
+      userId: ctx.box.user_id,
+      kind: 'email',
+      title: `Urgent email: ${t.who_name || t.who_address || 'someone'}`,
+      body: r.summary || t.subject || '',
+      href: `/admin/mail?t=${t.id}`,
+      tag: `mail-${t.id}`,
+    }).catch(() => null);
+    await db.from('mail_threads').update({ alerted_at: now }).eq('id', t.id);
+  }
+  return true;
+}
+
+async function draftReplies(ctx: Context, until: number): Promise<number> {
+  const { db, box } = ctx;
+  // Only ones that need a reply (not something to do), and never to a system address.
+  const { data: todo } = await db
+    .from('mail_threads')
+    .select(`${THREAD_COLS}, draft_for, priority, tone, opportunity, summary`)
+    .eq('box_id', box.id)
+    .eq('state', 'reply')
+    .eq('action_only', false)
+    .eq('automated', false)
+    .order('last_in_at', { ascending: false })
+    .limit(30);
+  const need = (todo ?? []).filter((t) => !t.draft_for || String(t.draft_for) < String(t.last_in_at));
+  // The most important first.
+  need.sort((a, b) => ['urgent', 'high', 'normal', 'low'].indexOf(String(a.priority)) - ['urgent', 'high', 'normal', 'low'].indexOf(String(b.priority)));
+  let n = 0;
+  for (const t of need.slice(0, DRAFTS_PER_RUN)) {
+    if (Date.now() > until - 15_000) break;
+    const ok = await writeDraft(ctx, t as never);
+    if (ok) n++;
+  }
+  return n;
+}
+
+/** Writes (or rewrites, with your steer) one conversation's draft. */
+export async function writeDraft(
+  ctx: Context,
+  t: { id: string; conversation_id: string; subject: string | null; who_name: string | null; who_address: string | null; enquiry_id: string | null; rule_id: string | null; last_in_at: string | null; last_in_graph_id: string | null; priority?: string | null; tone?: string | null; opportunity?: string | null; summary?: string | null },
+  steer?: string
+): Promise<string | null> {
+  const thread = await threadForAi(ctx, t);
+  const notes = { priority: t.priority ?? null, tone: t.tone ?? null, opportunity: t.opportunity ?? null, summary: t.summary ?? null };
+  const signOff = ctx.box.sign_off || 'Kind regards,';
+  const written = await draftForThread(thread, ctx.owner, await voiceFor(ctx, t), signOff, notes, steer);
+  // Your signature carries your name: the draft ends at the sign-off, so it isn't there twice.
+  const draft = written && ctx.box.signature_html ? endAtSignOff(written, signOff) : written;
+  await ctx.db
+    .from('mail_threads')
+    .update(draft ? { draft, draft_for: t.last_in_at, draft_error: null } : { draft_error: 'The writing assistant couldn’t write this one. Try again, or write it yourself.', draft_for: t.last_in_at })
+    .eq('id', t.id);
+  // And in Outlook's Drafts, under their email, ready to send from there.
+  if (draft && ctx.box.outlook_drafts) await putOutlookDraft(ctx.db, ctx.box, t.id, draft).catch(() => null);
+  return draft;
+}
+
+/* ── Drafts in Outlook ─────────────────────────────────────────────────── */
+
+type ReplyBox = Pick<Box, 'address' | 'signature' | 'signature_html' | 'signature_images' | 'reply_font'>;
+
+/**
+ * Your reply as Outlook would write it: your words in your usual font, then your Outlook signature (copied from your
+ * sent emails), or the plain one from Settings if none could be copied.
+ */
+export function replyHtml(box: Omit<ReplyBox, 'address' | 'signature_images'>, text: string): string {
+  const font = box.reply_font ? ` style="${box.reply_font.replace(/"/g, "'")}"` : '';
+  const sig = box.signature_html ? box.signature_html : box.signature?.trim() ? `<div${font}>${textToHtml(box.signature.trim())}</div>` : '';
+  return `<div${font}>${textToHtml(text)}</div>${sig}`;
+}
+
+/** The pictures the signature needs (its logo), sent with each reply. */
+export const signatureImages = (box: Pick<ReplyBox, 'signature_html' | 'signature_images'>) => (box.signature_html ? (box.signature_images ?? []) : []);
+
+/**
+ * Takes the app's Outlook draft for a conversation away, unless you've changed it since (then it's yours and stays)
+ * or it has been sent. Returns 'kept' when yours is left in place.
+ */
+async function clearOutlookDraft(address: string, id: string, at: string | null): Promise<'gone' | 'kept'> {
+  const d = await draftState(address, id);
+  if (!d || !d.isDraft) return 'gone'; // sent, or already deleted
+  const untouched = at && Date.parse(d.lastModifiedDateTime) <= Date.parse(at) + 60_000;
+  if (!untouched) return 'kept';
+  await deleteDraft(address, id);
+  return 'gone';
+}
+
+/**
+ * Puts this text in Outlook's Drafts as the reply to their latest email, in place of the app's earlier draft (one you've
+ * edited in Outlook is never replaced: that one stays and no new one is made). Returns the link to open it.
+ */
+export async function putOutlookDraft(db: Db, box: ReplyBox, threadId: string, text: string, all = false, files: FileToAttach[] = []): Promise<{ link: string | null; kept: boolean }> {
+  const { data: t } = await db.from('mail_threads').select('last_in_graph_id, outlook_draft_id, outlook_draft_at').eq('id', threadId).maybeSingle();
+  if (!t?.last_in_graph_id) return { link: null, kept: false };
+  if (t.outlook_draft_id && (await clearOutlookDraft(box.address, t.outlook_draft_id as string, t.outlook_draft_at as string | null)) === 'kept') return { link: null, kept: true };
+  const d = await createReplyDraft(box.address, t.last_in_graph_id as string, replyHtml(box, text), { all, images: signatureImages(box), files });
+  await db.from('mail_threads').update({ outlook_draft_id: d.id, outlook_draft_at: d.lastModifiedDateTime }).eq('id', threadId);
+  return { link: d.webLink, kept: false };
+}
+
+/** After you've sent from the app or said no reply needed: the app's untouched Outlook draft goes straight away. */
+export async function dropOutlookDraft(db: Db, address: string, threadId: string): Promise<void> {
+  const { data: t } = await db.from('mail_threads').select('outlook_draft_id, outlook_draft_at').eq('id', threadId).maybeSingle();
+  if (!t?.outlook_draft_id) return;
+  await clearOutlookDraft(address, t.outlook_draft_id as string, t.outlook_draft_at as string | null);
+  await db.from('mail_threads').update({ outlook_draft_id: null, outlook_draft_at: null }).eq('id', threadId);
+}
+
+/**
+ * Keeps Outlook's Drafts in step: a draft for every conversation that needs a reply and has one written (also ones
+ * written before Outlook drafts were on); the app's untouched drafts taken away once you've replied or said no reply
+ * needed, or when Outlook drafts are turned off.
+ */
+async function syncOutlookDrafts(ctx: Context, until: number): Promise<number> {
+  const { db, box } = ctx;
+  const { data } = await db
+    .from('mail_threads')
+    .select('id, state, draft, draft_for, last_in_at, outlook_draft_id, outlook_draft_at')
+    .eq('box_id', box.id)
+    .or('state.eq.reply,outlook_draft_id.not.is.null')
+    .limit(500);
+  let n = 0;
+  for (const t of data ?? []) {
+    if (n >= 20 || Date.now() > until - 5_000) break;
+    const wanted = box.drafts && box.outlook_drafts && t.state === 'reply';
+    try {
+      if (!wanted && t.outlook_draft_id) {
+        await clearOutlookDraft(box.address, t.outlook_draft_id as string, t.outlook_draft_at as string | null);
+        await db.from('mail_threads').update({ outlook_draft_id: null, outlook_draft_at: null }).eq('id', t.id);
+        n++;
+      } else if (wanted && !t.outlook_draft_id && t.draft && t.draft_for && String(t.draft_for) >= String(t.last_in_at)) {
+        await putOutlookDraft(db, box, t.id as string, t.draft as string);
+        n++;
+      }
+    } catch {
+      // Try again next run.
+    }
+  }
+  return n;
+}
+
+/** For the API: the run's context for one mailbox (to rewrite a draft on request). */
+export async function contextFor(db: Db, boxId: string) {
+  const { data: box } = await db.from('mail_boxes').select(BOX_COLS).eq('id', boxId).maybeSingle();
+  return box ? Context.load(db, box as Box) : null;
+}
+
+/* ── Your writing style ────────────────────────────────────────────────── */
+
+const STYLE_EVERY_DAYS = 30;
+
+function styleDue(box: Box): boolean {
+  // Still reading the last six months of sent emails.
+  if (box.sent_before && Date.parse(box.sent_before) > Date.now() - STYLE_AFTER_DAYS * 86_400_000) return false;
+  if (box.style_edited && box.style) return false; // yours: never overwritten
+  return !box.style_at || Date.now() - Date.parse(box.style_at) > STYLE_EVERY_DAYS * 86_400_000;
+}
+
+/**
+ * Learns how you write from up to 40 of your recent sent emails: the ones you actually wrote (a few lines or more,
+ * to outside people, not forwards or calendar replies), spread across different people.
+ */
+export async function learnFromSent(ctx: Context): Promise<boolean> {
+  const { db, box } = ctx;
+  const { data: sent } = await db
+    .from('mail_messages')
+    .select('graph_id, to_addresses, subject, preview, rule_id')
+    .eq('box_id', box.id)
+    .eq('direction', 'out')
+    .order('at', { ascending: false })
+    .limit(400);
+  const perPerson = new Map<string, number>();
+  const picked: { graph_id: string; to: string; subject: string }[] = [];
+  for (const m of sent ?? []) {
+    const subject = String(m.subject || '');
+    const to = (m.to_addresses as string[] | null)?.[0] ?? '';
+    if (/^(fw|fwd|accepted|declined|tentative|automatic reply)\b/i.test(subject) || String(m.preview || '').length < 60) continue;
+    if (companyDomain(domainOf(to)) === ctx.ownDomain) continue;
+    const n = perPerson.get(to) ?? 0;
+    if (n >= 3) continue; // a spread of people, not one long thread
+    perPerson.set(to, n + 1);
+    const rule = m.rule_id ? ctx.byId.get(m.rule_id as string) : undefined;
+    picked.push({ graph_id: m.graph_id as string, to: rule ? `${rule.folder.split('/')[0]} (${rule.label})` : 'someone', subject });
+    if (picked.length >= 40) break;
+  }
+  const samples: SentSample[] = [];
+  for (let i = 0; i < picked.length; i += 8) {
+    const got = await Promise.all(picked.slice(i, i + 8).map((p) => messageText(box.address, p.graph_id).then((r) => ({ ...p, text: r.text })).catch(() => null)));
+    for (const g of got) if (g && g.text.length >= 40) samples.push({ to: g.to, subject: g.subject, text: g.text });
+  }
+  const style = await learnStyle(samples, ctx.owner);
+  // Too few emails, or it couldn't: try again in a day rather than every run.
+  const at = style ? new Date().toISOString() : new Date(Date.now() - (STYLE_EVERY_DAYS - 1) * 86_400_000).toISOString();
+  await db
+    .from('mail_boxes')
+    .update(style ? { style: style.guide, style_examples: style.examples, style_from: samples.length, style_at: at, style_edited: false } : { style_at: at })
+    .eq('id', box.id);
+  if (style) Object.assign(box, { style: style.guide, style_examples: style.examples, style_at: at });
+  return !!style;
+}
+
+/** Your style for one draft: the guide, the examples, and up to three emails you've sent this same person. */
+async function voiceFor(ctx: Context, t: { who_address: string | null; conversation_id: string }): Promise<Voice> {
+  const { db, box } = ctx;
+  const past: Voice['past'] = [];
+  if (t.who_address) {
+    const { data } = await db
+      .from('mail_messages')
+      .select('graph_id, subject, conversation_id')
+      .eq('box_id', box.id)
+      .eq('direction', 'out')
+      .contains('to_addresses', [t.who_address])
+      .order('at', { ascending: false })
+      .limit(6);
+    for (const m of (data ?? []).slice(0, 3)) {
+      const text = await messageText(box.address, m.graph_id as string).then((r) => r.text).catch(() => '');
+      if (text.length >= 20) past.push({ subject: String(m.subject || ''), text });
+    }
+  }
+  return { guide: box.style, examples: box.style_examples ?? [], past };
+}
+
+/* ── Your signature ───────────────────────────────────────────────────── */
+
+// Not when you've given it (signature_locked): then it's yours as it is.
+const signatureDue = (box: Box) => !box.signature_locked && (!box.signature_at || Date.now() - Date.parse(box.signature_at) > 7 * 86_400_000);
+
+/**
+ * Copies your Outlook signature from your latest sent emails (the one they have in common, with its logo), and the
+ * font you write in. Outlook doesn't let apps read the saved signature itself, so this is how it stays the same as
+ * yours. Returns whether a signature was found.
+ */
+export async function learnSignature(db: Db, box: Pick<Box, 'id' | 'address' | 'signature_html' | 'signature_images' | 'signature_at' | 'reply_font'>): Promise<boolean> {
+  const sent = await recentSentHtml(box.address, 20);
+  const html = pickSignature(sent.map((m) => m.html));
+  const font = pickFont(sent.map((m) => m.html));
+  let images: InlineImage[] = [];
+  const cids = html ? cidsIn(html) : [];
+  if (html && cids.length) {
+    // From an email that has this signature in it.
+    const flat = (x: string) => x.replace(/\s+/g, '');
+    const source = sent.find((m) => flat(m.html).includes(flat(html).slice(0, 200)));
+    if (source) images = (await inlineImages(box.address, source.id)).filter((i) => cids.includes(i.contentId));
+  }
+  const now = new Date().toISOString();
+  const patch = html ? { signature_html: html, signature_images: images, signature_at: now, reply_font: font ?? box.reply_font } : { signature_at: now, reply_font: font ?? box.reply_font };
+  await db.from('mail_boxes').update(patch).eq('id', box.id);
+  Object.assign(box, patch);
+  return !!html;
+}
+
+/* ── Highlighting in Outlook ────────────────────────────────────────────── */
+
+const MARKS_PER_RUN = 40;
+
+
+/**
+ * Keeps Outlook in step: the latest email in each conversation that needs a reply gets the "Urgent" or "Needs reply"
+ * category (and a flag when it's urgent or important); once you've replied or said no reply needed, they come off.
+ * Only the app's own categories, and only flags the app set, are ever taken off.
+ */
+async function highlight(ctx: Context, until: number): Promise<number> {
+  const { db, box } = ctx;
+  // Ticked complete in Outlook = dealt with: the same as "No reply needed" in the app (and a customer's
+  // conversation goes into their folder).
+  if (box.highlight) {
+    const done = await completedInInbox(box.address).catch(() => [] as string[]);
+    if (done.length) {
+      const { data: ticked } = await db.from('mail_threads').select('id, conversation_id').eq('box_id', box.id).eq('state', 'reply').in('mark_id', done.slice(0, 100));
+      for (const t of ticked ?? []) {
+        const now = new Date().toISOString();
+        await db.from('mail_threads').update({ done_at: now, state: 'done', updated_at: now }).eq('id', t.id);
+        await dropOutlookDraft(db, box.address, t.id as string).catch(() => null);
+        await fileThreadNow(db, box, t.conversation_id as string).catch(() => 0);
+      }
+    }
+  }
+  const { data } = await db
+    .from('mail_threads')
+    .select('id, state, priority, action_only, last_in_graph_id, mark, mark_id')
+    .eq('box_id', box.id)
+    .or('state.eq.reply,mark.not.is.null')
+    .limit(500);
+  const todo = (data ?? []).filter((t) => {
+    const want = markFor(box.highlight, t.state as string, t.priority as string | null, !!t.action_only);
+    return want !== (t.mark ?? null) || (want && t.mark_id !== t.last_in_graph_id);
+  });
+  if (!todo.length) return 0;
+  if (box.highlight && !box.categories_ready && (await ensureCategories(box.address))) {
+    box.categories_ready = true;
+    await db.from('mail_boxes').update({ categories_ready: true }).eq('id', box.id);
+  }
+  let n = 0;
+  for (const t of todo.slice(0, MARKS_PER_RUN)) {
+    if (Date.now() > until - 5_000) break;
+    const want = markFor(box.highlight, t.state as string, t.priority as string | null, !!t.action_only);
+    const flaggedByUs = !!t.mark; // every mark the app sets comes with a flag
+    try {
+      // Off the email it was on, if that's not the one it should be on now.
+      if (t.mark_id && (!want || t.mark_id !== t.last_in_graph_id)) await markMessage(box.address, t.mark_id as string, { category: null, flag: false, unflag: flaggedByUs }).catch(() => null);
+      if (want && t.last_in_graph_id) {
+        await markMessage(box.address, t.last_in_graph_id as string, { category: want === 'urgent' ? CAT_URGENT : want === 'action' ? CAT_ACTION : CAT_REPLY, flag: true, unflag: flaggedByUs });
+      }
+      await db.from('mail_threads').update({ mark: want, mark_id: want ? t.last_in_graph_id : null }).eq('id', t.id);
+      n++;
+    } catch {
+      // Deleted in Outlook, say: try again next run (and stop once the conversation moves on).
+    }
+  }
+  return n;
+}
+
+/* ── 4. Filing ─────────────────────────────────────────────────────────── */
+
+async function fileMail(ctx: Context, until: number): Promise<{ filed: number; marketing: number }> {
+  const { db, box } = ctx;
+  type Cand = { id: string; graph_id: string; conversation_id: string; at: string; marketing: boolean; rule: { folder: string; status: string; action: string; never_marketing: boolean; enquiry_id: string | null } | null };
+  const cols = 'id, graph_id, conversation_id, at, marketing, rule:mail_rules!inner(folder, status, action, never_marketing, enquiry_id)';
+  // Approved folders when filing is on; with it off, only CRM customers' own folders (their own setting, on by default).
+  const fileQuery = () => {
+    const q = db.from('mail_messages').select(cols).eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('rule.status', 'on').eq('rule.action', 'file');
+    return box.filing ? q : q.not('rule.enquiry_id', 'is', null);
+  };
+  // Only emails that could move: an approved folder (filing on), or marketing (marketing on). The last two days'
+  // first (so a notification is out of the Inbox within minutes, not after the backlog), then oldest first.
+  const recentSince = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const [recent, toFile, toMarket, toMarketByRule, loose] = await Promise.all([
+    box.filing || box.file_customers ? fileQuery().gte('at', recentSince).order('at', { ascending: false }).limit(100) : Promise.resolve({ data: [] }),
+    box.filing || box.file_customers ? fileQuery().order('at').limit(500) : Promise.resolve({ data: [] }),
+    box.marketing
+      ? db.from('mail_messages').select('id, graph_id, conversation_id, at, marketing, rule:mail_rules(folder, status, action, never_marketing, enquiry_id)').eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('marketing', true).order('at').limit(200)
+      : Promise.resolve({ data: [] }),
+    box.marketing
+      ? db.from('mail_messages').select(cols).eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').eq('rule.status', 'on').eq('rule.action', 'marketing').order('at').limit(200)
+      : Promise.resolve({ data: [] }),
+    // Dealt-with emails from someone with no folder (a one-off sender on Gmail): Inbox › Filed, not left behind.
+    box.filing
+      ? db.from('mail_messages').select('id, graph_id, conversation_id, at, marketing').eq('box_id', box.id).eq('place', 'inbox').eq('direction', 'in').is('rule_id', null).order('at', { ascending: false }).limit(200)
+      : Promise.resolve({ data: [] }),
+  ]);
+  const one = (r: unknown) => (Array.isArray(r) ? (r[0] ?? null) : r) as Cand['rule'];
+  const seen = new Set<string>();
+  const cands: (Cand & { dest: 'file' | 'marketing' | 'filed' })[] = [];
+  for (const [list, dest] of [[toMarket.data, 'marketing'], [toMarketByRule.data, 'marketing'], [recent.data, 'file'], [toFile.data, 'file'], [loose.data, 'filed']] as const) {
+    for (const m of (list ?? []) as unknown as Cand[]) {
+      if (seen.has(m.id)) continue;
+      seen.add(m.id);
+      cands.push({ ...m, rule: one(m.rule), dest });
+    }
+  }
+  if (!cands.length) return { filed: 0, marketing: 0 };
+  const convs = [...new Set(cands.map((m) => m.conversation_id))];
+  const states = new Map<string, { state: ThreadState; replied: boolean }>();
+  for (let i = 0; i < convs.length; i += 25) {
+    const { data } = await db.from('mail_threads').select('conversation_id, state, last_out_at').eq('box_id', box.id).in('conversation_id', convs.slice(i, i + 25));
+    for (const t of data ?? []) states.set(t.conversation_id as string, { state: t.state as ThreadState, replied: !!t.last_out_at });
+  }
+  const inbox = await inboxId(box.address);
+  let filed = 0;
+  let marketing = 0;
+  let moves = 0;
+  for (const m of cands) {
+    if (moves >= MOVES_PER_RUN || Date.now() > until - 5_000) break;
+    const t = states.get(m.conversation_id);
+    let dest: string | null = null;
+    if (m.dest === 'marketing') {
+      // Never from anyone you've written to, or anyone you've said isn't marketing.
+      if (!m.rule?.never_marketing && !t?.replied) dest = MARKETING_FOLDER;
+    } else if (m.dest === 'filed') {
+      if (t && readyToFile(t.state, m.at)) dest = FILED_FOLDER;
+    } else if (m.rule && t && readyToFile(t.state, m.at)) {
+      dest = m.rule.folder;
+    }
+    if (!dest) continue;
+    moves++;
+    try {
+      // Only from the inbox: if you've already moved it somewhere yourself, it stays where you put it.
+      const parent = await getParentFolder(box.address, m.graph_id);
+      if (parent !== inbox) {
+        await db.from('mail_messages').update({ place: 'elsewhere' }).eq('id', m.id);
+        continue;
+      }
+      const before = ctx.folders.size;
+      const folderId = await ensureFolder(box.address, dest, ctx.folders);
+      if (ctx.folders.size !== before) await saveFolders(ctx);
+      await moveMessage(box.address, m.graph_id, folderId);
+      const kind = dest === MARKETING_FOLDER && m.dest === 'marketing' ? 'marketing' : 'filed';
+      await db.from('mail_messages').update({ place: kind, filed_at: new Date().toISOString(), filed_folder: dest, file_error: null }).eq('id', m.id);
+      if (kind === 'filed') filed++;
+      else marketing++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'failed';
+      // Gone (deleted in Outlook): stop trying.
+      await db.from('mail_messages').update(/not found|ErrorItemNotFound/i.test(msg) ? { place: 'elsewhere', file_error: msg.slice(0, 300) } : { file_error: msg.slice(0, 300) }).eq('id', m.id);
+    }
+  }
+  return { filed, marketing };
+}
+
+async function saveFolders(ctx: Context) {
+  const rows = [...ctx.folders].filter(([path]) => !ctx.yours.has(path)).map(([path, graph_id]) => ({ box_id: ctx.box.id, path, graph_id }));
+  if (rows.length) await ctx.db.from('mail_folders').upsert(rows, { onConflict: 'box_id,path', ignoreDuplicates: true });
+}
+
+/** Every rule for a mailbox (a page of 1000 at a time: the database hands back no more in one go). */
+async function allRules(db: Db, boxId: string): Promise<Rule[]> {
+  const out: Rule[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await db.from('mail_rules').select(RULE_COLS).eq('box_id', boxId).order('id').range(from, from + 999);
+    if (error) throw new Error(error.message);
+    out.push(...((data ?? []) as Rule[]));
+    if (!data || data.length < 1000) return out;
+  }
+}

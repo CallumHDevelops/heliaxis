@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { HubWeekDay } from './HubView';
 
-/** The week ahead: seven day tiles (a dot per booking), and the chosen day's surveys and installs underneath. */
+/** The week ahead: seven day tiles (a dot per booking), and the chosen day's surveys, installs, diary entries and Outlook appointments underneath. */
 export function WeekAhead({ days }: { days: HubWeekDay[] }) {
   const [sel, setSel] = useState(0);
   const day = days[sel];
@@ -37,7 +37,7 @@ export function WeekAhead({ days }: { days: HubWeekDay[] }) {
                 <span className="hub-today-time">{it.time}</span>
                 <Link href={it.href} className="hub-row-main">
                   <b>
-                    <span className={`hub-today-tag is-${it.kind}`}>{it.kind === 'survey' ? 'Survey' : 'Install'}</span>
+                    <span className={`hub-today-tag is-${it.kind}`}>{{ survey: 'Survey', install: 'Install', diary: 'Diary', outlook: 'Outlook' }[it.kind]}</span>
                     {it.title}
                   </b>
                   <small>{it.sub}</small>

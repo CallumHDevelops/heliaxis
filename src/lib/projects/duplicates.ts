@@ -2,10 +2,11 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { toWaId } from '@/lib/whatsapp/shared';
 import { chunks } from '@/lib/crm/delete-customer';
+import { nameKey } from '@/lib/crm/name-key';
 
 /**
  * Possible duplicates (spec 4.10): other customers with the same email, the same WhatsApp number or
- * the same phone number (07… and +44 … count as the same), plus a website booking that matched an
+ * the same phone number (07… and +44 … count as the same), the same first and last name, plus a website booking that matched an
  * existing customer (survey_bookings.duplicate_of). The other numbers and emails a merge kept on a
  * customer count too (crm_aliases), and people staff said aren't the same person are left alone
  * (crm_distinct_pairs, both from merge.sql). It's a badge for staff, with Merge… beside it
@@ -20,8 +21,8 @@ export type Duplicate = {
   name: string;
   project_ref: string | null;
   project_id: string | null;
-  /** What they share: the same email, the same number, or a website booking that matched them. */
-  why?: 'email' | 'number' | 'booking';
+  /** What they share: the same email, the same number, the same name (the weakest), or a website booking that matched them. */
+  why?: 'email' | 'number' | 'name' | 'booking';
 };
 
 type Db = ReturnType<typeof createAdminClient>;
@@ -43,6 +44,9 @@ function keysOf(p: Person): string[] {
   const email = (p.email ?? '').trim().toLowerCase();
   if (EMAIL.test(email)) keys.push(`e:${email}`);
   for (const n of new Set([toWaId(p.wa_id), toWaId(p.phone)])) if (n) keys.push(`n:${n}`);
+  // Last, so an email or number match is what it says when there are both.
+  const nm = nameKey(p.name);
+  if (nm) keys.push(`nm:${nm}`);
   return keys;
 }
 
@@ -162,7 +166,7 @@ export async function possibleDuplicates(enquiryIds: string[]): Promise<Map<stri
     };
     for (const id of ids) {
       const p = idx.byId.get(id);
-      if (p) for (const k of [...keysOf(p), ...(idx.extra.get(id) ?? [])]) for (const o of idx.byKey.get(k) ?? []) add(id, o, k.startsWith('e:') ? 'email' : 'number');
+      if (p) for (const k of [...keysOf(p), ...(idx.extra.get(id) ?? [])]) for (const o of idx.byKey.get(k) ?? []) add(id, o, k.startsWith('e:') ? 'email' : k.startsWith('nm:') ? 'name' : 'number');
     }
     const wanted = new Set(ids);
     for (const [a, b] of links) {
@@ -190,10 +194,72 @@ export async function possibleDuplicates(enquiryIds: string[]): Promise<Map<stri
           project_id: jobs.get(o)?.id ?? null,
           why: why.get(`${id}|${o}`),
         }));
-      if (list.length) result.set(id, list);
+      if (list.length) result.set(id, list.slice(0, 5));
     }
   } catch {
     // A badge is never worth failing a page for.
   }
   return result;
+}
+
+export type DuplicateGroup = {
+  /** What they share (the strongest of it). */
+  why: 'email' | 'number' | 'name';
+  people: { id: string; name: string; email: string | null; phone: string | null; postcode: string | null; source: string | null; created_at: string; project_id: string | null; project_ref: string | null; stage: string | null }[];
+};
+
+/** Every set of customers who look like the same person, for the review page (people staff said aren't the same are left out). Never throws. */
+export async function duplicateGroups(): Promise<DuplicateGroup[]> {
+  try {
+    const db = createAdminClient();
+    const idx = await currentIndex(db);
+    const strength = { email: 0, number: 1, name: 2 } as const;
+    // Union the people who share any key, remembering the strongest reason.
+    const parent = new Map<string, string>();
+    const find = (x: string): string => {
+      const p = parent.get(x) ?? x;
+      if (p === x) return x;
+      const r = find(p);
+      parent.set(x, r);
+      return r;
+    };
+    const why = new Map<string, keyof typeof strength>();
+    for (const [k, list] of idx.byKey) {
+      const ids = list.filter((id) => idx.byId.has(id));
+      if (ids.length < 2 || ids.length > 8) continue; // a key shared by many is a shared line or a common name, not a person twice
+      const kind: keyof typeof strength = k.startsWith('e:') ? 'email' : k.startsWith('nm:') ? 'name' : 'number';
+      // Pairs staff said are different don't join.
+      const usable = ids.filter((a, i) => ids.slice(i + 1).some((b) => !idx.distinct.has(a < b ? `${a}|${b}` : `${b}|${a}`)) || ids.slice(0, i).some((b) => !idx.distinct.has(b < a ? `${b}|${a}` : `${a}|${b}`)));
+      if (usable.length < 2) continue;
+      for (const id of usable.slice(1)) parent.set(find(id), find(usable[0]));
+      const root = find(usable[0]);
+      if (!why.has(root) || strength[kind] < strength[why.get(root)!]) why.set(root, kind);
+    }
+    const groups = new Map<string, string[]>();
+    for (const id of parent.keys()) groups.set(find(id), [...(groups.get(find(id)) ?? []), id]);
+    for (const [root, members] of groups) if (!members.includes(root)) members.push(root);
+    const all = [...new Set([...groups.values()].flat())];
+    if (!all.length) return [];
+    const extra = new Map<string, { postcode: string | null; source: string | null; created_at: string }>();
+    for (const part of chunks(all, 100)) {
+      const { data } = await db.from('enquiries').select('id, postcode, source, created_at').in('id', part);
+      for (const r of (data ?? []) as { id: string; postcode: string | null; source: string | null; created_at: string }[]) extra.set(r.id, r);
+    }
+    const jobs = await jobsOf(db, all);
+    const out: DuplicateGroup[] = [];
+    for (const [root, members] of groups) {
+      const people = [...new Set(members)]
+        .filter((id) => extra.has(id))
+        .map((id) => {
+          const p = idx.byId.get(id)!;
+          const x = extra.get(id)!;
+          return { id, name: (p.name ?? '').trim() || 'Unknown', email: p.email, phone: p.phone, postcode: x.postcode, source: x.source, created_at: x.created_at, project_id: jobs.get(id)?.id ?? null, project_ref: jobs.get(id)?.project_ref ?? null, stage: null };
+        })
+        .sort((a, b) => a.created_at.localeCompare(b.created_at));
+      if (people.length > 1) out.push({ why: why.get(find(root)) ?? why.get(root) ?? 'name', people });
+    }
+    return out.sort((a, b) => strength[a.why] - strength[b.why] || b.people[b.people.length - 1].created_at.localeCompare(a.people[a.people.length - 1].created_at));
+  } catch {
+    return [];
+  }
 }

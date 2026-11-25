@@ -1,6 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { CHANNEL_LABEL } from './channel';
+import { anyChannelLabel } from './channel';
 import { unknownNumbers } from './maths';
 import { overview, periodFor, type Overview } from './metrics';
 import { addDays, ukClock } from './schedule';
@@ -72,5 +72,5 @@ export async function buildWeeklyReport(opts: { status: 'provisional' | 'final';
   return data.id as number;
 }
 
-export const channelName = (c: string) => (c === 'untracked' ? 'Before tracking began' : (CHANNEL_LABEL as Record<string, string>)[c] ?? c);
+export const channelName = (c: string) => anyChannelLabel(c);
 export const reportWeekLabel = (start: string) => `${new Date(`${start}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} to ${new Date(`${addDays(start, 6)}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;

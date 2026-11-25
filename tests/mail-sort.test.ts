@@ -1,0 +1,262 @@
+import { describe, expect, it } from 'vitest';
+import {
+  companyDomain,
+  domainFromText,
+  domainOf,
+  folderFor,
+  groupForOrgType,
+  guessLabel,
+  isPersonalDomain,
+  looksAutomated,
+  looksLikeMarketing,
+  markFor,
+  customerFolder,
+  clearAwayTo,
+  belongsTo,
+  isSendingService,
+  companyFolder,
+  isHestiaFolder,
+  matchExisting,
+  pathPart,
+  prettyFolder,
+  withSignOff,
+  endAtSignOff,
+  cidsIn,
+  cleanSignature,
+  insertAtTop,
+  markedSignature,
+  pickFont,
+  pickSignature,
+  sharedEnding,
+  readyToFile,
+  textToHtml,
+  threadState,
+  tidyFolderPath,
+} from '@/lib/mail/shared';
+
+describe('who goes where', () => {
+  it('finds the company domain behind a mail server', () => {
+    expect(companyDomain('mail.goodwe.com')).toBe('goodwe.com');
+    expect(companyDomain('goodwe.com')).toBe('goodwe.com');
+    expect(companyDomain('email.nationalgrid.co.uk')).toBe('nationalgrid.co.uk');
+    expect(companyDomain('nationalgrid.co.uk')).toBe('nationalgrid.co.uk');
+    expect(companyDomain('a.b.hmrc.gov.uk')).toBe('hmrc.gov.uk');
+  });
+
+  it('reads a domain from an address or a website', () => {
+    expect(domainOf('Jane@Sales.GoodWe.com')).toBe('sales.goodwe.com');
+    expect(domainFromText('https://www.goodwe.com/uk/contact')).toBe('goodwe.com');
+    expect(domainFromText('info@nationalgrid.co.uk')).toBe('nationalgrid.co.uk');
+    expect(domainFromText('not a site')).toBe('');
+  });
+
+  it('never groups people on free email services by domain', () => {
+    expect(isPersonalDomain('gmail.com')).toBe(true);
+    expect(isPersonalDomain('btinternet.com')).toBe(true);
+    expect(isPersonalDomain('goodwe.com')).toBe(false);
+  });
+
+  it('makes folder names Outlook will take', () => {
+    expect(folderFor('Suppliers', 'GoodWe')).toBe('Suppliers/GoodWe');
+    expect(folderFor('Customers', 'Smith / Jones: Ltd')).toBe('Customers/Smith Jones Ltd');
+    expect(tidyFolderPath(' Suppliers /  GoodWe / ')).toBe('Suppliers/GoodWe');
+    expect(tidyFolderPath('a/b/c/d')).toBe('a/b/c');
+    expect(guessLabel('mail.goodwe.com')).toBe('Goodwe');
+    expect(groupForOrgType('supplier')).toBe('Suppliers');
+    expect(groupForOrgType(null)).toBe('Other');
+  });
+});
+
+describe('marketing and system emails', () => {
+  it('spots a mailing list', () => {
+    expect(looksLikeMarketing([{ name: 'List-Unsubscribe', value: '<https://x.com/u>' }])).toBe(true);
+    expect(looksLikeMarketing([{ name: 'Precedence', value: 'bulk' }])).toBe(true);
+    expect(looksLikeMarketing([{ name: 'Subject', value: 'Your quote' }])).toBe(false);
+    expect(looksLikeMarketing(undefined)).toBe(false);
+  });
+
+  it('spots a system sender', () => {
+    expect(looksAutomated('no-reply@nationalgrid.co.uk')).toBe(true);
+    expect(looksAutomated('noreply@x.com')).toBe(true);
+    expect(looksAutomated('notifications@github.com')).toBe(true);
+    expect(looksAutomated('jane@goodwe.com')).toBe(false);
+    expect(looksAutomated('jane@goodwe.com', [{ name: 'Auto-Submitted', value: 'auto-replied' }])).toBe(true);
+  });
+});
+
+describe('where a conversation stands', () => {
+  const base = { marketing: false, lastInAt: '2026-11-20T10:00:00Z', lastOutAt: null, doneAt: null, triagedFor: null, needsReply: null };
+
+  it('is new until it has been looked at', () => {
+    expect(threadState(base)).toBe('new');
+  });
+  it('needs a reply, or not, once looked at', () => {
+    expect(threadState({ ...base, triagedFor: base.lastInAt, needsReply: true })).toBe('reply');
+    expect(threadState({ ...base, triagedFor: base.lastInAt, needsReply: false })).toBe('fyi');
+  });
+  it('is looked at again when they write again', () => {
+    expect(threadState({ ...base, lastInAt: '2026-11-21T10:00:00Z', triagedFor: base.lastInAt, needsReply: false })).toBe('new');
+  });
+  it('is replied once you sent the last email', () => {
+    expect(threadState({ ...base, lastOutAt: '2026-11-20T11:00:00Z', triagedFor: base.lastInAt, needsReply: true })).toBe('replied');
+  });
+  it('is done when you said no reply needed after their last email', () => {
+    expect(threadState({ ...base, doneAt: '2026-11-20T12:00:00Z', triagedFor: base.lastInAt, needsReply: true })).toBe('done');
+  });
+  it('marketing, unless you have written to them', () => {
+    expect(threadState({ ...base, marketing: true })).toBe('marketing');
+    expect(threadState({ ...base, marketing: true, lastOutAt: '2026-11-20T11:00:00Z' })).toBe('replied');
+  });
+
+  it('files dealt-with emails, and old ones whatever their state', () => {
+    const now = Date.parse('2026-11-22T10:00:00Z');
+    expect(readyToFile('replied', '2026-11-21T10:00:00Z', now)).toBe(true);
+    expect(readyToFile('reply', '2026-11-21T10:00:00Z', now)).toBe(false);
+    expect(readyToFile('new', '2026-11-21T10:00:00Z', now)).toBe(false);
+    expect(readyToFile('reply', '2026-09-01T10:00:00Z', now)).toBe(true);
+  });
+});
+
+describe('replies', () => {
+  it('escapes and keeps paragraphs', () => {
+    expect(textToHtml('Hi Jane,\n\nYes <ok> & thanks\nCallum')).toBe('<p style="margin: 0 0 1em 0;">Hi Jane,</p><p style="margin: 0 0 0 0;">Yes &lt;ok&gt; &amp; thanks<br>Callum</p>');
+  });
+});
+
+describe('highlighting in Outlook', () => {
+  it('marks only conversations that need a reply, by importance', () => {
+    expect(markFor(true, 'reply', 'urgent')).toBe('urgent');
+    expect(markFor(true, 'reply', 'high')).toBe('high');
+    expect(markFor(true, 'reply', 'normal')).toBe('reply');
+    expect(markFor(true, 'reply', null)).toBe('reply');
+    expect(markFor(true, 'reply', 'normal', true)).toBe('action');
+    expect(markFor(true, 'reply', 'urgent', true)).toBe('urgent');
+  });
+  it('takes the mark off once dealt with, or when highlighting is off', () => {
+    expect(markFor(true, 'replied', 'urgent')).toBeNull();
+    expect(markFor(true, 'done', 'high')).toBeNull();
+    expect(markFor(false, 'reply', 'urgent')).toBeNull();
+  });
+});
+
+describe('your signature, copied from your sent emails', () => {
+  const SIG = '<div id="Signature"><p style="font-family:Aptos">Callum Hutchings<br>Director, Heliaxis</p><table><tr><td><img src="cid:logo123"></td></tr></table></div>';
+  const web = (words: string) => `<html><body><div style="font-family: Aptos, sans-serif; font-size: 11pt">${words}</div><div><br></div>${SIG}</body></html>`;
+
+  it('finds the signature Outlook marks, with everything inside it', () => {
+    expect(markedSignature(web('Hi Tom, split it please.'))).toBe(SIG);
+    expect(markedSignature('<div>No signature here</div>')).toBeNull();
+  });
+
+  it('picks the one most emails share, never one from the phone', () => {
+    const phone = '<div>On my way</div><div id="ms-outlook-mobile-signature">Get Outlook for iOS</div>';
+    expect(pickSignature([web('One'), phone, web('Two'), web('Three')])).toBe(SIG);
+    expect(pickSignature([web('Only one')])).toBeNull();
+  });
+
+  it('finds the shared ending when Outlook on a computer does not mark it', () => {
+    const sig = '<p class="MsoNormal">Kind regards<br>Callum Hutchings<br>07700 900123</p>';
+    const a = `<div class="WordSection1"><p class="MsoNormal">Hi Sarah, thanks for this.</p>${sig}</div>`;
+    const b = `<div class="WordSection1"><p class="MsoNormal">Morning Tom, all good.</p>${sig}</div>`;
+    const found = sharedEnding(a, b);
+    expect(found).toContain('Callum Hutchings');
+    expect(found).not.toContain('Sarah');
+    expect(pickSignature([a, b])).toContain('07700 900123');
+  });
+
+  it('leaves out a sign-off that only some emails share', () => {
+    const sig = '<p class="MsoNormal">Callum Hutchings<br>Heliaxis<br>07700 900123</p>';
+    const body = (words: string, off: string) => `<div class="WordSection1"><p class="MsoNormal">${words}</p><p class="MsoNormal">${off}</p>${sig}</div>`;
+    const got = pickSignature([body('Hi Sarah, yes.', 'Kind regards,'), body('Hi Jo, no problem.', 'Kind regards,'), body('Morning Tom.', 'Cheers,'), body('Hi Rhys, Tuesday works.', 'Thanks,')]);
+    expect(got).toBe(sig);
+  });
+
+  it('keeps the logo reference and takes out anything that runs', () => {
+    expect(cidsIn(SIG)).toEqual(['logo123']);
+    expect(cleanSignature('<p onclick="x()">Hi<script>alert(1)</script><a href="javascript:evil()">x</a><iframe src="y"></iframe></p>')).toBe('<p>Hi<a href="#">x</a></p>');
+  });
+
+  it('copies the font you write in', () => {
+    expect(pickFont([web('a'), web('b')])).toBe('font-family: Aptos, sans-serif; font-size: 11pt');
+    expect(pickFont([web('a')])).toBeNull();
+  });
+
+  it('puts the reply above the quoted email', () => {
+    expect(insertAtTop('<html><body class="x"><hr>quoted</body></html>', '<p>Reply</p>')).toBe('<html><body class="x"><p>Reply</p><hr>quoted</body></html>');
+  });
+});
+
+describe('sign-off', () => {
+  it('ends every reply with Kind regards', () => {
+    expect(withSignOff('Hi Sarah,\n\nYes, Tuesday works.', 'Kind regards,')).toBe('Hi Sarah,\n\nYes, Tuesday works.\n\nKind regards,');
+    expect(withSignOff('Hi Tom,\n\nSplit it please.\n\nCheers,\nCallum', 'Kind regards,')).toBe('Hi Tom,\n\nSplit it please.\n\nKind regards,\nCallum');
+    expect(withSignOff('Hi,\n\nThanks.\n\nKind regards,\nCallum', 'Kind regards,')).toBe('Hi,\n\nThanks.\n\nKind regards,\nCallum');
+    expect(withSignOff('Hi,\n\nThanks.\n\nKind Regards', 'Kind regards,')).toBe('Hi,\n\nThanks.\n\nKind Regards');
+  });
+});
+
+describe('customer folders', () => {
+  it('sit inside the Inbox, under Customers, with the customer number', () => {
+    expect(customerFolder('Sarah Davies', 'HX-0069')).toBe('Inbox/Customers/Sarah Davies (HX-0069)');
+    expect(customerFolder('Smith / Jones', 'HX-0101')).toBe('Inbox/Customers/Smith Jones (HX-0101)');
+    expect(customerFolder('Jane Smith', null)).toBe('Inbox/Customers/Jane Smith');
+  });
+});
+
+describe('No reply needed', () => {
+  it('always stores it: its folder, Marketing, or Inbox › Filed; never deletes', () => {
+    expect(clearAwayTo({ folder: 'Inbox/Customers/Sarah Davies (HX-0069)', status: 'on', action: 'file' })).toBe('Inbox/Customers/Sarah Davies (HX-0069)');
+    expect(clearAwayTo({ folder: 'Inbox/GoodWe', status: 'suggested', action: 'file' })).toBe('Inbox/GoodWe');
+    expect(clearAwayTo({ folder: 'Inbox/GoodWe', status: 'off', action: 'file' })).toBe('Inbox/Filed');
+    expect(clearAwayTo({ folder: 'Marketing', status: 'on', action: 'marketing' })).toBe('Marketing');
+    expect(clearAwayTo(null)).toBe('Inbox/Filed');
+  });
+});
+
+describe('your own folders', () => {
+  const existing = [
+    { path: 'Inbox/GoodWe', name: 'GoodWe' },
+    { path: `Inbox/${pathPart('Finance / Bank')}`, name: 'Finance / Bank' },
+    { path: 'Inbox/Lovell & Co.', name: 'Lovell & Co.' },
+    { path: 'READ Inbox', name: 'READ Inbox' },
+  ];
+  it('reuses a folder you already have', () => {
+    expect(matchExisting('Goodwe', existing)).toBe('Inbox/GoodWe');
+    expect(matchExisting('Lovell and Co', existing)).toBe('Inbox/Lovell & Co.');
+    expect(matchExisting('Finance/Bank', existing)).toBe('Inbox/Finance ∕ Bank');
+    expect(matchExisting('National Grid', existing)).toBeNull();
+  });
+  it('Hestia’s own folders sit inside the Inbox, under their group', () => {
+    expect(companyFolder('National Grid', 'Grid and DNO')).toBe('Inbox/Grid and DNO/National Grid');
+    expect(companyFolder('Someone')).toBe('Inbox/Other/Someone');
+    expect(isHestiaFolder('Inbox/Suppliers/GoodWe')).toBe(true);
+    expect(isHestiaFolder('Inbox/Customers/Sarah Davies (HX-0069)')).toBe(true);
+    expect(isHestiaFolder('Inbox/Filed')).toBe(true);
+    expect(isHestiaFolder('Marketing')).toBe(true);
+    expect(isHestiaFolder('Inbox/Bell Group')).toBe(false);
+    expect(isHestiaFolder('Suppliers/GoodWe')).toBe(false);
+  });
+  it('shows paths the way Outlook does', () => {
+    expect(prettyFolder('Inbox/Customers/Sarah Davies (HX-0069)')).toBe('Customers › Sarah Davies (HX-0069)');
+    expect(prettyFolder(`Inbox/${pathPart('Finance / Bank')}`)).toBe('Finance / Bank');
+    expect(prettyFolder('Marketing')).toBe('Marketing');
+  });
+});
+
+describe('emails sent through Xero, Stripe and the like', () => {
+  it('belong with the business behind them, from Reply-To', () => {
+    expect(isSendingService('post.xero.com')).toBe(true);
+    expect(isSendingService('goodwe.com')).toBe(false);
+    expect(belongsTo('messaging-service@post.xero.com', 'accounts@anymeters.co.uk')).toBe('accounts@anymeters.co.uk');
+    expect(belongsTo('messaging-service@post.xero.com', null)).toBe('messaging-service@post.xero.com');
+    expect(belongsTo('tom@goodwe.com', 'sales@goodwe.com')).toBe('tom@goodwe.com');
+    expect(belongsTo('dse_na4@docusign.net', 'noreply@docusign.net')).toBe('dse_na4@docusign.net');
+  });
+});
+
+describe('your signature carries your name', () => {
+  it('so a draft ends at the sign-off', () => {
+    expect(endAtSignOff('Hi Sam,\n\nYes.\n\nKind Regards\nCallum', 'Kind Regards')).toBe('Hi Sam,\n\nYes.\n\nKind Regards');
+    expect(endAtSignOff('Hi Sam,\n\nYes.\n\nKind Regards', 'Kind Regards')).toBe('Hi Sam,\n\nYes.\n\nKind Regards');
+  });
+});

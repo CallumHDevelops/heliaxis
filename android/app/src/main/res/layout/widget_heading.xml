@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A section in the Hestia widget: Today, Needs you, Tasks, Tomorrow. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_heading_text"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="10dp"
+    android:paddingBottom="2dp"
+    android:textAllCaps="true"
+    android:letterSpacing="0.06"
+    android:textColor="@color/widgetGold"
+    android:textSize="11sp"
+    android:textStyle="bold" />

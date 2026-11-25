@@ -3,6 +3,8 @@ import type { Portal, PortalKey } from '@/lib/portals';
 import { TodayList } from './HubMyDay';
 import { WeekAhead } from './WeekAhead';
 import { MetaLeadsPanel, TodoPanel } from './DashPanels';
+import { EmailConnect, EmailPanel } from './EmailPanel';
+import type { HomeMail } from '@/lib/mail/server';
 import { MetisIcon } from '@/components/admin/MetisIcon';
 import { FromClaude, type FromClaudeProps } from '@/components/admin/FromClaude';
 import { HubSearch } from '@/components/admin/GlobalSearch';
@@ -28,8 +30,8 @@ export type HubTodayItem = {
   directions: string | null;
 };
 export type HubToday = { items: HubTodayItem[]; canAddDiary: boolean };
-/** One day of the week strip: its surveys and install days for the whole team. */
-export type HubWeekDay = { iso: string; dow: string; dom: number; items: { key: string; kind: 'survey' | 'install'; sort: number; time: string; title: string; sub: string; href: string }[] };
+/** One day of the week strip: surveys and install days for the whole team, plus my own diary entries and Outlook appointments. */
+export type HubWeekDay = { iso: string; dow: string; dom: number; items: { key: string; kind: 'survey' | 'install' | 'diary' | 'outlook'; sort: number; time: string; title: string; sub: string; href: string }[] };
 
 const ICONS: Record<PortalKey | 'users' | 'app', string> = {
   app: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
@@ -93,6 +95,7 @@ export function HubView({
   assistant = false,
   metaLeads = null,
   search = false,
+  mail = null,
 }: {
   firstName: string;
   portals: HubPortal[];
@@ -115,10 +118,13 @@ export function HubView({
   metaLeads?: MetaLeads | null;
   /** The search box under the greeting (Enquiries and CRM staff). */
   search?: boolean;
+  /** My email (src/lib/mail): what needs a reply; 'connect' offers to set it up; null hides it. */
+  mail?: HomeMail | 'connect' | null;
 }) {
   const isAdmin = usersBadge !== undefined;
   // One even row per area that needs someone: icon, name, a big number.
   const ORDER: { key: string; label: string; href: string; icon: keyof typeof ICONS | 'whatsapp' | 'metis' }[] = [
+    { key: 'email', label: 'Email', href: '/admin/mail', icon: 'enquiries' },
     { key: 'whatsapp', label: 'WhatsApp', href: '/admin/enquiries/inbox', icon: 'whatsapp' },
     { key: 'crm', label: 'CRM', href: '/admin/crm', icon: 'crm' },
     { key: 'social_monitoring', label: 'Social', href: '/admin/social', icon: 'social_monitoring' },
@@ -176,7 +182,13 @@ export function HubView({
       )}
 
       <div className="hub-work">
-        {metaLeads && <MetaLeadsPanel leads={metaLeads} />}
+        {/* Email first: replying is most of the day's work. Then new leads; the diary and to-dos beside them. */}
+        {(mail || metaLeads) && (
+          <div className="hub-work-main">
+            {mail === 'connect' ? <EmailConnect /> : mail ? <EmailPanel mail={mail} /> : null}
+            {metaLeads && <MetaLeadsPanel leads={metaLeads} />}
+          </div>
+        )}
         <div className="hub-work-side">
           {week && <WeekAhead days={week} />}
           {todayList && todayList.items.length > 0 && <TodayList today={todayList} />}

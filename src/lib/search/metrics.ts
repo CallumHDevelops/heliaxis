@@ -1,6 +1,6 @@
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { CHANNELS, ORGANIC_CHANNELS, type Channel } from './channel';
+import { CHANNELS, fallbackChannel, ORGANIC_CHANNELS, type Channel } from './channel';
 import { BANDS, bandCounts, delta, visibilityScore, weightedPosition, winnersAndLosers, type Band, type Delta } from './maths';
 import { addDays, ukClock, weekOf } from './schedule';
 import { getSetting } from './server';
@@ -80,14 +80,14 @@ export type Overview = {
   bandSeries: { week: string; counts: Record<Band, number> }[];
   winners: ReturnType<typeof winnersAndLosers>['winners'];
   losers: ReturnType<typeof winnersAndLosers>['losers'];
-  leads: { channel: Channel | 'untracked'; now: number; before: number }[];
+  leads: { channel: Channel | 'offline' | 'untracked'; now: number; before: number }[];
   freshness: { gscTo: string | null; serpRun: string | null };
   rankRunDates: { now: string | null; before: string | null };
 };
 
 /** Enquiries before channel tracking began: Meta lead forms are still paid Meta by their source. */
-export const channelOf = (r: { channel: string | null; source: string | null }): Channel | 'untracked' =>
-  (r.channel as Channel | null) ?? (/^meta/i.test(r.source ?? '') ? 'paid_meta' : 'untracked');
+export const channelOf = (r: { channel: string | null; source: string | null }): Channel | 'offline' | 'untracked' =>
+  (r.channel as Channel | null) ?? fallbackChannel(r.source);
 
 export async function overview(opts: { period?: Period; filters?: Filters } = {}, db: Db = createAdminClient()): Promise<Overview> {
   const period = opts.period ?? periodFor('this_week');
@@ -173,7 +173,7 @@ export async function overview(opts: { period?: Period; filters?: Filters } = {}
     });
   };
   const organic = (a: string, b: string) => enqIn(a, b).filter((e) => (ORGANIC_CHANNELS as string[]).includes(channelOf(e))).length;
-  const leads = [...CHANNELS, 'untracked' as const]
+  const leads = [...CHANNELS, 'offline' as const, 'untracked' as const]
     .map((ch) => ({ channel: ch, now: enqIn(period.start, period.end).filter((e) => channelOf(e) === ch).length, before: enqIn(period.compareStart, period.compareEnd).filter((e) => channelOf(e) === ch).length }))
     .filter((r) => r.now || r.before);
 

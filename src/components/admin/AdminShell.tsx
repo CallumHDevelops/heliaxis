@@ -19,6 +19,7 @@ import './admin-shell.css';
 
 type Tab =
   | 'dashboard'
+  | 'mail'
   | 'enquiries'
   | 'crm'
   | 'sales'
@@ -42,6 +43,8 @@ type Tab =
   | 'tasks'
   | 'builds'
   | 'cmsguide'
+  | 'cmsfacts'
+  | 'cmschecks'
   | 'assistant'
   | 'design'
   | 'social'
@@ -410,6 +413,7 @@ export async function AdminShell({
       label: 'CRM',
       items: [
         { href: '/admin/crm/dashboard', label: 'Dashboard', icon: icons.analytics, show: can('crm'), section: 'Customers' },
+        { href: '/admin/crm/duplicates', label: 'Possible duplicates', short: 'Duplicates', icon: icons.crm, show: can('crm'), section: 'Customers' },
         { href: '/admin/crm', label: 'Opportunities', icon: icons.crm, show: can('crm'), tab: true, section: 'Customers' },
         { href: '/admin/crm/organisations', label: 'Organisations', icon: <svg {...ICON}><path d="M4 21V4l9-1v18M13 8h7v13M7.5 8h2M7.5 12h2M7.5 16h2M16 12h1.5M16 16h1.5M2 21h20" /></svg>, show: can('crm'), section: 'Customers' },
         { href: '/admin/crm/contacts', label: 'Contacts', icon: <svg {...ICON}><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>, show: can('crm'), section: 'Customers' },
@@ -418,6 +422,8 @@ export async function AdminShell({
         { href: '/admin/surveys', label: 'Surveys and diary', icon: icons.surveys, active: active === 'surveys', show: can('crm'), section: 'Diary and insight' },
         { href: '/admin/enquiries/inbox', label: 'WhatsApp inbox', icon: icons.whatsapp, show: can('enquiries'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },
         { href: '/admin/crm/chats', label: 'WhatsApp chats', icon: icons.whatsapp, show: !can('enquiries') && can('crm'), tab: true, badge: waUnread, liveBadge: 'wa', section: 'Enquiries and messages' },
+        // My email: your own mailbox, sorted (src/lib/mail). Each person only ever sees their own.
+        { href: '/admin/mail', label: 'My email', icon: icons.enquiries, active: active === 'mail', show: can('crm'), section: 'Enquiries and messages' },
         { href: '/admin/enquiries/smart-replies', label: 'Smart replies & chasers', short: 'Smart replies', icon: icons.replies, show: can('enquiries'), section: 'Enquiries and messages' },
         { href: '/admin/enquiries/templates', label: 'WhatsApp templates', short: 'Templates', icon: icons.templates, show: can('enquiries'), section: 'Enquiries and messages' },
         { href: '/admin/crm/reports', label: 'CRM reports', icon: icons.reports, show: can('crm'), section: 'Diary and insight' },
@@ -482,6 +488,8 @@ export async function AdminShell({
       items: [
         { href: '/admin/cms', label: 'Manage CMS', icon: icons.cms, show: can('cms'), reload: true, section: 'Website' },
         { href: '/admin/blog', label: 'Blog', icon: icons.blog, active: active === 'blog', show: can('cms'), section: 'Website' },
+        { href: '/admin/cms-facts', label: 'Facts sheet', short: 'Facts', icon: icons.guide, active: active === 'cmsfacts', show: can('cms'), section: 'Website' },
+        { href: '/admin/cms-checks', label: 'Page checks', short: 'Checks', icon: icons.guide, active: active === 'cmschecks', show: can('cms'), section: 'Website' },
         { href: '/admin/cms-guide', label: 'CMS guide', short: 'Guide', icon: icons.guide, active: active === 'cmsguide', show: can('cms'), section: 'Website' },
         { href: '/admin/analytics', label: 'Website analytics', icon: icons.analytics, active: active === 'analytics', show: can('analytics'), section: 'Analytics' },
         { href: '/admin/search', label: 'Search: SEO and AI answers', short: 'Search', icon: icons.analytics, active: active === 'search', show: can('search'), section: 'Analytics' },
