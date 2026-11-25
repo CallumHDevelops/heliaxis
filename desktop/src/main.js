@@ -1,9 +1,11 @@
 'use strict';
 const { app, BrowserWindow, Tray, Menu, globalShortcut, ipcMain, nativeImage, nativeTheme, shell, dialog } = require('electron');
 const path = require('node:path');
+const fs = require('node:fs');
 const store = require('./store');
 const api = require('./api');
 
+const MICA = process.platform === 'win32' && Number(process.getSystemVersion().split('.')[2]) >= 22621;
 const COMPACT = { width: 640, height: 150 };
 const EXPANDED = { width: 980, height: 700 };
 
@@ -29,11 +31,13 @@ function createWindow() {
     show: false,
     title: 'Metis',
     icon: icon(),
-    backgroundMaterial: 'mica', // Windows 11 Mica; older Windows quietly ignores it
-    backgroundColor: '#00000000',
+    // Windows 11 (build 22621+) gets the Mica material; anything older gets a solid window, so text is never on a see-through background.
+    ...(MICA ? { backgroundMaterial: 'mica', backgroundColor: '#00000000' } : { backgroundColor: nativeTheme.shouldUseDarkColors ? '#211f18' : '#f7f2e7' }),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false },
   });
   win.setMenuBarVisibility(false);
+  // The page paints its own solid background unless Mica is behind it.
+  win.webContents.on('did-finish-load', () => MICA && win.webContents.executeJavaScript("document.documentElement.classList.add('mica')").catch(() => {}));
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   // Esc hides, Ctrl+N starts a new chat (also handled in the page for focus cases).
   win.webContents.on('before-input-event', (e, input) => {
@@ -159,6 +163,17 @@ function ipc() {
     if ('hotkey' in allowed) registerHotkey();
     if ('startWithWindows' in allowed) applyStartup(next.startWithWindows);
     return { settings: next, hotkeyProblem };
+  }));
+  // "Open file": fetch the document with the person's own sign-in, save it in a temp folder, open it in the default app.
+  ipcMain.handle('doc:open', guard(async (id) => {
+    const { name, bytes } = await api.downloadDocument(String(id || ''));
+    const dir = path.join(app.getPath('temp'), 'metis-docs');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, path.basename(name).replace(/[\\/:*?"<>|]+/g, '-') || 'document.pdf');
+    fs.writeFileSync(file, bytes);
+    const err = await shell.openPath(file);
+    if (err) throw new Error(`Saved ${file} but Windows could not open it: ${err}`);
+    return { file };
   }));
   ipcMain.handle('shell:open-hap', guard(async (href) => {
     if (typeof href !== 'string' || !href.startsWith('/admin')) throw new Error('Not a HAP page');

@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld('metis', {
   send: (text, threadId) => invoke('chat:send', text, threadId),
   setSettings: (patch) => invoke('settings:set', patch),
   openHap: (href) => invoke('shell:open-hap', href),
+  openDocument: (id) => invoke('doc:open', id),
   openUrl: (url) => invoke('shell:open-url', url),
   mode: (m) => ipcRenderer.send('window:mode', m),
   onChat: (fn) => on('chat:event', fn),

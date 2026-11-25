@@ -30,6 +30,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const opts = (await req.json().catch(() => ({}))) as { email?: boolean; whatsapp?: boolean; sms?: boolean; message?: string };
   const totals = totalsOf(q.content);
   if (totals.gross <= 0) return json({ error: 'Add at least one priced item before sending.' }, 400);
+  // Metis marks anything she could not price. Those must be priced (or removed) before the customer sees the quote.
+  const unpriced = q.content.blocks.flatMap((b) => (b.type === 'items' ? b.lines : [])).filter((l) => /^PRICE REQUIRED\b/i.test(l.description.trim()));
+  if (unpriced.length) return json({ error: `${unpriced.length} line${unpriced.length === 1 ? ' is' : 's are'} still marked PRICE REQUIRED. Price or remove ${unpriced.length === 1 ? 'it' : 'them'} before sending.` }, 400);
 
   const db = createAdminClient();
   const ref = await customerRefOf(q.enquiry_id);

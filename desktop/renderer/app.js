@@ -44,6 +44,49 @@
     b.hidden = !text;
   }
 
+  /** A card for something Metis made: its words, a picture if there is one, detail lines (warnings stand out) and buttons. */
+  function actionCard(a) {
+    const c = document.createElement('div');
+    c.className = `item${a.preview || a.detail?.length ? ' big' : ''}`;
+    const head = document.createElement('div');
+    head.className = 'item-head';
+    head.textContent = a.label;
+    c.append(head);
+    if (a.preview) {
+      const img = document.createElement('img');
+      img.className = 'preview';
+      img.alt = 'Mock-up of the roof with the panels';
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(a.preview)}`;
+      c.append(img);
+    }
+    for (const line of a.detail || []) {
+      const p = document.createElement('div');
+      p.className = /^(Warning|Problem)/.test(line) ? 'detail warn' : 'detail';
+      p.textContent = line;
+      c.append(p);
+    }
+    const row = document.createElement('div');
+    row.className = 'btns';
+    const buttons = a.buttons?.length ? a.buttons : [{ label: 'Open in HAP', href: a.href }];
+    for (const bt of buttons) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = bt.label;
+      b.addEventListener('click', async () => {
+        if (bt.documentId) {
+          b.disabled = true;
+          const r = await window.metis.openDocument(bt.documentId);
+          b.disabled = false;
+          if (!r.ok) addMessage('error', r.error);
+        } else if (bt.prompt) sendMessage(bt.prompt);
+        else if (bt.href) window.metis.openHap(String(bt.href).split('#')[0]);
+      });
+      row.append(b);
+    }
+    c.append(row);
+    return c;
+  }
+
   function addMessage(role, text, actions) {
     const el = document.createElement('div');
     el.className = `msg ${role}`;
@@ -52,18 +95,7 @@
     if (actions?.length) {
       const wrap = document.createElement('div');
       wrap.className = 'cards';
-      for (const a of actions) {
-        const c = document.createElement('div');
-        c.className = 'item';
-        const span = document.createElement('span');
-        span.textContent = a.label;
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.textContent = 'Open in HAP';
-        b.addEventListener('click', () => window.metis.openHap(String(a.href).split('#')[0]));
-        c.append(span, b);
-        wrap.append(c);
-      }
+      for (const a of actions) wrap.append(actionCard(a));
       el.append(wrap);
     }
     $('messages').append(el);
@@ -132,11 +164,11 @@
   });
 
   // --- chat
-  async function sendMessage() {
-    const text = $('input').value.trim();
+  async function sendMessage(forced) {
+    const text = (typeof forced === 'string' ? forced : $('input').value).trim();
     if (!text || busy) return;
     busy = true;
-    $('input').value = '';
+    if (typeof forced !== 'string') $('input').value = '';
     autosize();
     $('send').disabled = true;
     addMessage('user', text);

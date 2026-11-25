@@ -30,7 +30,7 @@
 html, body { height: 100%; margin: 0; }
 body {
   display: flex; flex-direction: column;
-  background: transparent; /* Mica shows through; falls back to the window colour */
+  background: var(--bg); /* solid, unless Mica is behind the window (html.mica) */
   color: var(--text);
   font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
 }
@@ -100,3 +100,13 @@ input[type="email"], input[type="password"], input[type="text"], input[type="url
 .composer textarea { flex: 1; resize: none; max-height: 140px; background: transparent; border: 0; color: var(--text); font: inherit; padding: 6px; }
 .composer textarea:focus { outline: none; }
 .composer:focus-within { border-color: var(--accent); }
+.item.big { flex-direction: column; align-items: stretch; gap: 6px; width: 100%; max-width: 560px; padding: 10px 12px; }
+.item-head { font-weight: 600; }
+.preview { width: 100%; border-radius: 8px; border: 1px solid var(--line); background: #f4f1e8; }
+.detail { font-size: 12.5px; color: var(--muted); }
+.detail.warn { color: var(--err); }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.btns button { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 6px; padding: 4px 10px; font-size: 12.5px; font-weight: 600; }
+.btns button:disabled { opacity: 0.6; }
+
+html.mica body { background: transparent; }

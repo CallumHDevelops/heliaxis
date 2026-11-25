@@ -133,6 +133,14 @@ const listThreads = ({ q = '', archived = false } = {}) => json(`/api/desktop/th
 const newThread = () => json('/api/desktop/threads', { method: 'POST', body: '{}' });
 const patchThread = (id, patch) => json(`/api/desktop/threads/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) });
 
+/** A stored document (a quote, a design pack) as bytes, with its file name. */
+async function downloadDocument(id) {
+  const r = await hap(`/api/desktop/documents/${encodeURIComponent(id)}`);
+  if (!r.ok) throw await readError(r);
+  const name = decodeURIComponent(r.headers.get('x-filename') || 'document.pdf');
+  return { name, bytes: Buffer.from(await r.arrayBuffer()) };
+}
+
 /** Send a message and call back with each server-sent event: tool, done or error. */
 async function send(text, threadId, emit) {
   const r = await hap('/api/desktop/chat', { method: 'POST', body: JSON.stringify({ text, threadId: threadId || undefined }) });
@@ -155,4 +163,4 @@ async function send(text, threadId, emit) {
   }
 }
 
-module.exports = { login, logout, restore, history, listThreads, newThread, patchThread, send, hapBase: base, isSignedIn: () => !!session, setOnExpired: (f) => (onExpired = f), ApiError };
+module.exports = { login, logout, restore, history, listThreads, newThread, patchThread, downloadDocument, send, hapBase: base, isSignedIn: () => !!session, setOnExpired: (f) => (onExpired = f), ApiError };

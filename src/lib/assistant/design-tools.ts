@@ -4,7 +4,7 @@ import { checkDesign } from '@/lib/pvdesign/check';
 import { layoutPanels } from '@/lib/pvdesign/layout';
 import { BOOK_NOT_READY, loadBook, loadSettings, searchBook, type BookRow } from '@/lib/pvdesign/server';
 import { parseSpecsJson, skuFrom, toBatterySpec, toInverterSpec, toPanelSize, toPanelSpec } from '@/lib/pvdesign/specs';
-import { applyOverrides, priceJob } from '@/lib/pricing/price';
+import { applyOverrides, priceJob, type PriceResult } from '@/lib/pricing/price';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
@@ -83,16 +83,38 @@ export const DESIGN_TOOLS: Anthropic.Tool[] = [
 
 export const DESIGN_NAMES = new Set(DESIGN_TOOLS.map((t) => t.name));
 
-const poundsOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 100) : null);
-const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
-const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-const gbp = (pence: number) => `£${(pence / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const poundsOrNull = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 100) : null);
+export const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+export const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+export const gbp = (pence: number) => `£${(pence / 100).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function product(rows: Map<string, BookRow>, sku: string, category: BookRow['category']): BookRow | string {
+export function product(rows: Map<string, BookRow>, sku: string, category: BookRow['category']): BookRow | string {
   const r = rows.get(sku);
   if (!r) return `${sku} is not in the price book. Use find_product to get a valid SKU.`;
   if (r.category !== category) return `${sku} is a ${r.category}, not a ${category}.`;
   return r;
+}
+
+/** The pricing inputs Metis passes (items, custom items, labour, scaffolding, VAT) turned into a priced job. Shared by price_quote and create_quote. */
+export async function priceFromInput(input: Record<string, unknown>): Promise<{ error: string } | { result: PriceResult; items: { sku: string; qty: number }[] }> {
+  const raw = Array.isArray(input.items) ? input.items : [];
+  const items = raw.map((i) => ({ sku: s((i as Record<string, unknown>)?.sku), qty: n((i as Record<string, unknown>)?.qty) ?? 0 })).filter((i) => i.sku && i.qty > 0);
+  const book = await loadBook(items.map((i) => i.sku));
+  if ('error' in book) return { error: book.error };
+  const { pricing } = await loadSettings();
+  const w = n(input.scaffolding_width_m);
+  const st = n(input.scaffolding_storeys);
+  const customItems = (Array.isArray(input.custom_items) ? input.custom_items : [])
+    .map((c) => c as Record<string, unknown>)
+    .filter((c) => s(c.description) && (n(c.qty) ?? 0) > 0)
+    .map((c) => ({ description: s(c.description), qty: n(c.qty) as number, unitPence: poundsOrNull(c.unit_price_gbp) ?? -1, costPence: poundsOrNull(c.cost_gbp), category: CATS.includes(s(c.category)) ? s(c.category) : 'other' }));
+  const priced = applyOverrides(pricing, { labourSellDayPence: poundsOrNull(input.labour_day_gbp), scaffoldingPence: poundsOrNull(input.scaffolding_gbp), vatPercent: n(input.vat_percent) });
+  const result = priceJob(
+    { items, customItems, installDays: Math.max(0, n(input.install_days) ?? 0), customerType: input.customer_type === 'commercial' ? 'commercial' : 'domestic', scaffolding: w != null && w > 0 && st != null && st > 0 ? { widthM: w, storeys: st } : null },
+    book.rows,
+    priced
+  );
+  return { result, items };
 }
 
 export async function runDesignTool(name: string, input: Record<string, unknown>, me?: { id: string; name: string }): Promise<string> {
@@ -177,23 +199,9 @@ export async function runDesignTool(name: string, input: Record<string, unknown>
     }
 
     case 'price_quote': {
-      const raw = Array.isArray(input.items) ? input.items : [];
-      const items = raw.map((i) => ({ sku: s((i as Record<string, unknown>)?.sku), qty: n((i as Record<string, unknown>)?.qty) ?? 0 })).filter((i) => i.sku && i.qty > 0);
-      const book = await loadBook(items.map((i) => i.sku));
-      if ('error' in book) return book.error;
-      const { pricing } = await loadSettings();
-      const w = n(input.scaffolding_width_m);
-      const st = n(input.scaffolding_storeys);
-      const customItems = (Array.isArray(input.custom_items) ? input.custom_items : [])
-        .map((c) => c as Record<string, unknown>)
-        .filter((c) => s(c.description) && (n(c.qty) ?? 0) > 0)
-        .map((c) => ({ description: s(c.description), qty: n(c.qty) as number, unitPence: poundsOrNull(c.unit_price_gbp) ?? -1, costPence: poundsOrNull(c.cost_gbp), category: CATS.includes(s(c.category)) ? s(c.category) : 'other' }));
-      const priced = applyOverrides(pricing, { labourSellDayPence: poundsOrNull(input.labour_day_gbp), scaffoldingPence: poundsOrNull(input.scaffolding_gbp), vatPercent: n(input.vat_percent) });
-      const r = priceJob(
-        { items, customItems, installDays: Math.max(0, n(input.install_days) ?? 0), customerType: input.customer_type === 'commercial' ? 'commercial' : 'domestic', scaffolding: w != null && w > 0 && st != null && st > 0 ? { widthM: w, storeys: st } : null },
-        book.rows,
-        priced
-      );
+      const pr = await priceFromInput(input);
+      if ('error' in pr) return pr.error;
+      const r = pr.result;
       return JSON.stringify({
         complete: r.complete,
         lines: r.lines.map((l) => ({ description: l.description, sku: l.detail ?? null, qty: l.qty, unit_price: l.priceRequired ? 'PRICE REQUIRED' : gbp(l.unit_pence), vat_percent: l.vat_rate })),
