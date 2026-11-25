@@ -14,6 +14,7 @@ import { cleanContact, matchesPerson, orgTypeLabel, sortContacts, type OrgContac
 import { cleanSearch } from '@/lib/global-search';
 import { searchHelp } from '@/lib/help/server';
 import { LOOKUP_NAMES, LOOKUP_TOOLS, runLookup } from './lookup-tools';
+import { DESIGN_NAMES, DESIGN_TOOLS, runDesignTool } from './design-tools';
 import { adPerformanceAnswer, aiSpendAnswer, leadSourcesAnswer } from './insights';
 
 /**
@@ -37,6 +38,7 @@ const obj = (properties: Record<string, unknown>) => ({
 
 export const TOOLS: Anthropic.Tool[] = [
   ...LOOKUP_TOOLS,
+  ...DESIGN_TOOLS,
   {
     name: 'search_customers',
     description:
@@ -185,6 +187,7 @@ async function project(id: string) {
 
 export async function runTool(name: string, input: Input, me: Actor, actions: AssistantAction[]): Promise<string> {
   if (LOOKUP_NAMES.has(name)) return runLookup(name, input, me);
+  if (DESIGN_NAMES.has(name)) return runDesignTool(name, input);
   const db = createAdminClient();
   switch (name) {
     case 'search_customers': {
