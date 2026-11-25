@@ -1,7 +1,7 @@
 {
   "name": "metis-desktop",
   "productName": "Metis",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Metis for Windows: the Heliaxis assistant on your desktop",
   "author": "Heliaxis Limited",
   "private": true,
@@ -49,12 +49,13 @@
       "icon": "assets/icon.png"
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": true,
       "createDesktopShortcut": false,
       "createStartMenuShortcut": true,
       "shortcutName": "Metis",
+      "deleteAppDataOnUninstall": false,
       "artifactName": "Metis-Setup-${version}.${ext}"
     },
     "publish": [

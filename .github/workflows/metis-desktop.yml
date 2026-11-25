@@ -29,7 +29,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: desktop/package-lock.json }
       - run: npm ci
-      - run: npm run dist
+      - name: Build (signed when the certificate secret is set)
+        shell: pwsh
+        run: |
+          if (-not $env:CSC_LINK) { Remove-Item Env:CSC_LINK, Env:CSC_KEY_PASSWORD -ErrorAction SilentlyContinue; $env:CSC_IDENTITY_AUTO_DISCOVERY = 'false' }
+          npm run dist
         env:
           CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
@@ -51,6 +55,8 @@ jobs:
       - run: npm ci
       - name: Build (notarised when the Apple secrets are set)
         run: |
+          # No certificate secret: GitHub passes empty values, which electron-builder reads as a path. Build unsigned instead.
+          if [ -z "$CSC_LINK" ]; then unset CSC_LINK CSC_KEY_PASSWORD; export CSC_IDENTITY_AUTO_DISCOVERY=false; fi
           if [ -n "$APPLE_ID" ]; then npx electron-builder --mac --publish never -c.mac.notarize=true; else npx electron-builder --mac --publish never; fi
         env:
           CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
