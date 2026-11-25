@@ -62,7 +62,23 @@ input[type="email"], input[type="password"], input[type="text"], input[type="url
 .error { color: var(--err); margin: 0; min-height: 0; font-size: 13px; } .error:empty { display: none; }
 .row { display: flex; gap: 8px; }
 
-.chat { gap: 8px; }
+.chatwrap { flex-direction: row; gap: 10px; }
+.chat { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.side { width: 230px; flex: none; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.side input { background: var(--bot); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 6px 10px; font: inherit; }
+.tabs { display: flex; gap: 4px; }
+.tab { flex: 1; background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 4px; color: var(--muted); }
+.tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.threads { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.thread { display: flex; align-items: center; gap: 2px; border-radius: 8px; }
+.thread:hover, .thread.on { background: var(--bot); }
+.thread.on { box-shadow: inset 2px 0 0 var(--accent); }
+.thread .open { flex: 1; min-width: 0; text-align: left; background: transparent; border: 0; padding: 7px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thread .act { background: transparent; border: 0; color: var(--muted); border-radius: 6px; padding: 2px 6px; font-size: 12px; visibility: hidden; }
+.thread:hover .act, .thread:focus-within .act { visibility: visible; }
+.thread .act:hover { color: var(--text); background: var(--bot); }
+.thread input { flex: 1; min-width: 0; margin: 3px; }
+.empty { color: var(--muted); font-size: 13px; padding: 8px; }
 .messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
 .msg { max-width: 92%; padding: 8px 12px; border-radius: 12px; overflow-wrap: anywhere; }
 .msg.user { align-self: flex-end; background: var(--user); white-space: pre-wrap; }

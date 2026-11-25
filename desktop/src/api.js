@@ -113,26 +113,29 @@ async function readError(r) {
   return new ApiError(j.error || `HAP returned ${r.status}`, r.status, r.status === 429 ? 'limit' : 'server');
 }
 
-async function getMe() {
-  const r = await hap('/api/desktop/chat');
+async function getMe(threadId) {
+  const r = await hap(`/api/desktop/chat${threadId ? `?threadId=${encodeURIComponent(threadId)}` : ''}`);
   if (!r.ok) throw await readError(r);
   const j = await r.json();
   me = { name: j.me, theme: j.theme };
-  return { me, messages: j.messages, configured: j.configured };
+  return { me, messages: j.messages, configured: j.configured, threadId: j.threadId, title: j.title };
 }
 
-async function history() {
-  return getMe();
-}
+const history = (threadId) => getMe(threadId);
 
-async function newChat() {
-  const r = await hap('/api/desktop/chat', { method: 'DELETE' });
+async function json(pathname, init) {
+  const r = await hap(pathname, init);
   if (!r.ok) throw await readError(r);
+  return r.json();
 }
+
+const listThreads = ({ q = '', archived = false } = {}) => json(`/api/desktop/threads?archived=${archived ? 1 : 0}&q=${encodeURIComponent(q)}`);
+const newThread = () => json('/api/desktop/threads', { method: 'POST', body: '{}' });
+const patchThread = (id, patch) => json(`/api/desktop/threads/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) });
 
 /** Send a message and call back with each server-sent event: tool, done or error. */
-async function send(text, emit) {
-  const r = await hap('/api/desktop/chat', { method: 'POST', body: JSON.stringify({ text }) });
+async function send(text, threadId, emit) {
+  const r = await hap('/api/desktop/chat', { method: 'POST', body: JSON.stringify({ text, threadId: threadId || undefined }) });
   if (!r.ok) throw await readError(r);
   const reader = r.body.getReader();
   const dec = new TextDecoder();
@@ -152,4 +155,4 @@ async function send(text, emit) {
   }
 }
 
-module.exports = { login, logout, restore, history, newChat, send, hapBase: base, isSignedIn: () => !!session, setOnExpired: (f) => (onExpired = f), ApiError };
+module.exports = { login, logout, restore, history, listThreads, newThread, patchThread, send, hapBase: base, isSignedIn: () => !!session, setOnExpired: (f) => (onExpired = f), ApiError };

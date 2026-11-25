@@ -7,6 +7,9 @@
   let hasMessages = false;
   let hotkeyProblem = null;
   let signedIn = false;
+  let threadId = null;
+  let sideOpen = false;
+  let archivedTab = false;
 
   // What the tool names mean to a person, for the "working…" line.
   const TOOL_LABELS = {
@@ -15,14 +18,24 @@
     draft_email: 'Drafting an email', draft_whatsapp: 'Drafting a WhatsApp', create_opportunity: 'Creating the opportunity',
     find_organisation: 'Finding the organisation', find_contact: 'Finding the contact', add_contact: 'Adding the contact',
     search_help: 'Searching Help', ai_spend: 'Checking AI spend', lead_sources: 'Checking lead sources', ad_performance: 'Checking ad performance',
+    list_quotes: 'Looking up quotes', list_surveys: 'Looking up surveys', list_diary: 'Checking the diary', list_subcontractors: 'Looking up subcontractors',
+    list_my_mail: 'Checking your mail', whats_overdue: 'Checking what’s overdue', whats_new: 'Checking what’s new',
   };
 
   function show(name) {
     current = name;
     for (const [k, el] of Object.entries(views)) el.hidden = k !== name;
     $('btn-new').hidden = name !== 'chat';
-    window.metis.mode(name === 'chat' && hasMessages ? 'expanded' : name === 'chat' ? 'compact' : 'expanded');
+    $('btn-chats').hidden = name !== 'chat';
+    layout();
     if (name === 'chat') $('input').focus();
+  }
+
+  /** Quick-ask bar until there is a conversation (or the chats list is opened); then the full window with the sidebar. */
+  function layout() {
+    const full = current === 'chat' && (hasMessages || sideOpen);
+    $('side').hidden = !full;
+    window.metis.mode(current === 'chat' && !full ? 'compact' : 'expanded');
   }
 
   function banner(text) {
@@ -57,7 +70,7 @@
     $('messages').scrollTop = $('messages').scrollHeight;
     if (role !== 'error' && !hasMessages) {
       hasMessages = true;
-      window.metis.mode('expanded');
+      layout();
     }
     return el;
   }
@@ -75,8 +88,10 @@
     if (s.configured === false) banner('The assistant isn’t switched on in HAP yet (no Anthropic key).');
     else banner(hotkeyProblem);
     fillSettings(s.settings, s.me);
+    threadId = s.threadId || null;
     loadMessages(s.messages);
     show('chat');
+    refreshThreads();
   }
 
   function fillSettings(settings, me) {
@@ -127,7 +142,7 @@
     addMessage('user', text);
     $('working').hidden = false;
     $('working-text').textContent = 'Thinking…';
-    const r = await window.metis.send(text);
+    const r = await window.metis.send(text, threadId);
     // Success and failure inside the stream arrive as events; this only fails if the request itself did.
     if (!r.ok) finish(() => addMessage('error', r.error));
   }
@@ -140,7 +155,11 @@
   }
   window.metis.onChat((ev) => {
     if (ev.type === 'tool') $('working-text').textContent = `${TOOL_LABELS[ev.name] || 'Working'}…`;
-    else if (ev.type === 'done') finish(() => addMessage('assistant', ev.reply, ev.actions));
+    else if (ev.type === 'done') {
+      if (ev.threadId) threadId = ev.threadId;
+      finish(() => addMessage('assistant', ev.reply, ev.actions));
+      refreshThreads();
+    }
     else if (ev.type === 'error') finish(() => addMessage('error', ev.error));
   });
   $('composer').addEventListener('submit', (e) => {
@@ -171,12 +190,128 @@
 
   async function newChat() {
     if (busy) return;
-    const r = await window.metis.newChat();
+    const r = await window.metis.newThread();
     if (!r.ok) return addMessage('error', r.error);
+    threadId = r.data.id;
     loadMessages([]);
-    window.metis.mode('compact');
+    layout();
     show('chat');
+    refreshThreads();
   }
+
+  async function openThread(id) {
+    if (busy || id === threadId) return;
+    const r = await window.metis.openThread(id);
+    if (!r.ok) return addMessage('error', r.error);
+    threadId = r.data.threadId || id;
+    loadMessages(r.data.messages);
+    sideOpen = true;
+    layout();
+    refreshThreads();
+    $('input').focus();
+  }
+
+  // --- the chats sidebar: search, rename, archive
+  let searchTimer = null;
+  async function refreshThreads() {
+    const r = await window.metis.listThreads({ q: $('thread-search').value, archived: archivedTab });
+    const ul = $('threads');
+    ul.textContent = '';
+    if (!r.ok) {
+      ul.innerHTML = '<li class="empty"></li>';
+      ul.firstChild.textContent = r.error;
+      return;
+    }
+    if (!r.data.threads.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = archivedTab ? 'No archived chats.' : $('thread-search').value ? 'No chats match.' : 'No chats yet.';
+      ul.append(li);
+    }
+    for (const t of r.data.threads) ul.append(threadItem(t));
+  }
+
+  function threadItem(t) {
+    const li = document.createElement('li');
+    li.className = `thread${t.id === threadId ? ' on' : ''}`;
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'open';
+    open.textContent = t.title;
+    open.title = t.title;
+    open.addEventListener('click', () => openThread(t.id));
+    open.addEventListener('dblclick', () => rename(li, t));
+    const ren = document.createElement('button');
+    ren.type = 'button';
+    ren.className = 'act';
+    ren.textContent = 'Rename';
+    ren.addEventListener('click', () => rename(li, t));
+    const arch = document.createElement('button');
+    arch.type = 'button';
+    arch.className = 'act';
+    arch.textContent = archivedTab ? 'Restore' : 'Archive';
+    arch.addEventListener('click', async () => {
+      const r = await window.metis.patchThread(t.id, { archived: !archivedTab });
+      if (!r.ok) return addMessage('error', r.error);
+      if (t.id === threadId && !archivedTab) {
+        threadId = null;
+        loadMessages([]);
+        layout();
+      }
+      refreshThreads();
+    });
+    li.append(open, ren, arch);
+    return li;
+  }
+
+  function rename(li, t) {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = t.title;
+    input.maxLength = 120;
+    li.textContent = '';
+    li.append(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finishRename = async (save) => {
+      if (done) return;
+      done = true;
+      if (save && input.value.trim() && input.value.trim() !== t.title) {
+        const r = await window.metis.patchThread(t.id, { title: input.value });
+        if (!r.ok) addMessage('error', r.error);
+      }
+      refreshThreads();
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') finishRename(true);
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        finishRename(false);
+      }
+    });
+    input.addEventListener('blur', () => finishRename(true));
+  }
+
+  $('thread-search').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(refreshThreads, 250);
+  });
+  for (const [id, archived] of [['tab-active', false], ['tab-archived', true]]) {
+    $(id).addEventListener('click', () => {
+      archivedTab = archived;
+      $('tab-active').classList.toggle('on', !archived);
+      $('tab-archived').classList.toggle('on', archived);
+      $('tab-active').setAttribute('aria-selected', String(!archived));
+      $('tab-archived').setAttribute('aria-selected', String(archived));
+      refreshThreads();
+    });
+  }
+  $('btn-chats').addEventListener('click', () => {
+    sideOpen = !sideOpen;
+    layout();
+    if (sideOpen) refreshThreads();
+  });
   $('btn-new').addEventListener('click', newChat);
   window.metis.onNewChat(newChat);
 
@@ -201,6 +336,7 @@
   $('logout').addEventListener('click', async () => {
     await window.metis.logout();
     signedIn = false;
+    threadId = null;
     loadMessages([]);
     show('login');
   });

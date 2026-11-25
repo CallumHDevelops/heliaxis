@@ -5,7 +5,7 @@ const store = require('./store');
 const api = require('./api');
 
 const COMPACT = { width: 640, height: 150 };
-const EXPANDED = { width: 760, height: 680 };
+const EXPANDED = { width: 980, height: 700 };
 
 let win = null;
 let tray = null;
@@ -135,17 +135,20 @@ function ipc() {
     }
     const h = await api.history();
     applyTheme(h.me.theme);
-    return { signedIn: true, me: h.me, messages: h.messages, configured: h.configured, settings: s, hotkeyProblem };
+    return { signedIn: true, me: h.me, messages: h.messages, threadId: h.threadId, configured: h.configured, settings: s, hotkeyProblem };
   }));
   ipcMain.handle('auth:login', guard(async (email, password) => {
     const h = await api.login(String(email || '').trim(), String(password || ''));
     applyTheme(h.me.theme);
-    return { signedIn: true, me: h.me, messages: h.messages, configured: h.configured, settings: store.readSettings(), hotkeyProblem };
+    return { signedIn: true, me: h.me, messages: h.messages, threadId: h.threadId, configured: h.configured, settings: store.readSettings(), hotkeyProblem };
   }));
   ipcMain.handle('auth:logout', guard(async () => api.logout()));
-  ipcMain.handle('chat:new', guard(() => api.newChat()));
-  ipcMain.handle('chat:send', guard(async (text) => {
-    await api.send(String(text || ''), (ev) => send('chat:event', ev));
+  ipcMain.handle('threads:list', guard((opts) => api.listThreads({ q: String(opts?.q || ''), archived: !!opts?.archived })));
+  ipcMain.handle('threads:open', guard((id) => api.history(String(id || ''))));
+  ipcMain.handle('threads:new', guard(() => api.newThread()));
+  ipcMain.handle('threads:patch', guard((id, patch) => api.patchThread(String(id), { ...(typeof patch?.title === 'string' ? { title: patch.title } : {}), ...(typeof patch?.archived === 'boolean' ? { archived: patch.archived } : {}) })));
+  ipcMain.handle('chat:send', guard(async (text, threadId) => {
+    await api.send(String(text || ''), threadId ? String(threadId) : '', (ev) => send('chat:event', ev));
   }));
   ipcMain.handle('settings:set', guard(async (patch) => {
     const allowed = {};

@@ -1,5 +1,5 @@
 import { assistantConfigured, runAssistant } from '@/lib/assistant/run';
-import { currentThread, saveThread, visibleMessages } from '@/lib/assistant/thread';
+import { createThread, currentThread, ownThread, saveThread, threadTitle, visibleMessages } from '@/lib/assistant/thread';
 import { actorOf, desktopSession } from '@/lib/desktop/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
@@ -13,8 +13,10 @@ const json = (body: unknown, status = 200) => NextResponse.json(body, { status, 
 export async function GET(req: Request) {
   const a = await desktopSession(req);
   if ('error' in a) return json({ error: a.error }, a.status);
-  const t = await currentThread(a.session.user.id).catch(() => undefined);
-  return json({ configured: assistantConfigured(), me: actorOf(a.session).name, theme: a.session.profile.theme ?? 'system', messages: visibleMessages(t?.messages ?? []) });
+  const wanted = new URL(req.url).searchParams.get('threadId');
+  const t = wanted ? await ownThread(a.session.user.id, wanted) : await currentThread(a.session.user.id).catch(() => undefined);
+  if (wanted && !t) return json({ error: 'Chat not found.' }, 404);
+  return json({ configured: assistantConfigured(), me: actorOf(a.session).name, theme: a.session.profile.theme ?? 'system', threadId: t?.id ?? null, title: t ? threadTitle(t as never) : null, messages: visibleMessages(t?.messages ?? []) });
 }
 
 /**
@@ -35,15 +37,18 @@ export async function POST(req: Request) {
   if (missing) return json({ error: 'Run supabase/assistant.sql in Supabase first.' }, 400);
 
   const me = actorOf(a.session);
-  const t = await currentThread(me.id);
+  const threadId = typeof b.threadId === 'string' ? b.threadId : '';
+  const t = threadId ? await ownThread(me.id, threadId) : await currentThread(me.id);
+  if (threadId && !t) return json({ error: 'Chat not found.' }, 404);
   const enc = new TextEncoder();
   const stream = new ReadableStream({
     async start(ctrl) {
       const send = (event: string, data: unknown) => ctrl.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       try {
         const result = await runAssistant(t?.messages ?? [], text, me, { ref: 'desktop', onTool: (name) => send('tool', { name }) });
-        await saveThread(me.id, t?.id, result.messages);
-        send('done', { reply: result.reply, actions: result.actions });
+        const savedId = t?.id ?? (await createThread(me.id));
+        await saveThread(me.id, savedId, result.messages);
+        send('done', { reply: result.reply, actions: result.actions, threadId: savedId });
       } catch (e) {
         const msg = e instanceof Error ? e.message : 'Metis did not answer';
         const error = /overloaded|529/i.test(msg) ? 'Metis is busy right now: try again in a minute.' : /rate.?limit|429/i.test(msg) ? 'The AI usage limit was reached: try again shortly.' : msg;

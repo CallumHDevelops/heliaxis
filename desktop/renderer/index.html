@@ -11,6 +11,7 @@
   <header class="bar" id="bar">
     <span class="brand"><span class="dot"></span>Metis</span>
     <span class="grow"></span>
+    <button class="icon" id="btn-chats" title="Show chats" aria-label="Show chats">Chats</button>
     <button class="icon" id="btn-new" title="New chat (Ctrl+N)" aria-label="New chat">New chat</button>
     <button class="icon" id="btn-settings" title="Settings" aria-label="Settings">Settings</button>
   </header>
@@ -30,14 +31,24 @@
   </main>
 
   <!-- Chat -->
-  <main id="view-chat" class="view chat" hidden>
-    <div id="messages" class="messages" aria-live="polite"></div>
-    <div id="working" class="working" hidden><span class="spark"></span><span id="working-text">Working…</span></div>
-    <form id="composer" class="composer">
-      <textarea id="input" rows="1" placeholder="Ask Metis…  (Enter to send, Shift+Enter for a new line)" autofocus></textarea>
-      <button class="primary" id="send" type="submit">Send</button>
-    </form>
-  </main>
+  <div id="view-chat" class="view chatwrap" hidden>
+    <aside id="side" class="side" hidden>
+      <input id="thread-search" type="search" placeholder="Search chats" aria-label="Search chats">
+      <div class="tabs" role="tablist">
+        <button id="tab-active" class="tab on" type="button" role="tab" aria-selected="true">Chats</button>
+        <button id="tab-archived" class="tab" type="button" role="tab" aria-selected="false">Archived</button>
+      </div>
+      <ul id="threads" class="threads"></ul>
+    </aside>
+    <section class="chat">
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <div id="working" class="working" hidden><span class="spark"></span><span id="working-text">Working…</span></div>
+      <form id="composer" class="composer">
+        <textarea id="input" rows="1" placeholder="Ask Metis…  (Enter to send, Shift+Enter for a new line)" autofocus></textarea>
+        <button class="primary" id="send" type="submit">Send</button>
+      </form>
+    </section>
+  </div>
 
   <!-- Settings -->
   <main id="view-settings" class="view" hidden>
