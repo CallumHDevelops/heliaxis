@@ -29,6 +29,7 @@ export async function GET() {
     firstContact: { name: wa.firstContactTemplate, fallback: def.name },
     chase: { name: wa.chaseTemplate, fallback: process.env.WHATSAPP_CHASE_TEMPLATE || wa.firstContactTemplate || def.name },
     survey: { name: crm.surveyTemplate, fallback: '' },
+    surveyToday: { name: crm.surveyTodayTemplate, fallback: crm.surveyTemplate },
     install: { name: crm.installTemplate, fallback: '' },
     review: { name: crm.reviewTemplate, fallback: '' },
   };

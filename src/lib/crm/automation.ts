@@ -184,7 +184,7 @@ function bookedAtTimeOn(sent: string[], kind: string, day: string) {
 }
 
 /** Confirmation when a date is booked, then countdowns. kind = install | survey. */
-async function countdowns(p: Proj, kind: 'install' | 'survey', days: number[], hour: number, template: string, now: Date) {
+async function countdowns(p: Proj, kind: 'install' | 'survey', days: number[], hour: number, template: string, now: Date, todayTemplate = '') {
   const whenIso = kind === 'install' ? p.install_at : p.survey_at;
   if (!whenIso) return 0;
   const when = new Date(whenIso);
@@ -241,11 +241,19 @@ async function countdowns(p: Proj, kind: 'install' | 'survey', days: number[], h
         : kind === 'survey' && n <= 1
           ? ' It helps if we can see your fuse box, meter and loft.'
           : '';
-    const text = `Hi ${first}, ${lead} — ${dateLabel(when)} at ${timeLabel(when)}.${extra} Any questions, just reply here.${n > 0 ? change : ''}${link ? ` ${link}` : ''}`;
+    // Survey morning: a warmer "see you today", with its own template when one is chosen.
+    const morning = kind === 'survey' && n === 0;
+    const text = morning
+      ? `Hi ${first}, really looking forward to meeting you today. Just to remind you, your Heliaxis survey is at ${timeLabel(when)}.${extra} Any questions, just reply here.${link ? ` ${link}` : ''}`
+      : `Hi ${first}, ${lead} — ${dateLabel(when)} at ${timeLabel(when)}.${extra} Any questions, just reply here.${n > 0 ? change : ''}${link ? ` ${link}` : ''}`;
+    const msg =
+      morning && todayTemplate
+        ? { text, template: todayTemplate, params: [first, timeLabel(when)] }
+        : { text, template, params: [first, daysWord(n), `${dateLabel(when)}, ${timeLabel(when)}`] };
     const ok = await sendToCustomer(
       p,
       c,
-      { text, template, params: [first, daysWord(n), `${dateLabel(when)}, ${timeLabel(when)}`] },
+      msg,
       'reminder',
       `“${daysWord(n)}” ${what} reminder`,
       subject
@@ -356,7 +364,7 @@ export async function runCrmAutomations() {
   ]);
   const held = await onHold([...((surveys ?? []) as Proj[]), ...((installs ?? []) as Proj[])].map((p) => p.id));
   for (const p of (surveys ?? []) as Proj[]) {
-    if (!held.has(p.id)) out.reminders += await countdowns(p, 'survey', s.surveyReminderDays, s.reminderHour, s.surveyTemplate, now);
+    if (!held.has(p.id)) out.reminders += await countdowns(p, 'survey', s.surveyReminderDays, s.reminderHour, s.surveyTemplate, now, s.surveyTodayTemplate);
   }
   for (const p of (installs ?? []) as Proj[]) {
     if (!held.has(p.id)) out.reminders += await countdowns(p, 'install', s.installReminderDays, s.reminderHour, s.installTemplate, now);

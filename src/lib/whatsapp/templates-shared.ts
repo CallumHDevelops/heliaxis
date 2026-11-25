@@ -116,7 +116,7 @@ export function interestPhrase(products: string[] | null | undefined): string {
 
 /* ── Ready-made Heliaxis templates ───────────────────────────────────────────── */
 
-export type JobKey = 'firstContact' | 'chase' | 'survey' | 'install' | 'review';
+export type JobKey = 'firstContact' | 'chase' | 'survey' | 'surveyToday' | 'install' | 'review';
 
 export type ReadyTemplate = {
   name: string;
@@ -203,6 +203,16 @@ export const READY_MADE: ReadyTemplate[] = [
     fields: ['first_name', 'when_words', 'date_time'],
     buttons: [],
     job: 'survey',
+  },
+  {
+    name: 'survey_today',
+    title: 'Survey morning: see you today',
+    category: 'UTILITY',
+    use: 'Sent by itself on the morning of a survey (Survey days before includes 0), if they haven’t messaged in the last 24 hours.',
+    body: 'Hi {{1}}, really looking forward to meeting you today. Just to remind you, your Heliaxis survey is at {{2}}. Any questions, just reply here.',
+    fields: ['first_name', 'time_words'],
+    buttons: [],
+    job: 'surveyToday',
   },
   {
     name: 'install_reminder',
@@ -324,7 +334,7 @@ export type Job = {
   label: string;
   /** Which settings API saves it, and under which key. */
   where: 'whatsapp' | 'crm';
-  setting: 'firstContactTemplate' | 'chaseTemplate' | 'surveyTemplate' | 'installTemplate' | 'reviewTemplate';
+  setting: 'firstContactTemplate' | 'chaseTemplate' | 'surveyTemplate' | 'surveyTodayTemplate' | 'installTemplate' | 'reviewTemplate';
   /**
    * What the job fills in. `flexible`: it fills each blank by its field (any of these, any order);
    * otherwise it sends exactly these, in this order (src/lib/crm/automation.ts).
@@ -337,6 +347,7 @@ export const JOBS: Job[] = [
   { key: 'firstContact', label: 'First message to new Meta leads', where: 'whatsapp', setting: 'firstContactTemplate', fields: ['first_name', 'interest'], flexible: true },
   { key: 'chase', label: 'Chasers once the free 24 hours are up', where: 'whatsapp', setting: 'chaseTemplate', fields: ['first_name', 'interest'], flexible: true },
   { key: 'survey', label: 'Survey booked + reminders', where: 'crm', setting: 'surveyTemplate', fields: ['first_name', 'when_words', 'date_time'], flexible: false },
+  { key: 'surveyToday', label: 'Survey morning (“see you today”)', where: 'crm', setting: 'surveyTodayTemplate', fields: ['first_name', 'time_words'], flexible: false },
   { key: 'install', label: 'Install booked + reminders', where: 'crm', setting: 'installTemplate', fields: ['first_name', 'when_words', 'date_time'], flexible: false },
   { key: 'review', label: 'Google review requests', where: 'crm', setting: 'reviewTemplate', fields: ['first_name', 'review_link'], flexible: false },
 ];

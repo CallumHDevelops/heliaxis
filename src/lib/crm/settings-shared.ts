@@ -24,6 +24,8 @@ export type CrmSettings = {
   /** Templates for when the 24h window is closed. {{1}} first name, {{2}} "in 3 days" / "tomorrow", {{3}} the date. */
   installTemplate: string;
   surveyTemplate: string;
+  /** Survey morning (the 0-days reminder) when the 24h window is closed. {{1}} first name, {{2}} the time. Blank = surveyTemplate. */
+  surveyTodayTemplate: string;
   /** Google review request after Complete. {{1}} first name, {{2}} the review link. */
   reviewUrl: string;
   reviewDelayDays: number;
@@ -60,6 +62,7 @@ export const DEFAULT_CRM_SETTINGS: CrmSettings = {
   reminderHour: 9,
   installTemplate: '',
   surveyTemplate: '',
+  surveyTodayTemplate: '',
   reviewUrl: '',
   reviewDelayDays: 3,
   reviewTemplate: '',
@@ -128,6 +131,7 @@ export function cleanCrmSettings(b: Partial<Record<keyof CrmSettings, unknown>>)
     reminderHour: num(b.reminderHour, 7, 20, d.reminderHour),
     installTemplate: str(b.installTemplate, 100),
     surveyTemplate: str(b.surveyTemplate, 100),
+    surveyTodayTemplate: str(b.surveyTodayTemplate, 100),
     reviewUrl: /^https:\/\//.test(str(b.reviewUrl, 500)) ? str(b.reviewUrl, 500) : '',
     reviewDelayDays: num(b.reviewDelayDays, 0, 60, d.reviewDelayDays),
     reviewTemplate: str(b.reviewTemplate, 100),

@@ -141,6 +141,9 @@ export function CrmSettingsView({ isAdmin }: { isAdmin: boolean }) {
                 <input className="crm-input" placeholder="survey_reminder" value={s.surveyTemplate} onChange={(e) => set('surveyTemplate', e.target.value)} />
               </div>
             </div>
+            <label className="crm-label">Survey morning template (when days before includes 0)</label>
+            <input className="crm-input" placeholder="survey_today" value={s.surveyTodayTemplate} onChange={(e) => set('surveyTodayTemplate', e.target.value)} />
+            <p className="crm-muted crm-small">{'{{1}}'} first name, {'{{2}}'} the time. Left blank, the morning uses the survey template.</p>
             <p className="crm-muted crm-small">
               Templates: {'{{1}}'} first name, {'{{2}}'} “in 3 days” / “tomorrow” / “booked for …”, {'{{3}}'} the date and time.{' '}
               <Link href="/admin/enquiries/templates" className="crm-link">
