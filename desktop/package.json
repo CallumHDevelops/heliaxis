@@ -8,7 +8,6 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "icon": "node scripts/make-icon.js",
     "test": "node --test test"
   },
   "dependencies": {

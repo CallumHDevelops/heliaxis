@@ -9,7 +9,6 @@ Windows desktop shell for Metis (Electron). It signs in with the person's normal
 cd desktop
 npm install
 node node_modules/electron/install.js   # only if npm skipped Electron's download script
-npm run icon                            # writes the placeholder icons into assets/
 npm start                               # --dev is the same; add --hidden to start in the tray
 ```
 
