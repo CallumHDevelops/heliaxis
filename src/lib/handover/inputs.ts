@@ -639,44 +639,58 @@ export function summaryInput(f: HandoverFacts): Made<SummaryInput> {
 export const IBG_PROVIDER = 'QualityMark';
 
 /** HX-HO-09's own page: how to switch this house's system off, from where the switches are. */
-export const SWITCH_FIELDS: { key: 'cu' | 'ac' | 'dc' | 'battery'; label: string; hint: string; for?: Tech }[] = [
+type SwitchKey = 'ev' | 'cu' | 'ac' | 'dc' | 'battery';
+export const SWITCH_FIELDS: { key: SwitchKey; label: string; hint: string; for?: Tech }[] = [
+  { key: 'ev', label: 'EV charger isolator', hint: 'e.g. On the wall beside the charger', for: 'ev' },
   { key: 'cu', label: 'Consumer unit circuit', hint: 'Where it is and its label, e.g. Under the stairs, labelled Solar PV' },
   { key: 'ac', label: 'AC isolator', hint: 'e.g. On the wall next to the inverter, in the loft' },
   { key: 'dc', label: 'DC isolator', hint: 'e.g. Built into the inverter', for: 'solar' },
   { key: 'battery', label: 'Battery isolator', hint: 'e.g. On the side of the battery', for: 'battery' },
 ];
 /** Where each switch usually is, used until the office or the electrician says exactly where. */
-export const SWITCH_DEFAULTS: Record<'cu' | 'ac' | 'dc' | 'battery', string> = {
+export const SWITCH_DEFAULTS: Record<SwitchKey, string> = {
+  ev: 'the isolator next to your charger',
   cu: 'the circuit breaker labelled for your solar or battery system',
   ac: 'the switch labelled AC isolator, next to your inverter',
   dc: 'the switch labelled DC isolator, on or next to your inverter',
   battery: 'the isolator on or next to your battery',
 };
+/** The consumer unit's circuit on a job with only a charger to switch off (no inverter, battery or heat pump). */
+export const SWITCH_CU_EV = 'the circuit breaker labelled for your EV charger';
 export type SwitchInput = JobHead & { steps: string[]; backup: boolean; procedures: string[] };
 export function switchInput(f: HandoverFacts): Made<SwitchInput> {
   if (!approved(f.settings, 'shutdown')) return missing('Approve the switching-off wording in CRM settings.', 'settings');
   const v = f.electrician?.values ?? {};
   const dcSite = Array.isArray(v.pvt_iso_where) ? str((v.pvt_iso_where as unknown[])[0]) : str(v.pvt_iso_where);
-  const where: Record<string, string | null> = { cu: val(f, 'HX-HO-09', 'cu'), ac: val(f, 'HX-HO-09', 'ac'), dc: val(f, 'HX-HO-09', 'dc') ?? dcSite, battery: val(f, 'HX-HO-09', 'battery') };
+  const where: Record<string, string | null> = { ev: val(f, 'HX-HO-09', 'ev'), cu: val(f, 'HX-HO-09', 'cu'), ac: val(f, 'HX-HO-09', 'ac'), dc: val(f, 'HX-HO-09', 'dc') ?? dcSite, battery: val(f, 'HX-HO-09', 'battery') };
+  // A charger and nothing with an inverter: no AC isolator step, and the consumer unit circuit is the charger's.
+  const evOnly = has(f, 'ev') && !has(f, 'solar') && !has(f, 'battery') && !has(f, 'heatpump');
+  if (evOnly && !where.cu) where.cu = SWITCH_CU_EV;
   // Not told where a switch is: the standard place, so the page is always made (the office can say exactly where on the Handover tab).
   for (const x of SWITCH_FIELDS) if (!where[x.key]) where[x.key] = SWITCH_DEFAULTS[x.key];
+  // The charger's own isolator step: when the electrician says one is fitted, or the office says where it is. Otherwise a line to stop any charge first.
+  const evIsolator = has(f, 'ev') && (v.ev_isolator === 'yes' || !!val(f, 'HX-HO-09', 'ev'));
   const lines = DRAFTS.shutdown.text.split('\n');
   const kept = lines
-    .filter((l) => (!/^3\./.test(l) || has(f, 'solar')) && (!/^4\./.test(l) || has(f, 'battery')))
-    .filter((l) => !/back-up power/.test(l) || f.design.battery_backup === true || f.electrician?.values.eess_backup === 'yes');
+    .filter((l) => (!/^\d+\. EV charger:/.test(l) || evIsolator) && (!/^EV charger:/.test(l) || (has(f, 'ev') && !evIsolator)))
+    .filter((l) => !/AC isolator/.test(l) || !evOnly)
+    .filter((l) => (!/^\d+\. Solar:/.test(l) || has(f, 'solar')) && (!/^\d+\. Battery:/.test(l) || has(f, 'battery')))
+    // The back-up warning only with a battery on the job (a design detail left ticked on a charger job isn't a battery).
+    .filter((l) => !/back-up power/.test(l) || (has(f, 'battery') && (f.design.battery_backup === true || f.electrician?.values.eess_backup === 'yes')));
   // The steps this job has, numbered 1…n, and switched back on the other way from the last of them (n…1).
   let n = 0;
   const numbered = kept.map((l) => (/^\d+\./.test(l) ? l.replace(/^\d+\./, `${++n}.`) : l));
   const back = n > 1 ? `${Array.from({ length: n - 1 }, (_, i) => n - i).join(', ')}, then 1` : '1';
   const steps = numbered
-    .map((l) => (/^\d+\./.test(l) ? l : l.replace(/\d+(?:, \d+)*,? then \d+/, back)))
-    .map((l) => l.replace('{cu}', where.cu ?? '').replace('{ac}', where.ac ?? '').replace('{dc}', where.dc ?? '').replace('{battery}', where.battery ?? ''));
+    // One step (a charger with no isolator of its own): back on at the same switch, not "the other way: 1".
+    .map((l) => (/^\d+\./.test(l) ? l : n === 1 && /^To switch it back on/.test(l) ? 'To switch it back on, switch the same circuit back on.' : l.replace(/\d+(?:, \d+)*,? then \d+/, back)))
+    .map((l) => l.replace('{ev}', where.ev ?? '').replace('{cu}', where.cu ?? '').replace('{ac}', where.ac ?? '').replace('{dc}', where.dc ?? '').replace('{battery}', where.battery ?? ''));
   return {
     ok: true,
     input: {
       ...head(f),
       steps,
-      backup: f.design.battery_backup === true || f.electrician?.values.eess_backup === 'yes',
+      backup: has(f, 'battery') && (f.design.battery_backup === true || f.electrician?.values.eess_backup === 'yes'),
       procedures: f.library.filter((l) => l.slot === 'HX-HO-09' || l.kind === 'procedure').map((l) => l.name),
     },
   };

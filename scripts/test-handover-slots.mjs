@@ -301,7 +301,25 @@ const order = (products) => {
 eq('switching off, solar + battery: 1–4, back on 4, 3, 2, then 1', order(['solar', 'battery']), [['1.', '2.', '3.', '4.'], 'To switch it back on, go the other way: 4, 3, 2, then 1.']);
 eq('solar only: 1–3, back on from 3', order(['solar']), [['1.', '2.', '3.'], 'To switch it back on, go the other way: 3, 2, then 1.']);
 eq('battery only: its isolator is step 3, back on from 3', [order(['battery']), I.switchInput(facts({ job: { ...facts().job, products: ['battery'] }, data: { 'HX-HO-09': { values: SWITCHES } } })).input.steps[2]], [[['1.', '2.', '3.'], 'To switch it back on, go the other way: 3, 2, then 1.'], '3. Battery: switch it off at its own isolator, as its manual shows: Battery side.']);
-eq('EV only: 1 and 2, back on 2, then 1', order(['ev']), [['1.', '2.'], 'To switch it back on, go the other way: 2, then 1.']);
+// The charger (shutdown-2): its isolator first when there is one, never an inverter's AC isolator on a charger-only job.
+const evSteps = (products, values = {}, electrician = {}) => I.switchInput(facts({ job: { ...facts().job, products }, data: { 'HX-HO-09': { values } }, electrician: { ...facts().electrician, values: { ...facts().electrician?.values, ...electrician } } })).input.steps;
+eq('EV only, isolator fitted: stop the charge and its isolator, then its circuit; back on 2, then 1', evSteps(['ev'], {}, { ev_isolator: 'yes' }), [
+  '1. EV charger: stop any charge, in the app or on the charger, then switch off its isolator: the isolator next to your charger.',
+  '2. Switch off the circuit at your consumer unit (fuse box): the circuit breaker labelled for your EV charger.',
+  'To switch it back on, go the other way: 2, then 1.',
+  'If anything sparks, smells of burning or looks damaged, keep away from it and call us on 01633 965205.',
+]);
+eq('EV only, no isolator: its circuit, with stopping the charge first; back on at the same circuit', evSteps(['ev'], {}, { ev_isolator: 'no' }), [
+  '1. Switch off the circuit at your consumer unit (fuse box): the circuit breaker labelled for your EV charger.',
+  'To switch it back on, switch the same circuit back on.',
+  'EV charger: stop any charge, in the app or on the charger, before you switch it off.',
+  'If anything sparks, smells of burning or looks damaged, keep away from it and call us on 01633 965205.',
+]);
+eq('EV only: where the office says the isolator is', evSteps(['ev'], { ev: 'Garage wall, left of the charger' }, { ev_isolator: 'no' })[0], '1. EV charger: stop any charge, in the app or on the charger, then switch off its isolator: Garage wall, left of the charger.');
+eq('EV and solar, isolator fitted: the charger first, then the solar steps, 1–4', evSteps(['ev', 'solar'], SWITCHES, { ev_isolator: 'yes' }).filter((l) => /^\d\./.test(l)).map((l) => l.slice(0, 16)), ['1. EV charger: s', '2. Switch off th', '3. Switch off th', '4. Solar: switch']);
+eq('no charger: no EV lines', [order(['solar', 'battery']), I.switchInput(facts()).input.steps.some((l) => /EV charger/.test(l))], [[['1.', '2.', '3.', '4.'], 'To switch it back on, go the other way: 4, 3, 2, then 1.'], false]);
+eq('the switching-off wording is a new version, so it’s approved again before it’s used', [H.DRAFTS.shutdown.version, I.switchInput(facts({ settings: { ...facts().settings, approved: { ...facts().settings.approved, shutdown: { version: 'shutdown-1', at: '2026-10-01T09:00:00Z', by: 'Callum' } } } })).ok], ['shutdown-2', false]);
+eq('the office is asked where the charger’s isolator is (EV jobs only)', [I.SWITCH_FIELDS.find((x) => x.key === 'ev')?.for, I.SWITCH_FIELDS.filter((x) => !x.for || ['solar'].includes(x.for)).some((x) => x.key === 'ev')], ['ev', false]);
 
 const rec = I.receiptInput(facts({ payments: [{ id: 'x1', kind: 'final', amount_pence: 512345, paid_on: '2026-11-10', method: 'bank_transfer', reference: 'INV-0042' }] }));
 eq('receipt: exactly the recorded payments (the deposit, then the final), nothing worked out', rec.input.lines.map((l) => [l.what, l.pence]), [['Deposit', 50000], ['Final payment', 512345]]);
