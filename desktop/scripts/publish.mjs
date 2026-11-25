@@ -17,7 +17,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const dir = path.resolve(process.argv[2] || 'dist');
-const blobToken = process.env.BLOB_READ_WRITE_TOKEN || '';
+// Whatever was pasted (quotes, a trailing line break, the BLOB_STORE_ID line above it), keep only the token itself.
+const rawToken = process.env.BLOB_READ_WRITE_TOKEN || '';
+const blobToken = /vercel_blob_rw_[A-Za-z0-9_]+/.exec(rawToken)?.[0] ?? (rawToken.trim() ? rawToken.trim() : '');
 const sbUrl = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const bucket = process.env.METIS_BUCKET || 'metis-desktop';
