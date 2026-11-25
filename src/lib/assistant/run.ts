@@ -64,7 +64,10 @@ function afterFallback(content: Anthropic.Beta.BetaContentBlock[]) {
 
 export type AssistantResult = { messages: Msg[]; reply: string; actions: AssistantAction[] };
 
-export async function runAssistant(history: Msg[], text: string, me: Actor): Promise<AssistantResult> {
+/** Optional hooks for a caller that wants to show progress, and a `ref` stored on the ai_usage rows (e.g. 'desktop'). */
+export type RunOptions = { ref?: string; onTool?: (name: string) => void };
+
+export async function runAssistant(history: Msg[], text: string, me: Actor, opts: RunOptions = {}): Promise<AssistantResult> {
   const client = new Anthropic();
   const messages: Msg[] = trim([...history, { role: 'user', content: text }]);
   const actions: AssistantAction[] = [];
@@ -83,7 +86,7 @@ export async function runAssistant(history: Msg[], text: string, me: Actor): Pro
       messages,
     });
 
-    await recordAi('assistant', res.model, res.usage);
+    await recordAi('assistant', res.model, res.usage, opts.ref);
     if (res.stop_reason === 'refusal') {
       // Nothing from a refused turn is kept; the user can rephrase.
       reply = 'Sorry — I can’t help with that one. Try rewording it.';
@@ -108,6 +111,7 @@ export async function runAssistant(history: Msg[], text: string, me: Actor): Pro
     for (const c of calls) {
       let out: string;
       let isError = false;
+      opts.onTool?.(c.name);
       try {
         out = await runTool(c.name, (c.input ?? {}) as Record<string, unknown>, me, actions);
       } catch (e) {

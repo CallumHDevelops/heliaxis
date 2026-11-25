@@ -47,3 +47,7 @@ next-env.d.ts
 /public/portal/site/zxing_reader.wasm
 # The ProspectPV map's web worker, copied from node_modules by scripts/copy-maplibre.mjs before each build
 /public/maplibre/
+
+# Metis desktop app
+/desktop/node_modules/
+/desktop/dist/

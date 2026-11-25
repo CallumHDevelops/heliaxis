@@ -1,45 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { crmSession, json } from '@/lib/crm/server';
-import { assistantConfigured, runAssistant, type Msg } from '@/lib/assistant/run';
+import { assistantConfigured, runAssistant } from '@/lib/assistant/run';
+import { currentThread as thread, visibleMessages as visible } from '@/lib/assistant/thread';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 type Session = NonNullable<Awaited<ReturnType<typeof crmSession>>>;
 const actor = (s: Session) => ({ id: s.user.id, name: s.profile.full_name || s.profile.email || 'Someone' });
-
-async function thread(userId: string) {
-  const { data } = await createAdminClient()
-    .from('assistant_threads')
-    .select('id, messages')
-    .eq('user_id', userId)
-    .eq('archived', false)
-    .order('updated_at', { ascending: false })
-    .limit(1);
-  return data?.[0] as { id: string; messages: Msg[] } | undefined;
-}
-
-/** What to show: the user's words and Metis's replies (tool calls and thinking left out). */
-function visible(messages: Msg[]) {
-  const out: { role: 'user' | 'assistant'; text: string }[] = [];
-  for (const m of messages) {
-    if (m.role !== 'user' && m.role !== 'assistant') continue;
-    if (typeof m.content === 'string') {
-      if (m.content.trim()) out.push({ role: m.role, text: m.content });
-      continue;
-    }
-    const text = m.content
-      .map((b) => (b.type === 'text' ? b.text : ''))
-      .join('\n')
-      .trim();
-    if (!text) continue;
-    // Several assistant steps in one answer read as one bubble.
-    const prev = out[out.length - 1];
-    if (m.role === 'assistant' && prev?.role === 'assistant') prev.text += `\n\n${text}`;
-    else out.push({ role: m.role, text });
-  }
-  return out;
-}
 
 export async function GET() {
   const s = await crmSession();

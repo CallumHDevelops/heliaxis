@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Metis</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="bar" id="bar">
+    <span class="brand"><span class="dot"></span>Metis</span>
+    <span class="grow"></span>
+    <button class="icon" id="btn-new" title="New chat (Ctrl+N)" aria-label="New chat">New chat</button>
+    <button class="icon" id="btn-settings" title="Settings" aria-label="Settings">Settings</button>
+  </header>
+
+  <div class="banner" id="banner" hidden></div>
+
+  <!-- Sign in -->
+  <main id="view-login" class="view" hidden>
+    <form id="login-form" class="card">
+      <h1>Sign in to Metis</h1>
+      <p class="muted">Use your normal HAP email and password.</p>
+      <label>Email<input id="email" type="email" autocomplete="username" required></label>
+      <label>Password<input id="password" type="password" autocomplete="current-password" required></label>
+      <p class="error" id="login-error" role="alert"></p>
+      <button class="primary" id="login-btn" type="submit">Sign in</button>
+    </form>
+  </main>
+
+  <!-- Chat -->
+  <main id="view-chat" class="view chat" hidden>
+    <div id="messages" class="messages" aria-live="polite"></div>
+    <div id="working" class="working" hidden><span class="spark"></span><span id="working-text">Working…</span></div>
+    <form id="composer" class="composer">
+      <textarea id="input" rows="1" placeholder="Ask Metis…  (Enter to send, Shift+Enter for a new line)" autofocus></textarea>
+      <button class="primary" id="send" type="submit">Send</button>
+    </form>
+  </main>
+
+  <!-- Settings -->
+  <main id="view-settings" class="view" hidden>
+    <div class="card">
+      <h1>Settings</h1>
+      <label>Global shortcut
+        <input id="set-hotkey" type="text" placeholder="Press the keys…" readonly>
+      </label>
+      <p class="muted small">Click the box, then press the combination you want (include Ctrl, Alt or Shift). Default Ctrl+Shift+H.</p>
+      <p class="error" id="hotkey-error"></p>
+      <label class="check"><input id="set-startup" type="checkbox"> Start Metis with Windows</label>
+      <label>HAP address<input id="set-url" type="url"></label>
+      <p class="muted small" id="set-who"></p>
+      <div class="row">
+        <button class="ghost" id="settings-back" type="button">Back</button>
+        <button class="ghost" id="logout" type="button">Sign out</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

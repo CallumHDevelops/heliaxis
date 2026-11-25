@@ -1,0 +1,20 @@
+{
+  "name": "metis-desktop",
+  "productName": "Metis",
+  "version": "0.1.0",
+  "description": "Metis for Windows: the Heliaxis assistant on your desktop",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "icon": "node scripts/make-icon.js",
+    "test": "node --test test"
+  },
+  "dependencies": {
+    "marked": "^18.1.1"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0"
+  }
+}
