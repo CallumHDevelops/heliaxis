@@ -58,6 +58,11 @@ export type Award = { on: boolean; title: string; wording: string; link: string;
 export type Accreditation = { name: string; number: string; url: string };
 /** The review line ("4.9 from 120 reviews on Google"): off, and hidden, until it is ticked on with a real count. */
 export type Reviews = { on: boolean; source: string; rating: number; count: number; url: string };
+/**
+ * A government scheme Heliaxis is approved for (the Warm Homes Loan Scheme): its official logo and the wording its branding guidelines allow,
+ * shown once under the systems. Off, and hidden, until it is ticked on with the wording; the logo only shows once the official file is added.
+ */
+export type Scheme = { on: boolean; name: string; wording: string; logoUrl: string; link: string };
 export type Finance = { askOn: boolean; figuresOn: boolean; aprPct: number; termYears: number; /** The official Warm Homes Loan page to link to (left empty until confirmed). */ link: string };
 
 export type EstimatorSettings = {
@@ -111,6 +116,7 @@ export type EstimatorSettings = {
   panelModel: string;
   accreditations: Accreditation[];
   reviews: Reviews;
+  scheme: Scheme;
   /** The browser's copy only: ready-made prices in place of the costs (see publicSettings). */
   priceTable?: PriceTable;
 };
@@ -159,6 +165,8 @@ export const DEFAULT_SETTINGS: EstimatorSettings = {
     { name: 'SSIP', number: '', url: 'https://ssip.org.uk' },
   ],
   reviews: { on: false, source: 'Google', rating: 0, count: 0, url: '' },
+  // Heliaxis is WHLS approved; off until the official logo pack and its wording rules are in.
+  scheme: { on: false, name: 'Warm Homes Loan Scheme', wording: 'Heliaxis is an approved Warm Homes Loan Scheme installer.', logoUrl: '', link: '' },
 };
 
 /** Settings from storage or a request, each number kept within a sensible range, the rest defaulted. */
@@ -176,6 +184,21 @@ export function cleanAccreditations(v: unknown): Accreditation[] {
       return { name: txt(a.name, 40), number: txt(a.number, 40), url: httpsOr(a.url, 300) };
     })
     .filter((a) => a.name);
+}
+
+export function cleanScheme(v: unknown): Scheme {
+  if (!v || typeof v !== 'object') return DEFAULT_SETTINGS.scheme;
+  const o = v as Record<string, unknown>;
+  const wording = txt(o.wording, 300);
+  const logo = txt(o.logoUrl, 300);
+  return {
+    on: o.on === true && !!wording,
+    name: txt(o.name, 80),
+    wording,
+    // The official file: hosted (https) or put in the site's own assets folder.
+    logoUrl: /^https:\/\//.test(logo) || /^\/assets\/[\w./-]+$/.test(logo) ? logo : '',
+    link: httpsOr(o.link, 300),
+  };
 }
 
 export function cleanReviews(v: unknown): Reviews {
@@ -284,6 +307,7 @@ export function cleanSettings(v: unknown): EstimatorSettings {
     panelModel: txt(o.panelModel, 80),
     accreditations: cleanAccreditations(o.accreditations),
     reviews: cleanReviews(o.reviews),
+    scheme: cleanScheme(o.scheme),
     finance: { askOn: bool(fi.askOn, false), figuresOn: bool(fi.figuresOn, false) && Number(fi.aprPct) > 0, aprPct: Math.min(100, Math.max(0, Number(fi.aprPct) || 0)), termYears: Math.min(25, Math.max(1, Math.round(Number(fi.termYears) || 10))), link: /^https:\/\//.test(txt(fi.link, 300)) ? txt(fi.link, 300) : '' },
   };
 }

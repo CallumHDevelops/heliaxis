@@ -76,6 +76,7 @@ export function EstimatorSettingsForm({ initial }: { initial: EstimatorSettings 
   const [panelModel, setPanelModel] = useState(initial.panelModel);
   const [accreditations, setAccreditations] = useState(initial.accreditations);
   const [reviews, setReviews] = useState(initial.reviews);
+  const [scheme, setScheme] = useState(initial.scheme);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -92,6 +93,7 @@ export function EstimatorSettingsForm({ initial }: { initial: EstimatorSettings 
     panelModel,
     accreditations,
     reviews,
+    scheme,
   });
   const cfg = cleanSettings(payload());
 
@@ -342,6 +344,34 @@ export function EstimatorSettingsForm({ initial }: { initial: EstimatorSettings 
         </div>
         <label className="est-check">
           <input type="checkbox" checked={reviews.on} onChange={(e) => setReviews({ ...reviews, on: e.target.checked })} /> Show the reviews line (needs a rating and a count)
+        </label>
+      </section>
+
+      <section className="qb-card">
+        <b>Government scheme banner (off until the official logo pack is in)</b>
+        <p className="crm-muted" style={{ margin: '0 0 10px' }}>
+          Shown once under the system cards. Use only the logo file the scheme sent you and the wording its branding guidelines allow; no rates or loan amounts here. The logo can be a full https:// address or a file in the site&rsquo;s /assets/ folder.
+        </p>
+        <div className="est-grid">
+          <div className="est-field">
+            <label htmlFor="sc-n">Scheme name</label>
+            <input id="sc-n" className="crm-input" value={scheme.name} onChange={(e) => setScheme({ ...scheme, name: e.target.value })} />
+          </div>
+          <div className="est-field">
+            <label htmlFor="sc-w">Wording</label>
+            <textarea id="sc-w" className="crm-input" rows={2} value={scheme.wording} onChange={(e) => setScheme({ ...scheme, wording: e.target.value })} />
+          </div>
+          <div className="est-field">
+            <label htmlFor="sc-l">Official logo file</label>
+            <input id="sc-l" className="crm-input" value={scheme.logoUrl} onChange={(e) => setScheme({ ...scheme, logoUrl: e.target.value })} placeholder="https:// or /assets/…" />
+          </div>
+          <div className="est-field">
+            <label htmlFor="sc-u">The scheme&rsquo;s official page (https://)</label>
+            <input id="sc-u" className="crm-input" value={scheme.link} onChange={(e) => setScheme({ ...scheme, link: e.target.value })} placeholder="https://" />
+          </div>
+        </div>
+        <label className="est-check">
+          <input type="checkbox" checked={scheme.on} onChange={(e) => setScheme({ ...scheme, on: e.target.checked })} /> Show the scheme banner on the estimator
         </label>
       </section>
 

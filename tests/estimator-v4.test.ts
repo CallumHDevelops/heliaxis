@@ -99,3 +99,21 @@ describe('V4: trust details in the settings', () => {
     expect(includedItems({ panels: 11, inverter: null, batteryName: null, scaffolding: true, workmanshipYears: 0 })).toContain('11 solar panels');
   });
 });
+
+describe('V4: the government scheme banner', () => {
+  it('starts off, with the WHLS wording ready', () => {
+    const s = cleanSettings({});
+    expect(s.scheme.on).toBe(false);
+    expect(s.scheme.wording).toMatch(/Warm Homes Loan Scheme/);
+  });
+  it('cannot be switched on without wording', () => {
+    expect(cleanSettings({ scheme: { on: true, wording: '' } }).scheme.on).toBe(false);
+    expect(cleanSettings({ scheme: { on: true, wording: 'Approved installer.' } }).scheme.on).toBe(true);
+  });
+  it('takes the logo only from https or the site’s own assets folder, and the link only as https', () => {
+    expect(cleanSettings({ scheme: { logoUrl: '/assets/whls-logo.png' } }).scheme.logoUrl).toBe('/assets/whls-logo.png');
+    expect(cleanSettings({ scheme: { logoUrl: 'https://example.org/logo.svg' } }).scheme.logoUrl).toBe('https://example.org/logo.svg');
+    expect(cleanSettings({ scheme: { logoUrl: 'javascript:x' } }).scheme.logoUrl).toBe('');
+    expect(cleanSettings({ scheme: { link: 'http://x.org' } }).scheme.link).toBe('');
+  });
+});

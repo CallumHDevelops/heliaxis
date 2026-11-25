@@ -27,6 +27,7 @@ import { includedItems } from '@/lib/estimator/included';
 import { TrustBar } from './TrustBar';
 import { SystemCards } from './SystemCards';
 import { ProofBand } from './ProofBand';
+import { SchemeBanner } from './SchemeBanner';
 import { BrandIcon } from '@/app/admin/crm/CrmUi';
 import { chosenKey, systemChoices } from '@/lib/estimator/choices';
 import { track } from '@/lib/estimator/analytics';
@@ -723,6 +724,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
           <BrandIcon k="document" size={20} /> A fixed price in writing after your free survey
         </li>
       </ul>
+      <SchemeBanner scheme={settings.scheme} />
       <div className="est-v4-next">
         {requested ? (
           <span className="est-headdone est-headdone--inline" role="status">

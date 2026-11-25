@@ -80,6 +80,13 @@
 .est-v4-next .est-btn-ghost:hover{background:var(--ink);color:var(--paper)}
 .est-v4-next a{display:inline-flex;align-items:center;gap:6px;color:var(--ink);font-weight:600;text-underline-offset:3px}
 
+/* The government scheme Heliaxis is approved for: the official logo on white, as scheme guidelines usually ask, and its wording. */
+.est-v4-scheme{display:flex;align-items:center;gap:18px;padding:14px 18px;border:1px solid var(--line);border-radius:3px;background:#fff}
+.est-v4-scheme img{flex:none;height:48px;width:auto;max-width:180px;object-fit:contain}
+.est-v4-scheme p{margin:0;font-size:.92rem;line-height:1.5;color:var(--ink)}
+.est-v4-scheme a{color:var(--ink);font-weight:600;text-underline-offset:3px}
+@media(max-width:600px){.est-v4-scheme{flex-direction:column;align-items:flex-start;gap:10px}}
+
 /* Accreditations with their numbers, each linked to its public register. */
 .est-v4-proof{display:grid;gap:14px;padding:22px 24px;border:1px solid var(--line);border-radius:3px;background:var(--card)}
 .est-v4-proof__head{display:grid;gap:6px}
