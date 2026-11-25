@@ -4,6 +4,7 @@ import { ISSUE } from '@/lib/documents/issue';
 import { EV_FIELDS, EV_TITLE } from '@/lib/site/forms/electrician/ev';
 import { HP_FIELDS, HP_TITLE } from '@/lib/site/forms/electrician/heatpump';
 import { captures } from '@/lib/site/forms/electrician/shared';
+import { NEW_IN_V6, NOT_ON_EARLIER, V6 } from '@/lib/site/forms/legacy';
 import type { Field, FormCtx } from '@/lib/site/forms/types';
 import { visibleFields } from '@/lib/site/rules';
 import { signature, siteBox, words, type ElectricianDocInput } from './common';
@@ -11,11 +12,13 @@ import { signature, siteBox, words, type ElectricianDocInput } from './common';
 /**
  * HX-EV-01, the EV Charge Point Installation Record (SPEC 2.10), and HX-HP-01, the Heat Pump
  * Electrical Supply Record (2.11): Heliaxis's own records, not regulated forms, so they print the questions as asked, in
- * their groups, with the answers. Only questions asked on the job print; nothing empty.
+ * their groups, with the answers. Only questions asked on the job print; nothing empty. A record
+ * from an assignment made before version 6 says "Not on the earlier version" for a version 6
+ * question left unanswered.
  */
 
 /** The rows of a record, grouped as the phone asked them. */
-function record(kit: Kit, fields: Field[], c: FormCtx) {
+function record(kit: Kit, fields: Field[], c: FormCtx, version: number = V6) {
   const step = { key: 'x', title: '', fields };
   let group = '';
   let rows: Row[] = [];
@@ -39,6 +42,10 @@ function record(kit: Kit, fields: Field[], c: FormCtx) {
     }
     const v = words(f, c.values[f.key]);
     if (f.level === 'optional' && !v) continue;
+    if (!v && version < V6 && NEW_IN_V6.has(f.key)) {
+      rows.push({ label: f.label, value: NOT_ON_EARLIER });
+      continue;
+    }
     rows.push({ label: f.label, value: v, must: f.level === 'must' });
   }
   flush();
@@ -59,7 +66,7 @@ export async function makeEvRecord(d: ElectricianDocInput): Promise<Uint8Array> 
   siteBox(kit, d, 'Installed by');
   const top = [...(d.ctx.el?.ev_model ? [{ label: 'Charger', value: d.ctx.el.ev_model }] : []), ...serialRow('Charger serial number', d.ctx.values.SN_EV)];
   if (top.length) kit.rows(top);
-  record(kit, EV_FIELDS, d.ctx);
+  record(kit, EV_FIELDS, d.ctx, d.schemaVersion ?? 1);
   await signature(kit, d, 'Installed and tested by');
   return kit.save();
 }

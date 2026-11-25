@@ -5,7 +5,7 @@ import { schemaReady } from '@/lib/schema-ready';
 import { DEFAULT_RATES } from '@/lib/subcontractors/agreement';
 import { cleanAssignment, mobileProblem, moneyLine, vatFor, vatNow, waIdOf, isEmail, type MoneyLine } from './assign';
 import { designOf } from './design';
-import { formsFor, isElectricianForm, suggestedTrades } from './forms';
+import { formsFor, isElectricianForm, SITE_SCHEMA_VERSION, suggestedTrades } from './forms';
 import { legacySections } from './forms/legacy';
 import { defaultCertRoute } from './forms/electrician/cert';
 import { cisPercent, cisWords, isCisRate, parseAgreedRate, type CisRate, type RateBasis, type VatTreatment } from './money';
@@ -420,6 +420,8 @@ export async function createAssignments(
         vat_treatment: vat.value,
         vat_note: String(input.vat_note ?? '').trim().slice(0, 200) || null,
         forms,
+        // The forms version it's made with: what version 6 added is must only from then on (forms/legacy.ts NEW_IN_V6).
+        schema_version: SITE_SCHEMA_VERSION,
         ...(clean.fields.trade === 'electrician' && !clean.fields.cert_route ? { cert_route: defaultCertRoute() } : {}),
       },
     });

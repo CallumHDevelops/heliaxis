@@ -4,6 +4,7 @@
  * tab). Sections that don't apply aren't shown. The certificate and Finish are always there: the
  * owner's completion conditions aren't optional. Type-only imports, plus the sections.
  */
+import { NEW_IN_V6, V6 } from '../legacy';
 import type { FlagRule, SiteForm, Step } from '../types';
 import { BAT_FLAGS, BAT_TESTS_STEP, batInspectStep, LOCATION_FLAGS } from './battery';
 import { certFlags, certSteps } from './cert';
@@ -37,15 +38,21 @@ const SECTIONS: Record<string, { steps: (forms: string[]) => Step[]; flags: () =
   finish: { steps: () => [FINISH_STEP], flags: () => FINISH_FLAGS, minutes: 2 },
 };
 
-/** The electrician's form for these sections, in `order` (forms/index.ts ELECTRICIAN_FORMS). */
-export function electricianForm(forms: string[], order: readonly string[]): SiteForm {
+/**
+ * On an assignment made before version 6, what version 6 added (NEW_IN_V6) is asked as should, not
+ * must: a job already under way isn't stopped at sign-off for a question it didn't have.
+ */
+const beforeV6 = (step: Step): Step => ({ ...step, fields: step.fields.map((f) => (NEW_IN_V6.has(f.key) && f.level === 'must' ? { ...f, level: 'should' as const } : f)) });
+
+/** The electrician's form for these sections, in `order` (forms/index.ts ELECTRICIAN_FORMS), as the assignment's schema version asks them. */
+export function electricianForm(forms: string[], order: readonly string[], version = V6): SiteForm {
   const want = new Set([...forms, 'cert', 'finish']);
   const used = order.filter((k) => want.has(k) && SECTIONS[k]);
   return {
     id: 'electrician',
     stage: 'main',
     title: 'Electrical checks',
-    steps: used.flatMap((k) => SECTIONS[k].steps(used)),
+    steps: used.flatMap((k) => SECTIONS[k].steps(used)).map((s) => (version < V6 ? beforeV6(s) : s)),
     sig: finishSig(used),
     flags: used.flatMap((k) => SECTIONS[k].flags()),
     minutes: used.reduce((a, k) => a + SECTIONS[k].minutes, 0),

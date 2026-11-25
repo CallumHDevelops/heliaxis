@@ -107,6 +107,7 @@ export async function electricianInput(
     draft: opts.draft || !signoff,
     declaration: signoff?.declaration ?? null,
     buildingRef: typeof paper.building_regs_ref === 'string' && paper.building_regs_ref.trim() ? paper.building_regs_ref.trim() : null,
+    schemaVersion: a.schema_version ?? 1,
   };
   // The hash: what the documents print from (not the signature image's bytes, which never change),
   // and not the office's own answers kept beside the electrician's (the EIC's design part): none of

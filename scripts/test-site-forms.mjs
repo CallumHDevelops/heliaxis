@@ -174,7 +174,7 @@ eq('the roofer has nothing to scan', [rooferForms.length, rooferForms.flatMap((f
 // Nothing in the app's code reads, writes or prints them (a saved SN_PANEL from old test data is just ignored).
 const fs = await import('node:fs');
 const path = await import('node:path');
-const SRC_DIR = new URL('../src/', import.meta.url).pathname;
+const SRC_DIR = (await import('node:url')).fileURLToPath(new URL('../src/', import.meta.url));
 const hits = [];
 const walk = (dir) => {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

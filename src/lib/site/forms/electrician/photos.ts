@@ -6,6 +6,7 @@
  */
 import type { Field, FormCtx, Step } from '../types';
 import { installationTT } from './carry';
+import { evBuried, evIsolator, evRod } from './ev';
 import { has, is } from './shared';
 
 const photo = (key: string, label: string, hint: string, extra: Partial<Field> = {}): Field => ({ key, type: 'PHOTOS', label, hint, level: 'must', need: 1, ...extra });
@@ -26,8 +27,8 @@ export function frameSafetyEarth(c: FormCtx): boolean | null {
   if (frameEarthed(c)) return true;
   return is(c, 'pvi_frame_ext', 'no') && is(c, 'pvi_frame_exp', 'no') && is(c, 'pvi_frame_lp', 'no') ? false : null;
 }
-/** An earth electrode is fitted: a back-up battery, the battery inspection's own electrode ticked, a TT installation (the EIC's or the EV record's answer), or the EV charger on its own rod. */
-export const electrodeFitted = (c: FormCtx) => is(c, 'eess_backup', 'yes') || is(c, 'bat_bu_electrode', 'done') || installationTT(c) || is(c, 'ev_openpen', 'electrode');
+/** An earth electrode is fitted: a back-up battery, the battery inspection's own electrode ticked, a TT installation (the EIC's or the EV record's answer), or the EV charger on its own rod (only while its open-PEN question applies). */
+export const electrodeFitted = (c: FormCtx) => is(c, 'eess_backup', 'yes') || is(c, 'bat_bu_electrode', 'done') || installationTT(c) || (ev(c) && evRod(c));
 
 export const PHOTO_FIELDS: Field[] = [
   photo('EP01', 'Consumer unit before', 'Before you touch anything: cover on, every label readable.', { group: 'Before you touch anything' }),
@@ -64,6 +65,12 @@ export const PHOTO_FIELDS: Field[] = [
   photo('EP45', 'Labels', 'Labels at the consumer unit and the charger.', { show: ev }),
   photo('EP46', 'Charger online', 'Charger online in its app; a charging test if a car is there.', { level: 'should', show: ev }),
   photo('EP47', 'Load-management CT', 'Where fitted: the CT clamp and its lead.', { level: 'should', show: ev }),
+  // Schema 6. The 40s are full after EP49, so the EV slots carry on at EP60 (never used before).
+  photo('EP48', 'Inside the charger after wiring', 'Cover off, before it goes back on: L, N and E terminations, CT and data connections, the cable entry and gland, all in shot.', { need: 2, show: ev }),
+  photo('EP49', 'Penetrations', 'Every hole through a wall, floor or ceiling for this circuit, sealed or fire-stopped. Take both sides of each one.', { need: 2, show: ev }),
+  photo('EP60', 'Updated circuit chart', 'The chart at the consumer unit, readable, with the new EV circuit on it.', { show: ev }),
+  photo('EP61', 'Charger isolator', 'The isolator, labelled, and shown locked off if you can.', { show: (c) => ev(c) && evIsolator(c), note: () => 'Needed because an isolator is fitted (EV charger record).' }),
+  photo('EP62', 'Buried cable', 'Before backfill: the trench depth, the duct and the marker tape.', { show: (c) => ev(c) && evBuried(c), note: () => 'Needed because the cable is buried (EV charger record).' }),
   // REGS 3.4: a grant claim needs these four (only when the job claims the OZEV grant).
   photo('EPG1', 'Grant: charger close-up', 'For the OZEV grant claim: the charger, close up.', { group: 'EV grant photos', show: (c) => ev(c) && c.design.ozev_grant === true }),
   photo('EPG2', 'Grant: model and serial label', 'For the OZEV grant claim: the label with the model and serial readable.', { show: (c) => ev(c) && c.design.ozev_grant === true }),

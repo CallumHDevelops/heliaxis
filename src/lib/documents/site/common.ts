@@ -34,6 +34,8 @@ export type ElectricianDocInput = {
   declaration?: string | null;
   /** The job's Building Control reference (paperwork.building_regs_ref), once the office has it. */
   buildingRef?: string | null;
+  /** The assignment's forms version (site_assignments.schema_version): a record made before version 6 says so where a newer question has no answer. */
+  schemaVersion?: number | null;
 };
 
 const WORD: Record<string, string> = { yes: 'Yes', no: 'No', na: 'N/A', pass: 'Pass', fail: 'Fail' };
