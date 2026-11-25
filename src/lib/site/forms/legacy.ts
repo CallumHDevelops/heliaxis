@@ -187,6 +187,49 @@ export const savedBeforeV4 = (answers: Record<string, unknown> | null | undefine
 export const NEW_IN_V4 = new Set(['pvi_watertight', 'pvi_frame_earthed', 'pvi_frame_func', 'pvi_mount', 'pvi_frame_metal', 'pvi_frame_ext', 'pvi_frame_exp', 'pvi_frame_lp']);
 export const NOT_ON_EARLIER = 'Not on the earlier version of this record';
 
+/**
+ * What schema version 6 added: the EV charger record's new questions and the EV photos. On an
+ * assignment made before version 6 (a job already under way, or a phone holding the old forms) they
+ * are asked, but as should, never must: the sign-off isn't stopped for a question that wasn't there
+ * when the job started. Its record prints NOT_ON_EARLIER where one has no answer.
+ */
+export const NEW_IN_V6 = new Set([
+  'ev_location',
+  'ev_afdd',
+  'ev_afdd_why',
+  'ev_isolator',
+  'ev_cable',
+  'ev_kw',
+  'ev_tether',
+  'ev_lbl_cu',
+  'ev_lbl_chart',
+  'ev_lbl_charger',
+  'ev_lbl_iso',
+  'ev_lbl_rcd',
+  'ev_lbl_rod',
+  'ev_lbl_dual',
+  'ev_random',
+  'ev_firmware',
+  'ev_app',
+  'ev_app_n',
+  'ev_test',
+  'ev_test_n',
+  'ev_show_start',
+  'ev_show_sched',
+  'ev_show_rcd',
+  'ev_show_iso',
+  'ev_show_lights',
+  'ev_show_contact',
+  'ev_show_warranty',
+  'EP48',
+  'EP49',
+  'EP60',
+  'EP61',
+  'EP62',
+]);
+/** The schema version NEW_IN_V6 arrived in. */
+export const V6 = 6;
+
 /** The values with every old answer read under its new key, where the new key has none (WORDING-SPEC 12.3). */
 export function withLegacy(values: Record<string, unknown>): Record<string, unknown> {
   if (!Object.keys(values).some((k) => OLD_KEY.test(k))) return values;

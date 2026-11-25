@@ -8,7 +8,7 @@ import type { Answers } from '@/lib/site/types';
 import { valuesOf } from '@/lib/site/values';
 import { modelsOf, type CustomerSig, type ElectricianFacts, type HandoverFacts, type LibraryItem, type Payment, type SlotData, type SystemFacts } from './inputs';
 import { getHandoverSettings } from './settings';
-import { isSlot, modelKey, type SlotCode, type SlotDoc } from './slots';
+import { docItem, isSlot, modelKey, type SlotCode, type SlotDoc } from './slots';
 
 /**
  * Everything the handover pack is worked out from, read for one job: the job and its customer, the
@@ -315,16 +315,19 @@ export async function loadHandover(db: Db, projectId: string): Promise<Loaded | 
 /**
  * The pack's documents as the catalogue reads them (current ones, with the store's Out of date marks
  * and the G99 papers' parts). Never the G98 data sheet (generated_key HX-HO-15-SHEET): it's the
- * office's helper, and one filed in HX-HO-15 before that isn't the notice the DNO was sent.
+ * office's helper, and one filed in HX-HO-15 before that isn't the notice the DNO was sent. A
+ * generated document is read in its own item where it has one (docItem): HX-EV-01 was filed in
+ * HX-HO-19 before it had its own.
  */
 export function slotDocs(l: Loaded): SlotDoc[] {
   return l.docs
     .filter((d) => d.handover_slot && isSlot(d.handover_slot) && d.handover_slot !== 'PACK' && !d.archived_at && d.generated_key !== 'HX-HO-15-SHEET')
     .map((d) => {
-      const data = l.slots.get(String(d.handover_slot))?.data;
+      const slot = docItem(d);
+      const data = l.slots.get(slot)?.data;
       return {
         id: d.id,
-        slot: String(d.handover_slot),
+        slot,
         name: d.name,
         source: d.source,
         key: d.generated_key,

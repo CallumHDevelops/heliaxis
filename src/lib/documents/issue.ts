@@ -21,6 +21,7 @@ export const ISSUE: Record<string, string> = {
   'HX-HO-16': 'Issue 1',
   'HX-HO-18': 'Issue 1',
   'HX-EV-01': 'Issue 1',
+  'HX-EV-03': 'Issue 1',
   'HX-HP-01': 'Issue 1',
   // The In-House pack (internal, never sent to a customer). Provisional until the owner approves the codes.
   'HX-IH-01': 'Issue 1',

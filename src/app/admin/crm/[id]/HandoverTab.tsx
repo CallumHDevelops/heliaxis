@@ -80,7 +80,7 @@ const FIX_LABEL: Record<Fix, string> = {
 };
 /** The electrician's own records (their step-by-step site app): asking for them means putting them on the job. */
 const SITE_ITEMS = ['HX-HO-04'];
-const SITE_KEYS = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'EIC', 'CERT_OWN', 'HX-EV-01', 'HX-HP-01'];
+const SITE_KEYS = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'EIC', 'CERT_OWN', 'HX-EV-01', 'HX-EV-03', 'HX-HP-01'];
 
 /** The sheets of values the office types, and the pack item each is kept on. */
 type ValuesForm = 'plan' | 'switches' | 'summary' | 'g98';

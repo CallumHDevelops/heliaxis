@@ -71,14 +71,17 @@ export const DRAFTS: Record<DraftKey, { version: string; title: string; text: st
     text: 'I’m happy that the work at {address} has been finished, and I’ve been shown how the system works and how to switch it off.',
   },
   shutdown: {
-    version: 'shutdown-1',
+    // shutdown-2 (25 Nov 2026): the EV charger's steps, and no inverter's AC isolator on a charger-only job.
+    version: 'shutdown-2',
     title: 'Switching off (HX-HO-09)',
     text: [
-      '1. Switch off the circuit at your consumer unit (fuse box): {cu}.',
-      '2. Switch off the AC isolator: {ac}.',
-      '3. Solar: switch off the DC isolator: {dc}.',
-      '4. Battery: switch it off at its own isolator, as its manual shows: {battery}.',
-      'To switch it back on, go the other way: 4, 3, 2, then 1.',
+      '1. EV charger: stop any charge, in the app or on the charger, then switch off its isolator: {ev}.',
+      '2. Switch off the circuit at your consumer unit (fuse box): {cu}.',
+      '3. Switch off the AC isolator: {ac}.',
+      '4. Solar: switch off the DC isolator: {dc}.',
+      '5. Battery: switch it off at its own isolator, as its manual shows: {battery}.',
+      'To switch it back on, go the other way: 5, 4, 3, 2, then 1.',
+      'EV charger: stop any charge, in the app or on the charger, before you switch it off.',
       'If your battery gives back-up power, some circuits stay on in a power cut and when the consumer unit is switched off. Switch the battery off at its own isolator too before anyone works on them.',
       'If anything sparks, smells of burning or looks damaged, keep away from it and call us on 01633 965205.',
     ].join('\n'),

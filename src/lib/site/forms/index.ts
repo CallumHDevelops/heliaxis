@@ -19,8 +19,11 @@ import type { SiteForm } from './types';
  * Version 4: the electrician's records in Heliaxis's own words and keys (WORDING-SPEC 12); answers
  * saved under the old keys are read through LEGACY_KEYS (forms/legacy.ts). Version 5: the roof checks
  * are the roofer's (RX10–RX14); the electrician's Roof and panels questions are no longer shown.
+ * Version 6: the EV charger record's new questions and photos (forms/legacy.ts NEW_IN_V6): must from
+ * version 6, should on an assignment made before it. Assignments made before version 6 hold the
+ * column's default (1): it's written when an assignment is made from version 6 (site/server.ts).
  */
-export const SITE_SCHEMA_VERSION = 5;
+export const SITE_SCHEMA_VERSION = 6;
 export { LEGACY_KEYS, withLegacy } from './legacy';
 
 /**
@@ -28,7 +31,7 @@ export { LEGACY_KEYS, withLegacy } from './legacy';
  * electrician's pack is built from the sections on the assignment (forms/electrician).
  */
 const BY_TRADE: Partial<Record<Trade, SiteForm[]>> = { roofer: [ROOFER], scaffolder: [SCAFFOLD_UP, SCAFFOLD_DOWN] };
-const ELECTRICIAN: ((forms: string[]) => SiteForm)[] = [(forms) => electricianForm(forms, ELECTRICIAN_FORMS)];
+const ELECTRICIAN: ((forms: string[], version?: number) => SiteForm)[] = [(forms, version) => electricianForm(forms, ELECTRICIAN_FORMS, version ?? SITE_SCHEMA_VERSION)];
 
 /** Every form of every trade (the electrician's with all its sections), for the key checks in the tests. */
 export function allForms(): SiteForm[] {
@@ -37,7 +40,8 @@ export function allForms(): SiteForm[] {
 
 /** The forms an assignment is filled in with, in stage order (a phone's copy saved before version 4 may still hold the old section ids). */
 export function schemaFor(a: { trade: Trade; forms?: string[] | null; schema_version?: number | null }): SiteForm[] {
-  if (a.trade === 'electrician') return ELECTRICIAN.map((make) => make(legacySections(a.forms ?? [])));
+  // Its own version: an assignment made before version 6 asks version 6's questions as should.
+  if (a.trade === 'electrician') return ELECTRICIAN.map((make) => make(legacySections(a.forms ?? []), a.schema_version ?? 1));
   return BY_TRADE[a.trade] ?? [];
 }
 

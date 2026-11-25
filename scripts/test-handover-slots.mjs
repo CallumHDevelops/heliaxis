@@ -36,16 +36,16 @@ function eq(name, got, want) {
 // The owner's list, in his order, by Heliaxis's codes.
 const OWNER_LIST = ['HX-HO-01', 'HX-BAT-01', 'HX-HO-06', 'HX-PV-02', 'HX-BAT-02', 'HX-PV-01', 'HX-PV-03', 'HX-HO-02', 'HX-BAT-04', 'HX-HO-08', 'HX-HO-15', 'HX-HO-10', 'HX-BAT-03', 'HX-HO-11', 'HX-HO-12', 'HX-HO-16', 'HX-HO-09', 'HX-HO-17', 'HX-HO-13', 'HX-HO-18', 'HX-HO-05', 'HX-HO-04', 'HX-HO-14', 'HX-HO-07', 'HX-HO-03', 'HX-HO-19'];
 eq('every document in the owner’s list has a slot', OWNER_LIST.filter((c) => !S.slotDef(c)), []);
-eq('32 items plus the combined PACK (the 26, the construction phase plan, the EV/heat pump grid notice and four heat pump papers)', [S.PACK_ITEMS.length, S.SLOTS.length], [32, 33]);
+eq('36 items plus the combined PACK (the 26, the construction phase plan, the EV/heat pump grid notice, four heat pump papers and four EV ones)', [S.PACK_ITEMS.length, S.SLOTS.length], [36, 37]);
 eq('titles in Heliaxis’s own words', [S.slotDef('HX-HO-16').title, S.slotDef('HX-HO-07').title, S.slotDef('HX-BAT-04').title, S.slotDef('HX-HO-02').title, S.slotDef('HX-HO-08').title], ['Grid connection papers (G99)', 'Warranty insurance', 'Battery location statement (PAS 63100)', 'System summary and sign-off', 'Completion sign-off']);
-eq('every code is Heliaxis’s own', S.PACK_ITEMS.filter((s) => !/^HX-(HO|PV|BAT|HP)-\d\d$/.test(s.code)).map((s) => s.code), []);
+eq('every code is Heliaxis’s own', S.PACK_ITEMS.filter((s) => !/^HX-(HO|PV|BAT|HP|EV)-\d\d$/.test(s.code)).map((s) => s.code), []);
 eq('every item has a customer line and a contents group', S.PACK_ITEMS.filter((s) => !s.customer || !s.group).map((s) => s.code), []);
 eq(
   'pack order is the customer order (HANDOVER 2.6)',
   [...S.PACK_ITEMS].sort((a, b) => a.order - b.order).map((s) => s.code),
-  ['HX-HO-01', 'HX-HO-02', 'HX-HO-03', 'HX-HO-04', 'HX-BAT-04', 'HX-HO-05', 'HX-HP-04', 'HX-HO-06', 'HX-HO-07', 'HX-HO-08', 'HX-HO-09', 'HX-HO-10', 'HX-HO-11', 'HX-HO-12', 'HX-HO-13', 'HX-HO-14', 'HX-HP-05', 'HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-BAT-03', 'HX-HP-02', 'HX-HP-03', 'HX-HO-15', 'HX-HO-16', 'HX-HO-21', 'HX-HO-17', 'HX-HO-18', 'HX-HO-20', 'HX-HO-19']
+  ['HX-HO-01', 'HX-HO-02', 'HX-HO-03', 'HX-HO-04', 'HX-BAT-04', 'HX-HO-05', 'HX-HP-04', 'HX-EV-03', 'HX-EV-02', 'HX-HO-06', 'HX-HO-07', 'HX-HO-08', 'HX-HO-09', 'HX-HO-10', 'HX-HO-11', 'HX-HO-12', 'HX-HO-13', 'HX-HO-14', 'HX-HP-05', 'HX-PV-02', 'HX-PV-01', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-EV-01', 'HX-BAT-03', 'HX-HP-02', 'HX-HP-03', 'HX-HO-15', 'HX-HO-16', 'HX-HO-21', 'HX-HO-17', 'HX-HO-18', 'HX-HO-20', 'HX-EV-04', 'HX-HO-19']
 );
-eq('"Which is it?" ends with Something else; the office’s uploads (the G98 notice, the estimate page, the PAS 63100 papers) are offered', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Battery location statement (PAS 63100)', 'Building Regulations certificate', 'Heat pump handover certificate', 'QualityMark guarantee certificate', 'Solar estimate, shading and care', 'Wiring diagram (schematic)', 'Design calculations', 'Ground loop design', 'Battery location check (PAS 63100)', 'Heat pump commissioning checklist', 'Cylinder commissioning checklist', 'G98 notice as sent', 'G99 papers', 'DNO notice for an EV charger or heat pump', 'Final invoice', 'Construction phase plan', 'Something else']);
+eq('"Which is it?" ends with Something else; the office’s uploads (the G98 notice, the estimate page, the PAS 63100 papers) are offered', S.UPLOAD_PICKS.map((s) => s.pick), ['MCS certificate', 'Electrical certificate (EIC)', 'Battery location statement (PAS 63100)', 'Building Regulations certificate', 'Heat pump handover certificate', 'Smart charge point statement of compliance', 'QualityMark guarantee certificate', 'Solar estimate, shading and care', 'Wiring diagram (schematic)', 'Design calculations', 'Ground loop design', 'Battery location check (PAS 63100)', 'Heat pump commissioning checklist', 'Cylinder commissioning checklist', 'G98 notice as sent', 'G99 papers', 'DNO notice for an EV charger or heat pump', 'Final invoice', 'Construction phase plan', 'OZEV grant claim confirmation', 'Something else']);
 
 /* ── Applies: technologies and the DNO route ──────────────────────────────── */
 
@@ -55,10 +55,26 @@ const applies = (products, extra = {}) => {
 };
 const yes = (m) => Object.keys(m).filter((k) => m[k] === null);
 eq(
-  'EV only: the covering letter, certificate, Building Regulations, warranty, completion, switching off, manuals, invoice (and the optional extras)',
+  'EV only: the covering letter, certificate, Building Regulations, the EV papers, warranty, completion, switching off, manuals, invoice (and the optional extras); no grant claim',
   yes(applies(['ev'])),
-  ['HX-HO-01', 'HX-HO-04', 'HX-HO-05', 'HX-HO-06', 'HX-HO-08', 'HX-HO-09', 'HX-HO-21', 'HX-HO-17', 'HX-HO-18', 'HX-HO-20', 'HX-HO-19']
+  ['HX-HO-01', 'HX-HO-04', 'HX-HO-05', 'HX-EV-03', 'HX-EV-02', 'HX-HO-06', 'HX-HO-08', 'HX-HO-09', 'HX-EV-01', 'HX-HO-21', 'HX-HO-17', 'HX-HO-18', 'HX-HO-20', 'HX-HO-19']
 );
+const evCodes = (m) => yes(m).filter((k) => k.startsWith('HX-EV-'));
+eq('EV with the OZEV grant: the claim too', [evCodes(applies(['ev'], { ozevGrant: true })), applies(['ev'], { ozevGrant: false })['HX-EV-04'], applies(['ev'])['HX-EV-04']], [
+  ['HX-EV-03', 'HX-EV-02', 'HX-EV-01', 'HX-EV-04'],
+  'No OZEV grant claimed on this job (Job details)',
+  'No OZEV grant claimed on this job (Job details)',
+]);
+eq('the grant ticked on a job with no charger: still not needed', applies(['solar'], { ozevGrant: true })['HX-EV-04'], 'No EV charger on this job');
+eq('EV only: no MCS, no solar or battery items', ['HX-HO-03', 'HX-HO-07', 'HX-HO-02', 'HX-HO-10', 'HX-PV-01', 'HX-BAT-01', 'HX-HO-15', 'HX-HO-16'].filter((k) => applies(['ev'])[k] === null), []);
+const evSolar = yes(applies(['ev', 'solar'], { ozevGrant: true }));
+eq('EV and solar: every solar item and every EV item, once each', [
+  ['HX-HO-02', 'HX-HO-03', 'HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-HO-15', 'HX-HO-10'].every((k) => evSolar.includes(k)),
+  ['HX-EV-01', 'HX-EV-02', 'HX-EV-03', 'HX-EV-04', 'HX-HO-21'].every((k) => evSolar.includes(k)),
+  evSolar.length === new Set(evSolar).size,
+], [true, true, true]);
+eq('no EV items on a solar-only job', yes(applies(['solar'])).filter((k) => k.startsWith('HX-EV-')), []);
+eq('the grid notice’s customer line reads for an EV job', S.slotDef('HX-HO-21').customer, 'The notice that tells your electricity network (DNO) about the new equipment we connected.');
 eq('EV only: the rest say why', [applies(['ev'])['HX-PV-02'], applies(['ev'])['HX-HO-02'], applies(['ev'])['HX-BAT-01'], applies(['ev'])['HX-HO-03']], ['No solar panels on this job', 'No solar or battery on this job', 'No battery on this job', 'No MCS certificate for this job’s technologies']);
 eq('heat pump only: MCS certificate and guarantee apply', [applies(['heatpump'])['HX-HO-03'], applies(['heatpump'])['HX-HO-07'], applies(['heatpump'])['HX-HO-02']], [null, null, 'No solar or battery on this job']);
 const sb = applies(['solar', 'battery']);
@@ -170,6 +186,30 @@ const done = byCode(S.slotStates(ctx({ docs: [...partDocs, doc('HX-HO-02')], gen
 const sc = S.sendCheck(Object.values(done));
 eq('Send allowed once the site documents are in; the rest follow', [sc.ok, sc.following.map((v) => v.code).includes('HX-HO-03')], [true, true]);
 
+// EV: every EV item listed, Waiting for the electrician, Missing for the office, or Not needed with a reason.
+const EV_ONLY = { products: ['ev'], dnoRoute: null, models: ['Zappi 2'] };
+const evWorking = byCode(S.slotStates(ctx({ ...EV_ONLY, electrician: 'working', commissioned: null })));
+eq('EV job while the electrician works: the records Waiting, the office’s papers Missing, the grant Not needed with why', ['HX-EV-01', 'HX-EV-03', 'HX-EV-02', 'HX-EV-04'].map((k) => [k, evWorking[k].state, evWorking[k].why, evWorking[k].hidden]), [
+  ['HX-EV-01', 'waiting', 'Waiting for Dave (electrician)', false],
+  ['HX-EV-03', 'waiting', 'Waiting for Dave (electrician)', false],
+  ['HX-EV-02', 'missing', 'Upload the charger maker’s statement of compliance (the electrician handed the customer a copy).', false],
+  ['HX-EV-04', 'na', 'No OZEV grant claimed on this job (Job details)', false],
+]);
+eq('…and Send is held by every EV item still open', S.sendCheck(Object.values(evWorking)).blocking.map((v) => v.code).filter((k) => k.startsWith('HX-EV-')).sort(), ['HX-EV-01', 'HX-EV-02', 'HX-EV-03']);
+eq('the grant claimed: its claim holds Send too', S.sendCheck(S.slotStates(ctx({ ...EV_ONLY, ozevGrant: true }))).blocking.map((v) => v.code).includes('HX-EV-04'), true);
+eq('the DNO notice for the charger follows, it doesn’t hold Send', S.sendCheck(Object.values(evWorking)).following.map((v) => v.code).includes('HX-HO-21'), true);
+const evDone = S.slotStates(ctx({ ...EV_ONLY, ozevGrant: true, docs: ['HX-EV-01', 'HX-EV-03', 'HX-HO-04'].map((c) => doc(c)).concat(['HX-EV-02', 'HX-EV-04'].map((c) => doc(c, { source: 'upload', key: null }))), gen: partGen }));
+eq('every EV item Complete: they no longer hold Send', S.sendCheck(evDone).blocking.map((v) => v.code).filter((k) => k.startsWith('HX-EV-')), []);
+const evMarked = S.slotStates(ctx({ ...EV_ONLY, docs: ['HX-EV-01', 'HX-EV-03', 'HX-HO-04'].map((c) => doc(c)), gen: partGen, marks: { 'HX-EV-02': { na: true, reason: 'Maker’s statement is inside the charger manual (HX-HO-17)', by: 'Sarah', at: '2026-11-25T10:00:00Z' } } }));
+eq('the statement marked Not needed with a reason: shown with it, and Send isn’t held by it', [byCode(evMarked)['HX-EV-02'].state, byCode(evMarked)['HX-EV-02'].why, S.sendCheck(evMarked).blocking.map((v) => v.code).includes('HX-EV-02')], ['na', 'Maker’s statement is inside the charger manual (HX-HO-17)', false]);
+eq('an EV record filed in Other useful documents before it had its own item is read in HX-EV-01; others stay put', [
+  S.docItem({ handover_slot: 'HX-HO-19', generated_key: 'HX-EV-01' }),
+  S.docItem({ handover_slot: 'HX-EV-01', generated_key: 'HX-EV-01' }),
+  S.docItem({ handover_slot: 'HX-HO-19', generated_key: 'HX-HP-01' }),
+  S.docItem({ handover_slot: 'HX-HO-19', generated_key: null }),
+], ['HX-EV-01', 'HX-EV-01', 'HX-HO-19', 'HX-HO-19']);
+eq('a solar job: no EV item shown or holding Send', [S.slotStates(ctx()).filter((v) => v.code.startsWith('HX-EV-') && !v.hidden).length, S.sendCheck(S.slotStates(ctx())).blocking.filter((v) => v.code.startsWith('HX-EV-')).length], [0, 0]);
+
 // Customer view, pack contents grouping.
 eq('portal: a waiting item is "on its way", a not-needed one hidden', [S.customerState(part['HX-HO-03']), S.customerState(part['HX-HO-16']), S.customerState({ ...part['HX-PV-02'], docs: [doc('HX-PV-02', { visible: true })] })], ['coming', null, 'ready']);
 const groups = S.contentsGroups(Object.values(part).filter((v) => v.state !== 'na' && v.code !== 'HX-HO-01'));
@@ -261,7 +301,25 @@ const order = (products) => {
 eq('switching off, solar + battery: 1–4, back on 4, 3, 2, then 1', order(['solar', 'battery']), [['1.', '2.', '3.', '4.'], 'To switch it back on, go the other way: 4, 3, 2, then 1.']);
 eq('solar only: 1–3, back on from 3', order(['solar']), [['1.', '2.', '3.'], 'To switch it back on, go the other way: 3, 2, then 1.']);
 eq('battery only: its isolator is step 3, back on from 3', [order(['battery']), I.switchInput(facts({ job: { ...facts().job, products: ['battery'] }, data: { 'HX-HO-09': { values: SWITCHES } } })).input.steps[2]], [[['1.', '2.', '3.'], 'To switch it back on, go the other way: 3, 2, then 1.'], '3. Battery: switch it off at its own isolator, as its manual shows: Battery side.']);
-eq('EV only: 1 and 2, back on 2, then 1', order(['ev']), [['1.', '2.'], 'To switch it back on, go the other way: 2, then 1.']);
+// The charger (shutdown-2): its isolator first when there is one, never an inverter's AC isolator on a charger-only job.
+const evSteps = (products, values = {}, electrician = {}) => I.switchInput(facts({ job: { ...facts().job, products }, data: { 'HX-HO-09': { values } }, electrician: { ...facts().electrician, values: { ...facts().electrician?.values, ...electrician } } })).input.steps;
+eq('EV only, isolator fitted: stop the charge and its isolator, then its circuit; back on 2, then 1', evSteps(['ev'], {}, { ev_isolator: 'yes' }), [
+  '1. EV charger: stop any charge, in the app or on the charger, then switch off its isolator: the isolator next to your charger.',
+  '2. Switch off the circuit at your consumer unit (fuse box): the circuit breaker labelled for your EV charger.',
+  'To switch it back on, go the other way: 2, then 1.',
+  'If anything sparks, smells of burning or looks damaged, keep away from it and call us on 01633 965205.',
+]);
+eq('EV only, no isolator: its circuit, with stopping the charge first; back on at the same circuit', evSteps(['ev'], {}, { ev_isolator: 'no' }), [
+  '1. Switch off the circuit at your consumer unit (fuse box): the circuit breaker labelled for your EV charger.',
+  'To switch it back on, switch the same circuit back on.',
+  'EV charger: stop any charge, in the app or on the charger, before you switch it off.',
+  'If anything sparks, smells of burning or looks damaged, keep away from it and call us on 01633 965205.',
+]);
+eq('EV only: where the office says the isolator is', evSteps(['ev'], { ev: 'Garage wall, left of the charger' }, { ev_isolator: 'no' })[0], '1. EV charger: stop any charge, in the app or on the charger, then switch off its isolator: Garage wall, left of the charger.');
+eq('EV and solar, isolator fitted: the charger first, then the solar steps, 1–4', evSteps(['ev', 'solar'], SWITCHES, { ev_isolator: 'yes' }).filter((l) => /^\d\./.test(l)).map((l) => l.slice(0, 16)), ['1. EV charger: s', '2. Switch off th', '3. Switch off th', '4. Solar: switch']);
+eq('no charger: no EV lines', [order(['solar', 'battery']), I.switchInput(facts()).input.steps.some((l) => /EV charger/.test(l))], [[['1.', '2.', '3.', '4.'], 'To switch it back on, go the other way: 4, 3, 2, then 1.'], false]);
+eq('the switching-off wording is a new version, so it’s approved again before it’s used', [H.DRAFTS.shutdown.version, I.switchInput(facts({ settings: { ...facts().settings, approved: { ...facts().settings.approved, shutdown: { version: 'shutdown-1', at: '2026-10-01T09:00:00Z', by: 'Callum' } } } })).ok], ['shutdown-2', false]);
+eq('the office is asked where the charger’s isolator is (EV jobs only)', [I.SWITCH_FIELDS.find((x) => x.key === 'ev')?.for, I.SWITCH_FIELDS.filter((x) => !x.for || ['solar'].includes(x.for)).some((x) => x.key === 'ev')], ['ev', false]);
 
 const rec = I.receiptInput(facts({ payments: [{ id: 'x1', kind: 'final', amount_pence: 512345, paid_on: '2026-11-10', method: 'bank_transfer', reference: 'INV-0042' }] }));
 eq('receipt: exactly the recorded payments (the deposit, then the final), nothing worked out', rec.input.lines.map((l) => [l.what, l.pence]), [['Deposit', 50000], ['Final payment', 512345]]);

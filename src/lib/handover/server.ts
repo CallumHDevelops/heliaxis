@@ -157,6 +157,7 @@ function stateCtx(l: Loaded, gen: Partial<Record<SlotCode, GenNeed>>) {
     dnoRoute: f.job.dno.route,
     pas63100: f.design.pas63100,
     maintenancePlan: f.design.maintenance_plan,
+    ozevGrant: f.design.ozev_grant,
     docs,
     marks: Object.fromEntries([...l.slots].map(([k, s]) => [k, { na: s.na, reason: s.na_reason, by: s.updated_by ? (l.people.get(s.updated_by) ?? null) : null, at: s.updated_at }])),
     gen,
