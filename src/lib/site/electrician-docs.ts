@@ -9,7 +9,7 @@ import { makePhotoRecord, type RecordDeclaration, type RecordSlot } from '@/lib/
 import { PV_INSPECT_TITLE, makePvInspect } from '@/lib/documents/site/pv-inspect';
 import { PV_SWITCHON_TITLE, makePvSwitchOn } from '@/lib/documents/site/pv-switch-on';
 import { PV_TEST_TITLE, makePvTests } from '@/lib/documents/site/pv-tests';
-import { makeEvRecord, makeHpRecord } from '@/lib/documents/site/records';
+import { EV_HANDOVER_TITLE, makeEvHandover, makeEvRecord, makeHpRecord } from '@/lib/documents/site/records';
 import { inputsHash, saveGenerated, type Reprint, type SaveResult, type StoredRef } from '@/lib/documents/store';
 import { tradeFiles } from './electrician';
 import { serverCtx } from './form-ctx';
@@ -26,7 +26,8 @@ import { readAssignment, type AssignmentRow, type Db } from './server';
 /**
  * The electrician's paperwork (SPEC 2.13 item 6, 2.14), made after the sign-off's reply and stored
  * against the job with saveGenerated: HX-PV-01 to HX-PV-03 (solar), HX-BAT-01 and HX-BAT-02
- * (battery), the EV and heat pump records (HX-EV-01, HX-HP-01), each in its handover pack item, held
+ * (battery), the EV and heat pump records (HX-EV-01, HX-HP-01) and the EV charger's commissioning
+ * and handover certificate (HX-EV-03), each in its handover pack item, held
  * back until the pack goes (release with_pack). File names carry the title, not the code. A
  * certificate uploaded as photos of its pages becomes one PDF in HX-HO-04. The photo record is made
  * only when the office asks. Each is a new version only when what it's made from changed.
@@ -41,6 +42,8 @@ type DocDef = {
   section: string;
   products: string[];
   make: (d: ElectricianDocInput) => Promise<Uint8Array>;
+  /** Made only for an assignment of this forms version or later (what it prints was first asked then). */
+  since?: number;
 };
 
 export const ELECTRICIAN_DOCS: DocDef[] = [
@@ -49,8 +52,10 @@ export const ELECTRICIAN_DOCS: DocDef[] = [
   { key: 'HX-PV-03', title: PV_SWITCHON_TITLE, slot: 'HX-PV-03', section: 'pvswitchon', products: ['solar'], make: makePvSwitchOn },
   { key: 'HX-BAT-01', title: BAT_INSPECT_TITLE, slot: 'HX-BAT-01', section: 'battery', products: ['battery'], make: makeBatteryInspection },
   { key: 'HX-BAT-02', title: BAT_TESTS_TITLE, slot: 'HX-BAT-02', section: 'battery', products: ['battery'], make: makeBatteryTests },
-  // Its own item since 25 Nov 2026 (one made before is read there too: handover/facts.ts docItem).
+  // Its own item since 25 Nov 2026 (one made before is read there too: handover/slots.ts docItem).
   { key: 'HX-EV-01', title: EV_TITLE, slot: 'HX-EV-01', section: 'ev', products: ['ev'], make: makeEvRecord },
+  // The customer's certificate, from the EV record's version 6 answers (an older job's is uploaded on the Handover tab).
+  { key: 'HX-EV-03', title: EV_HANDOVER_TITLE, slot: 'HX-EV-03', section: 'ev', products: ['ev'], make: makeEvHandover, since: 6 },
   { key: 'HX-HP-01', title: HP_TITLE, slot: 'HX-HO-19', section: 'heatpump', products: ['heatpump'], make: makeHpRecord },
 ];
 /** Answers the office writes on the assignment (eic/design.ts), not the electrician: left out of what their documents are hashed on. */
@@ -180,6 +185,7 @@ export async function saveElectricianDocs(db: Db, assignmentId: string, opts: { 
   const out: SaveResult[] = [];
   for (const d of ELECTRICIAN_DOCS) {
     if (!a.forms.includes(d.section) || !d.products.some((p) => products.includes(p))) continue;
+    if (d.since && (a.schema_version ?? 1) < d.since) continue;
     if (opts.force && !opts.force.includes(d.slot)) continue;
     const bytes = await d.make(input);
     out.push(

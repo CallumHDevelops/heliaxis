@@ -81,6 +81,12 @@ export function heatPumpCircuit(values: Record<string, unknown>): Circuit | null
   return circuits.find((x) => x.sug === 'heatpump') ?? circuits.find((x) => typeof x.desc === 'string' && /heat\s*pump/i.test(x.desc)) ?? null;
 }
 
+/** The charger's circuit on the EIC: the one added from the job's suggestion, else the first described as an EV charger or charge point. */
+export function evCircuit(values: Record<string, unknown>): Circuit | null {
+  const { circuits } = boardsOf(values);
+  return circuits.find((x) => x.sug === 'ev') ?? circuits.find((x) => typeof x.desc === 'string' && /\bev\b|charge\s*point|charger/i.test(x.desc)) ?? null;
+}
+
 /** The heat pump record's boxes and the circuit's columns that are the same test. */
 export const HP_IR: [string, string][] = [
   ['hp_ir_le', 'ir_le'],

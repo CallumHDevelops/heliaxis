@@ -361,6 +361,19 @@ const evText = flat(await textOf(await D.rec.makeEvRecord(input(ctxOf(['ev'], fe
 await keep('HX-EV-01', await D.rec.makeEvRecord(input(ctxOf(['ev'], fe.values, fe.photos))));
 eq('EV record: title, code, earthing, open-PEN, RCD, demand vs fuse, smart charging, DNO route', ['EV Charge Point Installation Record', 'HX-EV-01 · Issue 1', 'TN-C-S (PME)', 'Device in the charger', 'Type A RCD, 6 mA DC detection (RDC-DD) in the charger', '52 A', '80 A', 'Statement of compliance handed over', '60 A or less: notify within 28 days'].filter((x) => !evText.includes(x)), []);
 eq('EV record: the charger serial from Serials', evText.includes(`Charger serial number ${fe.values.SN_EV[0].s}`), true);
+// HX-EV-03: the customer's commissioning and handover certificate, from the same answers (schema 6).
+const ev6 = F.schemaFor({ trade: 'electrician', forms: F.formsFor(['ev']), schema_version: 6 })[0];
+const f6 = fillAll(ev6, ['ev'], { ev_model: 'Zappi 2' }, { ev_load: 'yes', ev_limit: 32, ev_kw: 7.4, ev_tether: 'untethered', ev_firmware: '5.2.1', ev_isolator: 'yes', ev_random: true, ev_test: 'vehicle' });
+const c6 = ctxOf(['ev'], f6.values, f6.photos, { ev_model: 'Zappi 2' });
+const handoverBytes = await D.rec.makeEvHandover({ ...input(c6), schemaVersion: 6 });
+await keep('HX-EV-03', handoverBytes);
+const hoText = flat(await textOf(handoverBytes));
+eq('EV handover certificate: what was installed, how it’s set up, what they were shown', ['EV charger commissioning and handover certificate', 'HX-EV-03 · Issue 1', 'Zappi 2', f6.values.SN_EV[0].s, '7.4 kW', 'Untethered (a socket)', '32 A', 'Randomised delay', 'Active', '5.2.1', 'Yes, with a vehicle', 'Starting and stopping a charge', 'What the status lights mean', 'How the charger’s warranty is registered', '01633 965205'].filter((x) => !hoText.includes(x)), []);
+eq('…signed by the electrician only (the customer signs the completion sign-off), and no MCS claim for the charger', [hoText.includes('Sam Sparks, Sparks Electrical'), /Customer signature|Signed by the customer/i.test(hoText), /MCS certified|MCS certificate/i.test(hoText)], [true, false, false]);
+const noModel = flat(await textOf(await D.rec.makeEvHandover({ ...input(ctxOf(['ev'], f6.values, f6.photos)), schemaVersion: 6 })));
+eq('…and no charger model on Job details doesn’t stop it being made', noModel.includes('EV charger commissioning and handover certificate'), true);
+const oldHo = flat(await textOf(await D.rec.makeEvHandover({ ...input(ctxOf(['ev'], { ...fe.values, ev_kw: undefined, ev_firmware: undefined }, fe.photos)), schemaVersion: 1 })));
+eq('…on a job from before version 6, a newer question left empty says so', oldHo.includes('Not on the earlier version of this record'), true);
 const hp = formFor(['heatpump']);
 const fh = fillAll(hp, ['heatpump']);
 const hpBytes = await D.rec.makeHpRecord(input(ctxOf(['heatpump'], fh.values, fh.photos)));
@@ -537,12 +550,13 @@ const tasks = (key) => globalThis.__rec.tasks.filter((x) => x.key.startsWith(key
 eq('one handover call task, Friday → Monday, for the job owner', tasks('site-call:').map((x) => [x.title, x.dueDate, x.assigneeId]), [['Handover call: go through the pack and the solar app with Jane', '2026-11-09', 'owner-1']]);
 eq('EF2 not possible: the monitoring task', tasks('site-monitoring:').map((x) => x.title), ['Set up monitoring remotely · 12 High Street, NP20 4AB']);
 const made = db.rows('crm_documents').filter((d) => d.project_id === p1.id && d.generated_key);
-eq('the paperwork: HX-PV-01 to 03, HX-BAT-01 and 02 in their handover items, held for the pack', made.map((d) => [d.generated_key, d.handover_slot, d.release, d.visible]).sort(), [
-  ['HX-BAT-01', 'HX-BAT-01', 'with_pack', false],
-  ['HX-BAT-02', 'HX-BAT-02', 'with_pack', false],
-  ['HX-PV-01', 'HX-PV-01', 'with_pack', false],
-  ['HX-PV-02', 'HX-PV-02', 'with_pack', false],
-  ['HX-PV-03', 'HX-PV-03', 'with_pack', false],
+// Into the customer's portal straight away (the owner, 20 Nov 2026), each in its handover item.
+eq('the paperwork: HX-PV-01 to 03, HX-BAT-01 and 02 in their handover items, in the portal straight away', made.map((d) => [d.generated_key, d.handover_slot, d.release, d.visible]).sort(), [
+  ['HX-BAT-01', 'HX-BAT-01', 'now', true],
+  ['HX-BAT-02', 'HX-BAT-02', 'now', true],
+  ['HX-PV-01', 'HX-PV-01', 'now', true],
+  ['HX-PV-02', 'HX-PV-02', 'now', true],
+  ['HX-PV-03', 'HX-PV-03', 'now', true],
   ['PO-0001', null, 'now', false],
 ]);
 eq('…named with the job ref and the title (no code)', made.find((d) => d.generated_key === 'HX-PV-02').name, 'HX-0042 Solar PV string test results.pdf');
@@ -603,19 +617,19 @@ eq('the handover pack is told: their certificate’s reference, the summary’s 
   const inspect2 = withRef[0].doc;
   eq('…the new copy says so, and its print version opens', [flat(await textOf(db.files.get(`crm-docs/${inspect2.storage_path}`))).includes('ref BC-0042'), (await ED.electricianDocPrint(db, ref(inspect2))) instanceof Uint8Array], [true, true]);
 
-  // After the pack has gone (the documents are the customer's), a reading is put right: each one is
-  // Out of date, never replaced by itself, and the office's Regenerate on the string tests makes just them again.
+  // After the customer has them, a reading is put right: each is made again from the corrected answers
+  // (the owner, 20 Nov 2026: made again when corrected), with nothing left Out of date, and the office's
+  // Regenerate on the string tests then has nothing to do.
   for (const d of db.rows('crm_documents').filter((x) => x.project_id === p1.id && RECORDS.includes(x.generated_key) && !x.archived_at)) Object.assign(d, { visible: true, release: 'now' });
   const voc = [...e1.answers.pvt_voc.v];
   voc[0] = 394.9;
   e1.answers.pvt_voc = { v: voc, src: 'typed', at: '2026-11-07T09:00:00Z' };
   const behind = await ED.saveElectricianDocs(db, e1.id);
   const oldTests = db.rows('crm_documents').find((x) => x.project_id === p1.id && x.generated_key === 'HX-PV-02' && !x.archived_at);
-  eq('a correction after the customer has them: each Out of date, none replaced', [behind.map((r) => r.status), db.rows('handover_slots').some((s) => s.project_id === p1.id && s.slot === 'HX-PV-02' && s.data?.stale?.key === 'HX-PV-02')], [['out_of_date', 'out_of_date', 'out_of_date', 'out_of_date', 'out_of_date'], true]);
+  eq('a correction after the customer has them: each made again, none left Out of date', [behind.map((r) => r.status), db.rows('handover_slots').some((s) => s.project_id === p1.id && s.slot === 'HX-PV-02' && s.data?.stale?.key === 'HX-PV-02')], [['saved', 'saved', 'saved', 'saved', 'saved'], false]);
   const regen = await ED.saveElectricianDocs(db, e1.id, { force: ['HX-PV-02'], by: 'staff-1' });
   const newTests = db.rows('crm_documents').find((x) => x.project_id === p1.id && x.generated_key === 'HX-PV-02' && !x.archived_at);
-  eq('Regenerate on the string tests: only HX-PV-02 made again (v2, held to be released), the old one archived', [regen.map((r) => [r.doc.generated_key, r.status]), newTests.version, newTests.release, !!db.rows('crm_documents').find((x) => x.id === oldTests.id).archived_at], [[['HX-PV-02', 'saved']], 2, 'with_pack', true]);
-  eq('…from the corrected answers, so it isn’t Out of date any more', newTests.inputs_hash === db.rows('handover_slots').find((s) => s.project_id === p1.id && s.slot === 'HX-PV-02').data.stale.hash, true);
+  eq('Regenerate on the string tests afterwards: only HX-PV-02 looked at, already up to date (v2, in the portal)', [regen.map((r) => [r.doc.generated_key, r.status]), newTests.version, newTests.release, newTests.id === oldTests.id], [[['HX-PV-02', 'same']], 2, 'now', true]);
   eq('…and its print version follows the new copy', (await ED.electricianDocPrint(db, ref(newTests))) instanceof Uint8Array, true);
 }
 // The photo record (made when the office asks): its print version has the stored copy's words; a
@@ -676,6 +690,24 @@ eq('…and the PV inspection record prints its statement as signed', flat(await 
 const so1 = db.rows('site_signoffs').find((x) => x.assignment_id === e1.id);
 eq('the first job’s phone sent other words: the wording was recorded (for the day it was signed) and flagged', [so1.declaration.includes('on 6 November 2026'), so1.flags.some((f) => f.code === 'declaration_changed'), so1.extra.declaration_phone], [true, true, 'I confirm…']);
 fixed = null;
+
+// An EV job made from version 6: its sign-off is held for the new questions, then makes the EV record
+// and the customer's commissioning and handover certificate, each in its own handover item.
+{
+  const p3 = job(['ev'], { system: { ev_charger_model: 'Zappi 2' }, paperwork: {} });
+  const { NEW_IN_V6 } = await import('../src/lib/site/forms/legacy.ts');
+  const before = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => !NEW_IN_V6.has(k)));
+  const e3 = electrician(p3, ['ev'], before(fe.values), before(fe.photos));
+  e3.schema_version = 6;
+  const held = await sign(e3, { op_id: randomUUID() });
+  eq('version 6 EV job signed with only the old EV answers: held (422) for the new questions', [held.status, held.body.missing.map((m) => m.key).filter((k) => ['ev_location', 'ev_test', 'EP48'].includes(k)).sort()], [422, ['EP48', 'ev_location', 'ev_test']]);
+  e3.answers = wrap(f6.values);
+  for (const [slot, n] of Object.entries(f6.photos)) for (let i = db.rows('crm_photos').filter((x) => x.assignment_id === e3.id && x.slot === slot).length; i < n; i++) db.rows('crm_photos').push({ id: randomUUID(), assignment_id: e3.id, project_id: p3.id, slot, storage_path: `site/${e3.id}/${slot}-${i}.jpg`, taken_at: '2026-11-03T10:00:00Z', created_at: '2026-11-03T10:00:00Z', status: 'ok' });
+  const s5 = await sign(e3, { op_id: randomUUID() });
+  await afterReply();
+  eq('…with them: signed', s5.status, 200);
+  eq('the EV record and the handover certificate, each in its own item, in the portal', db.rows('crm_documents').filter((d) => d.project_id === p3.id && d.generated_key && !d.generated_key.startsWith('PO')).map((d) => [d.generated_key, d.handover_slot, d.visible]).sort(), [['HX-EV-01', 'HX-EV-01', true], ['HX-EV-03', 'HX-EV-03', true]]);
+}
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);
