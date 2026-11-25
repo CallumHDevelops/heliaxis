@@ -1,12 +1,12 @@
 {
-  "versionCode": 6,
-  "versionName": "1.0.5",
+  "versionCode": 7,
+  "versionName": "1.0.6",
   "minVersionCode": 1,
-  "releasedAt": "2026-11-22",
+  "releasedAt": "2026-11-25",
   "notes": [
-    "New: the Hestia widget. Long-press your home screen, then Widgets, Heliaxis, Hestia: today's calendar, the emails that need you and your tasks. Urgent emails also get their own notification setting."
+    "Tapping a survey or install in the Hestia widget now opens that customer's job, and Directions go to the pin the customer confirmed."
   ],
   "apk": "/app/heliaxis.apk",
   "sizeBytes": 5119796,
-  "sha256": "b53558275e5cc4d673c71c7b79b9c26bc6bedca05e8a25584f2921678e73fceb"
+  "sha256": "162d2f732eecf8529fb1138bf5dbba7d9602573959461ebe4716cd0d5d8d8864"
 }
