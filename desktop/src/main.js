@@ -18,7 +18,7 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => showWindow());
 }
 
-const icon = () => nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'tray.png'));
+const icon = () => nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'tray.png')).resize({ width: 32, height: 32 });
 const send = (channel, payload) => win && !win.isDestroyed() && win.webContents.send(channel, payload);
 
 function createWindow() {

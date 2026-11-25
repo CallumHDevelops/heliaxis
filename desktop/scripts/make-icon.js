@@ -1,6 +1,6 @@
 'use strict';
 // Draws the placeholder tray/app icon (near-black tile, yellow disc) as PNGs with no dependencies.
-// Replace desktop/assets/*.png with the real Heliaxis mark when the brand artwork is exported.
+// 
 const zlib = require('node:zlib');
 const fs = require('node:fs');
 const path = require('node:path');

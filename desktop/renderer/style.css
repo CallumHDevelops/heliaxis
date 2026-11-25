@@ -1,11 +1,11 @@
 :root {
-  --bg: #0b0b0c;
+  --bg: #211f18;
   --panel: rgba(24, 24, 26, 0.82);
-  --text: #f3f3f1;
-  --muted: #9a9a96;
+  --text: #f7f2e7;
+  --muted: #a69f8e;
   --line: rgba(255, 255, 255, 0.1);
   --accent: #f8bc1e;
-  --accent-ink: #1a1400;
+  --accent-ink: #211f18;
   --user: rgba(248, 188, 30, 0.16);
   --bot: rgba(255, 255, 255, 0.06);
   --err: #ff7a6b;
@@ -13,13 +13,13 @@
 }
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f6f5f1;
+    --bg: #f7f2e7;
     --panel: rgba(255, 255, 255, 0.78);
-    --text: #17171a;
-    --muted: #66665f;
+    --text: #211f18;
+    --muted: #6e6a5e;
     --line: rgba(0, 0, 0, 0.12);
-    --accent: #e0a000;
-    --accent-ink: #1a1400;
+    --accent: #e39a0c;
+    --accent-ink: #211f18;
     --user: rgba(224, 160, 0, 0.18);
     --bot: rgba(0, 0, 0, 0.05);
     --err: #b3261e;
@@ -38,7 +38,7 @@ body {
 .bar { display: flex; align-items: center; gap: 4px; padding: 8px 12px; -webkit-app-region: drag; }
 .bar button { -webkit-app-region: no-drag; }
 .brand { font-weight: 600; letter-spacing: 0.02em; display: flex; align-items: center; gap: 8px; }
-.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.dot { width: 16px; height: 16px; background: url(img/spark.svg) center/contain no-repeat; }
 .grow { flex: 1; }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:disabled { opacity: 0.55; cursor: default; }
