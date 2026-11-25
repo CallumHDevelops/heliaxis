@@ -66,6 +66,7 @@ export function parseQuoteInputs(raw: unknown): QuoteInputs | null {
     sizeMode: i.sizeMode === 'roof' ? 'roof' : 'usage',
     batteryKwh: battery ? num(i.batteryKwh, 1, 30, 5) : undefined,
     phase: i.phase === 'three' ? 'three' : i.phase === 'single' ? 'single' : 'unknown',
+    panels: num(i.panels, 0, 600, 0) || undefined,
   };
   return { inputs, imp: num(o.imp, 1, 100, 26.3), exp: num(o.exp, 0, 60, 12) };
 }

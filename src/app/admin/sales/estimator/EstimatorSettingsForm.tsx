@@ -73,6 +73,9 @@ export function EstimatorSettingsForm({ initial }: { initial: EstimatorSettings 
   const [notices, setNotices] = useState(initial.notices);
   const [award, setAward] = useState(initial.award);
   const [finance, setFinance] = useState(initial.finance);
+  const [panelModel, setPanelModel] = useState(initial.panelModel);
+  const [accreditations, setAccreditations] = useState(initial.accreditations);
+  const [reviews, setReviews] = useState(initial.reviews);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -86,6 +89,9 @@ export function EstimatorSettingsForm({ initial }: { initial: EstimatorSettings 
     notices,
     award,
     finance,
+    panelModel,
+    accreditations,
+    reviews,
   });
   const cfg = cleanSettings(payload());
 
@@ -292,6 +298,50 @@ export function EstimatorSettingsForm({ initial }: { initial: EstimatorSettings 
         </div>
         <label className="est-check">
           <input type="checkbox" checked={award.on} onChange={(e) => setAward({ ...award, on: e.target.checked })} /> Show the award on the page, the quote and the PDF
+        </label>
+      </section>
+
+      <section className="qb-card">
+        <b>What the system cards and trust section show</b>
+        <p className="crm-muted" style={{ margin: '0 0 10px' }}>
+          The panel model is named on each system card and in the quote&rsquo;s what&rsquo;s-included list; leave it empty and they just say the wattage. An accreditation only shows once its number is filled in, with a link to the scheme&rsquo;s public register so a customer can check it.
+        </p>
+        <div className="est-grid">
+          <div className="est-field">
+            <label htmlFor="pm">Panel make and model</label>
+            <input id="pm" className="crm-input" value={panelModel} onChange={(e) => setPanelModel(e.target.value)} placeholder="e.g. Aiko Neostar 450 W" />
+          </div>
+        </div>
+        <div className="est-grid">
+          {accreditations.map((a, i) => (
+            <div key={i} className="est-field">
+              <label htmlFor={`ac-${i}`}>{a.name} number</label>
+              <input id={`ac-${i}`} className="crm-input" value={a.number} onChange={(e) => setAccreditations(accreditations.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))} placeholder="Hidden until filled in" />
+              <input aria-label={`${a.name} register link`} className="crm-input" value={a.url} onChange={(e) => setAccreditations(accreditations.map((x, j) => (j === i ? { ...x, url: e.target.value } : x)))} placeholder="https:// register to check it" />
+            </div>
+          ))}
+        </div>
+        <b style={{ display: 'block', marginTop: 12 }}>Reviews line (off until a real count is entered)</b>
+        <div className="est-grid">
+          <div className="est-field">
+            <label htmlFor="rv-s">Where the reviews are</label>
+            <input id="rv-s" className="crm-input" value={reviews.source} onChange={(e) => setReviews({ ...reviews, source: e.target.value })} placeholder="Google" />
+          </div>
+          <div className="est-field">
+            <label htmlFor="rv-r">Average rating (out of 5)</label>
+            <input id="rv-r" className="crm-input" inputMode="decimal" value={String(reviews.rating || '')} onChange={(e) => setReviews({ ...reviews, rating: Number(e.target.value.replace(/[^0-9.]/g, '')) || 0 })} />
+          </div>
+          <div className="est-field">
+            <label htmlFor="rv-c">Number of reviews</label>
+            <input id="rv-c" className="crm-input" inputMode="numeric" value={String(reviews.count || '')} onChange={(e) => setReviews({ ...reviews, count: Number(e.target.value.replace(/\D/g, '')) || 0 })} />
+          </div>
+          <div className="est-field">
+            <label htmlFor="rv-u">Link to the reviews (https://)</label>
+            <input id="rv-u" className="crm-input" value={reviews.url} onChange={(e) => setReviews({ ...reviews, url: e.target.value })} placeholder="https://" />
+          </div>
+        </div>
+        <label className="est-check">
+          <input type="checkbox" checked={reviews.on} onChange={(e) => setReviews({ ...reviews, on: e.target.checked })} /> Show the reviews line (needs a rating and a count)
         </label>
       </section>
 

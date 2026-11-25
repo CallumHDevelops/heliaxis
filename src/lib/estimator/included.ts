@@ -7,6 +7,8 @@ export type IncludedArgs = {
   workmanshipYears: number;
   /** The package's own list from the admin: when it has lines, it is used as it is. */
   packageIncludes?: string[];
+  /** The panel's make and model from the admin, when it is set. */
+  panelModel?: string;
 };
 
 export function includedItems(a: IncludedArgs): string[] {
@@ -14,7 +16,7 @@ export function includedItems(a: IncludedArgs): string[] {
   if (own.length) return own;
   return [
     a.inverter ? `${a.inverter}` : 'GoodWe hybrid inverter',
-    `${a.panels} solar panels`,
+    `${a.panels} ${a.panelModel ? `${a.panelModel} ` : ''}solar panels`,
     'Roof mounting system',
     ...(a.scaffolding ? ['Scaffolding'] : []),
     ...(a.batteryName ? [a.batteryName] : []),

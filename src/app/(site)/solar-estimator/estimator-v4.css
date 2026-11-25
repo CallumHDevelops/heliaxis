@@ -1,0 +1,117 @@
+/* ── Solar estimator V4: the roof first, the systems side by side, what the price covers, checkable accreditations ─────────── */
+/* The results scroll into view below the sticky site header, not under it. */
+.est-wrap{scroll-margin-top:96px}
+.est-v4-eyebrow{font-family:var(--mono);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--solar)}
+
+/* The roof band: one of the page's dark moments. The satellite roof on the left, the rating and the size control on the right. */
+.est-v4-roof{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-radius:3px;overflow:hidden;position:relative}
+.est-v4-roof::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(60% 90% at 100% 0,rgba(248,188,30,.16),transparent 60%)}
+.est-v4-roof.no-map{grid-template-columns:minmax(0,1fr)}
+.est-v4-roof__map{background:#1a1913;border-right:1px solid var(--line-d)}
+.est-v4-roof__map .est-map{height:100%;align-content:start}
+.est-v4-roof__map .est-mapbox{width:100%;max-width:none}
+.est-v4-roof__map figcaption{color:var(--muted-d);padding:8px 14px 12px;font-size:.68rem}
+.est-v4-roof__info{position:relative;z-index:1;display:grid;gap:12px;align-content:center;padding:28px 28px 24px}
+.est-v4-roof__rating{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.est-v4-roof__rating h2{margin:0;font-family:var(--display);font-weight:900;font-size:clamp(1.5rem,3.2vw,2.1rem);line-height:1.05;letter-spacing:-.015em;color:var(--paper)}
+.est-v4-roof .est-suns{color:rgba(247,242,231,.18)}
+.est-v4-roof .est-suns svg{width:20px;height:20px}
+.est-v4-roof .est-suns svg.on{color:var(--solar)}
+.est-v4-roof__place{margin:0;color:var(--muted-d);font-size:.92rem;line-height:1.45}
+.est-v4-roof__facts{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line-d);border-radius:2px;width:max-content;max-width:100%}
+.est-v4-roof__facts span{padding:8px 12px;font-size:.84rem;color:var(--muted-d);border-right:1px solid var(--line-d)}
+.est-v4-roof__facts span:last-child{border-right:0}
+.est-v4-roof__facts b{color:var(--paper);font-weight:600}
+.est-v4-roof__links{display:flex;flex-wrap:wrap;gap:4px 18px}
+.est-v4-roof .est-link{color:var(--paper);font-size:.9rem}
+.est-v4-roof .est-link:hover{color:var(--solar)}
+
+/* The − and + for the panel count. */
+.est-v4-size{display:grid;gap:8px;padding-top:14px;border-top:1px solid var(--line-d)}
+.est-v4-size__lab{font-family:var(--mono);font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-d)}
+.est-v4-size__ctl{display:grid;grid-template-columns:52px minmax(0,1fr) 52px;align-items:stretch;border:1.5px solid rgba(247,242,231,.4);border-radius:3px;max-width:340px}
+.est-v4-size__ctl button{font:inherit;font-size:1.4rem;line-height:1;background:transparent;color:var(--paper);border:0;cursor:pointer;min-height:52px;transition:.15s}
+.est-v4-size__ctl button:first-child{border-right:1px solid var(--line-d)}
+.est-v4-size__ctl button:last-child{border-left:1px solid var(--line-d)}
+.est-v4-size__ctl button:hover:not(:disabled){background:var(--solar);color:var(--ink)}
+.est-v4-size__ctl button:focus-visible{outline:2px solid var(--solar);outline-offset:-2px}
+.est-v4-size__ctl button:disabled{opacity:.3;cursor:not-allowed}
+.est-v4-size__v{display:grid;place-items:center;align-content:center;gap:1px;padding:6px 8px;text-align:center}
+.est-v4-size__v b{font-family:var(--display);font-weight:800;font-size:1.15rem;color:var(--paper)}
+.est-v4-size__v small{font-family:var(--mono);font-size:.72rem;color:var(--solar)}
+.est-v4-size__note{margin:0;font-size:.84rem;line-height:1.5;color:var(--muted-d)}
+.est-v4-size__note .est-link{padding:0;font-size:.84rem}
+
+/* The systems side by side. Hairline cards, sharp corners; our pick has a gold rule along its top, the one showing is outlined in ink. */
+.est-v4-sys{display:grid;gap:12px}
+.est-v4-sys__head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 16px}
+.est-v4-sys__head h2{margin:0;font-family:var(--display);font-weight:800;font-size:clamp(1.3rem,2.6vw,1.7rem);letter-spacing:-.01em}
+.est-v4-sys__head p{margin:0;color:var(--muted);font-size:.92rem}
+.est-v4-sys__grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:12px}
+.est-v4-sys__card{position:relative;display:grid;grid-template-rows:auto auto 1fr auto auto;gap:10px;padding:18px 18px 18px;background:var(--card);border:1px solid var(--line);border-radius:3px;min-width:0}
+.est-v4-sys__card.is-pick{border-top:4px solid var(--solar);padding-top:15px}
+.est-v4-sys__card.is-on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.est-v4-sys__card.is-on.is-pick{border-top-color:var(--solar)}
+.est-v4-sys__tags{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;min-height:1.1em}
+.est-v4-sys__pick,.est-v4-sys__on{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase}
+.est-v4-sys__pick{color:var(--amber-2)}
+.est-v4-sys__on{color:var(--ink);margin-left:auto}
+.est-v4-sys__card h3{margin:0;font-family:var(--display);font-weight:800;font-size:1.2rem;line-height:1.15}
+.est-v4-sys__kit{margin:0;font-size:.84rem;line-height:1.45;color:var(--muted)}
+.est-v4-sys__figs{margin:0;display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
+.est-v4-sys__figs>div{padding:10px 0 0;display:grid;gap:2px}
+.est-v4-sys__figs>div.price{grid-column:1/-1;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.est-v4-sys__figs dt{font-family:var(--mono);font-size:.64rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.est-v4-sys__figs dd{margin:0;display:grid;gap:2px}
+.est-v4-sys__figs dd b{font-weight:700;font-size:1rem}
+.est-v4-sys__figs .price dd b{font-family:var(--display);font-weight:900;font-size:1.9rem;line-height:1.05;letter-spacing:-.02em}
+.est-v4-sys__figs .price small{font-size:.78rem;color:var(--muted)}
+.est-v4-sys__btn{width:100%;justify-content:center}
+.est-v4-sys .est-btn-ghost{color:var(--ink);border-color:var(--ink)}
+.est-v4-sys .est-btn-ghost:hover{background:var(--ink);color:var(--paper)}
+
+/* What the price covers, then the other ways to take the next step. */
+.est-v4-assure{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));border:1px solid var(--line);border-radius:3px;background:var(--paper-2)}
+.est-v4-assure li{display:flex;align-items:center;gap:10px;padding:12px 14px;font-size:.9rem;font-weight:600;border-right:1px solid var(--line)}
+.est-v4-assure li:last-child{border-right:0}
+.est-v4-assure svg{flex:none;color:var(--ink)}
+.est-v4-next{display:flex;flex-wrap:wrap;align-items:center;gap:8px 22px}
+.est-v4-next .est-btn-ghost{color:var(--ink);border-color:var(--ink)}
+.est-v4-next .est-btn-ghost:hover{background:var(--ink);color:var(--paper)}
+.est-v4-next a{display:inline-flex;align-items:center;gap:6px;color:var(--ink);font-weight:600;text-underline-offset:3px}
+
+/* Accreditations with their numbers, each linked to its public register. */
+.est-v4-proof{display:grid;gap:14px;padding:22px 24px;border:1px solid var(--line);border-radius:3px;background:var(--card)}
+.est-v4-proof__head{display:grid;gap:6px}
+.est-v4-proof .est-v4-eyebrow{color:var(--amber-2)}
+.est-v4-proof__head h2{margin:0;font-family:var(--display);font-weight:800;font-size:clamp(1.2rem,2.4vw,1.5rem)}
+.est-v4-proof__reviews{margin:0;display:flex;align-items:center;gap:6px;font-weight:600}
+.est-v4-proof__reviews a{color:var(--ink);text-underline-offset:3px}
+.est-v4-proof__list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:0;border:1px solid var(--line);border-radius:2px}
+.est-v4-proof__list li{display:flex;gap:10px;align-items:flex-start;padding:14px;border-right:1px solid var(--line)}
+.est-v4-proof__list li:last-child{border-right:0}
+.est-v4-proof__list li>div{display:grid;gap:2px;min-width:0}
+.est-v4-proof__list b{font-weight:700}
+.est-v4-proof__list .mono{font-family:var(--mono);font-size:.86rem;color:var(--ink)}
+.est-v4-proof__list a{font-size:.8rem;color:var(--muted);text-underline-offset:3px}
+.est-v4-proof__list a:hover{color:var(--ink)}
+.est-v4-proof__logos{max-width:100%;height:auto}
+
+/* The working: a quiet heading before the detailed figures. */
+.est-v4-how{display:grid;gap:4px;padding-top:10px;border-top:1px solid var(--line)}
+.est-v4-how h2{margin:0;font-family:var(--display);font-weight:800;font-size:clamp(1.2rem,2.4vw,1.5rem)}
+.est-v4-how p{margin:0;color:var(--muted);font-size:.92rem}
+
+@media(max-width:900px){
+  .est-v4-roof{grid-template-columns:minmax(0,1fr)}
+  .est-v4-roof__map{border-right:0;border-bottom:1px solid var(--line-d)}
+  /* A wider, shorter picture on a phone so the size control is reached sooner; the panels stay aligned (both are cropped from the centre). */
+  .est-v4-roof__map .est-mapbox{aspect-ratio:4/3}
+  .est-v4-roof__map .est-mapbox img{object-fit:cover}
+  .est-v4-roof__info{padding:22px 18px 20px}
+  .est-v4-size__ctl{max-width:none}
+  .est-v4-assure li,.est-v4-proof__list li{border-right:0;border-bottom:1px solid var(--line)}
+  .est-v4-assure li:last-child,.est-v4-proof__list li:last-child{border-bottom:0}
+  .est-v4-proof{padding:18px 16px}
+}
+@media print{.est-v4-size__ctl,.est-v4-roof__links,.est-v4-sys__btn,.est-v4-next{display:none!important}.est-v4-roof{background:#fff;color:#000}}

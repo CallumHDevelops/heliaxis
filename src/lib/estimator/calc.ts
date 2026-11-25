@@ -54,6 +54,10 @@ export type Notices = { vatLine: string; vatExpires: string; priceRiseLine: stri
 /** The GoodWe award block: built, and off until the exact wording from the award is entered. */
 export type Award = { on: boolean; title: string; wording: string; link: string; imageUrl: string };
 /** Finance copy. Off until Heliaxis's status for credit broking is confirmed; figures only when switched on with a rate. */
+/** One accreditation as the page shows it: the scheme, Heliaxis's number with it, and the public register where anyone can check it. Hidden until the number is filled in. */
+export type Accreditation = { name: string; number: string; url: string };
+/** The review line ("4.9 from 120 reviews on Google"): off, and hidden, until it is ticked on with a real count. */
+export type Reviews = { on: boolean; source: string; rating: number; count: number; url: string };
 export type Finance = { askOn: boolean; figuresOn: boolean; aprPct: number; termYears: number; /** The official Warm Homes Loan page to link to (left empty until confirmed). */ link: string };
 
 export type EstimatorSettings = {
@@ -103,6 +107,10 @@ export type EstimatorSettings = {
   notices: Notices;
   award: Award;
   finance: Finance;
+  /** The panel named on the system cards ("Aiko Neostar 450 W"); empty: the cards just say the wattage. */
+  panelModel: string;
+  accreditations: Accreditation[];
+  reviews: Reviews;
   /** The browser's copy only: ready-made prices in place of the costs (see publicSettings). */
   priceTable?: PriceTable;
 };
@@ -141,10 +149,42 @@ export const DEFAULT_SETTINGS: EstimatorSettings = {
   notices: { vatLine: '0% VAT on home solar and batteries ends 31 March 2027.', vatExpires: '2027-03-31', priceRiseLine: 'Energy bills are forecast to rise by about 26% in January 2027 (Cornwall Insight).', priceRiseExpires: '2026-11-25' },
   award: { on: false, title: '', wording: '', link: '', imageUrl: '' },
   finance: { askOn: false, figuresOn: false, aprPct: 0, termYears: 10, link: '' },
+  panelModel: '',
+  // NAPIT and MCS numbers as on Heliaxis's own documents (src/lib/subcontractors/agreement.ts); the rest stay hidden until filled in.
+  accreditations: [
+    { name: 'MCS', number: 'NAP-82308', url: 'https://mcscertified.com' },
+    { name: 'NAPIT', number: '82308', url: 'https://search.napit.org.uk' },
+    { name: 'RECC', number: '', url: 'https://members.recc.org.uk' },
+    { name: 'TrustMark', number: '', url: 'https://www.trustmark.org.uk' },
+    { name: 'SSIP', number: '', url: 'https://ssip.org.uk' },
+  ],
+  reviews: { on: false, source: 'Google', rating: 0, count: 0, url: '' },
 };
 
 /** Settings from storage or a request, each number kept within a sensible range, the rest defaulted. */
 const txt = (v: unknown, n: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+
+const httpsOr = (v: unknown, n: number) => (/^https:\/\//.test(txt(v, n)) ? txt(v, n) : '');
+
+/** The accreditations from storage or a request: up to eight with a name. */
+export function cleanAccreditations(v: unknown): Accreditation[] {
+  if (!Array.isArray(v)) return DEFAULT_SETTINGS.accreditations;
+  return v
+    .slice(0, 8)
+    .map((raw) => {
+      const a = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+      return { name: txt(a.name, 40), number: txt(a.number, 40), url: httpsOr(a.url, 300) };
+    })
+    .filter((a) => a.name);
+}
+
+export function cleanReviews(v: unknown): Reviews {
+  const r = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  const rating = Math.min(5, Math.max(0, Math.round((Number(r.rating) || 0) * 10) / 10));
+  const count = Math.min(1_000_000, Math.max(0, Math.round(Number(r.count) || 0)));
+  // Only ever on with a real count and rating to show.
+  return { on: r.on === true && count > 0 && rating > 0, source: txt(r.source, 40) || 'Google', rating, count, url: httpsOr(r.url, 300) };
+}
 
 /** The packages from storage or a request: up to six, each with sorted, de-duplicated price bands within sensible bounds. */
 export function cleanPackages(v: unknown): Package[] {
@@ -241,6 +281,9 @@ export function cleanSettings(v: unknown): EstimatorSettings {
     },
     // The award stays off until its wording is filled in.
     award: { on: bool(aw.on, false) && !!txt(aw.wording, 400), title: txt(aw.title, 100), wording: txt(aw.wording, 400), link: txt(aw.link, 300), imageUrl: txt(aw.imageUrl, 300) },
+    panelModel: txt(o.panelModel, 80),
+    accreditations: cleanAccreditations(o.accreditations),
+    reviews: cleanReviews(o.reviews),
     finance: { askOn: bool(fi.askOn, false), figuresOn: bool(fi.figuresOn, false) && Number(fi.aprPct) > 0, aprPct: Math.min(100, Math.max(0, Number(fi.aprPct) || 0)), termYears: Math.min(25, Math.max(1, Math.round(Number(fi.termYears) || 10))), link: /^https:\/\//.test(txt(fi.link, 300)) ? txt(fi.link, 300) : '' },
   };
 }
@@ -325,6 +368,8 @@ export type Inputs = {
   panelYields?: number[];
   /** Homes: the supply. Single phase unless they say three ('unknown' counts as single). */
   phase?: Phase | 'unknown';
+  /** The visitor's own panel count (the − and + on the results), held within what the roof and the supply take. Missing: we size it. */
+  panels?: number;
 };
 
 export type Estimate = {
@@ -375,6 +420,10 @@ export type Estimate = {
   phaseCapped: boolean;
   /** The array the largest inverter takes on this supply, kWp (0: not known). */
   phaseCapKwp: number;
+  /** The size we would suggest, and the fewest and most panels the visitor can choose (the roof and the supply set the most). */
+  panelsSuggested: number;
+  panelsMin: number;
+  panelsMax: number;
 };
 
 const EV_KWH = 2000;
@@ -429,9 +478,13 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
   const supplyCapKwp = home ? (s.priceTable ? s.priceTable.capKwp[phase] : chooseInverter(s, 0, { phase }).capKwp) : 0;
   const supplyCap = supplyCapKwp > 0 ? Math.floor((supplyCapKwp * 1000) / s.panelWatts + 1e-9) : Infinity;
   const uncapped = i.sizeMode === 'roof' && roofCap ? cap : Math.min(wanted, cap);
-  const panels = Math.max(1, Math.min(uncapped, supplyCap));
-  const phaseCapped = panels < uncapped;
-  const roofLimited = !!roofCap && wanted > roofCap && i.sizeMode !== 'roof';
+  const suggested = Math.max(1, Math.min(uncapped, supplyCap));
+  const panelsMax = Math.max(1, Math.min(cap, supplyCap));
+  const panelsMin = Math.min(minPanels, panelsMax);
+  const own = i.panels && Number.isFinite(i.panels) && i.panels > 0 ? Math.round(i.panels) : 0;
+  const panels = own ? Math.min(panelsMax, Math.max(panelsMin, own)) : suggested;
+  const phaseCapped = (own || uncapped) > supplyCap;
+  const roofLimited = !own && !!roofCap && wanted > roofCap && i.sizeMode !== 'roof';
   const kwp = (panels * s.panelWatts) / 1000;
   const generation = genFor(panels);
 
@@ -523,6 +576,9 @@ export function estimate(i: Inputs, s: EstimatorSettings = DEFAULT_SETTINGS): Es
     phase,
     phaseCapped,
     phaseCapKwp: supplyCapKwp,
+    panelsSuggested: suggested,
+    panelsMin,
+    panelsMax,
     pricing,
     batteryKwh,
     roofLimited,

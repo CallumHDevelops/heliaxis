@@ -25,6 +25,10 @@ import { PHONE, PHONE_HREF, QuoteCapture, QuoteModal, StickyBar, TalkLine, useEx
 import { whatsappHref } from '@/components/site/WhatsAppButton';
 import { includedItems } from '@/lib/estimator/included';
 import { TrustBar } from './TrustBar';
+import { SystemCards } from './SystemCards';
+import { ProofBand } from './ProofBand';
+import { BrandIcon } from '@/app/admin/crm/CrmUi';
+import { chosenKey, systemChoices } from '@/lib/estimator/choices';
 import { track } from '@/lib/estimator/analytics';
 import { pixel } from '@/lib/meta-pixel';
 import { panelPolygon, pointsAttr, toPixel, MAP_SIZE } from '@/lib/estimator/overlay';
@@ -91,6 +95,8 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
   // Their supply: single phase unless they say three ('unknown' counts as single).
   const [phase, setPhase] = useState<'unknown' | 'single' | 'three'>('unknown');
   const [sizeMode, setSizeMode] = useState<'usage' | 'roof'>('usage');
+  // The visitor's own panel count from the − and + on the results (0: our suggested size).
+  const [panelsOwn, setPanelsOwn] = useState(0);
   const [ev, setEv] = useState(false);
   const [heatpump, setHeatpump] = useState(false);
   const [house, setHouse] = useState('');
@@ -171,6 +177,7 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
     ev,
     heatpump,
     phase,
+    panels: panelsOwn || undefined,
   };
   const live: EstimatorSettings = { ...settings, importPence: rates.imp, exportPence: rates.exp };
   const r = estimate(inputs, live);
@@ -482,14 +489,14 @@ export function SolarEstimatorApp({ settings, roofLookup = false, addressPicker 
             <TalkLine />
           </div>
         ) : (
-          <Result knownAddress={knownAddress} rates={rates} setRates={setRates} roofHit={roofChoice === 'yes' ? roofHit : null} r={r} withBattery={withBattery} inputs={inputs} settings={live} postcode={postcode} town={roofChoice === 'yes' && roofHit ? (roofHit.address.split(',').at(-2)?.trim() ?? '') : (yieldData?.town ?? '')} source={roofChoice === 'yes' && roofHit ? (roofHit.monthly ? 'pvgis' : 'fallback') : (yieldData?.source ?? 'fallback')} note={yieldNote} controls={{ sizeMode, setSizeMode, shade, setShade, daytime, setDaytime, battery, setBattery, batteryKwh, setBatteryKwh, phase, setPhase, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); }} />
+          <Result knownAddress={knownAddress} rates={rates} setRates={setRates} roofHit={roofChoice === 'yes' ? roofHit : null} r={r} withBattery={withBattery} inputs={inputs} settings={live} postcode={postcode} town={roofChoice === 'yes' && roofHit ? (roofHit.address.split(',').at(-2)?.trim() ?? '') : (yieldData?.town ?? '')} source={roofChoice === 'yes' && roofHit ? (roofHit.monthly ? 'pvgis' : 'fallback') : (yieldData?.source ?? 'fallback')} note={yieldNote} controls={{ panelsOwn, setPanelsOwn, sizeMode, setSizeMode, shade, setShade, daytime, setDaytime, battery, setBattery, batteryKwh, setBatteryKwh, phase, setPhase, ev, setEv, heatpump, setHeatpump }} onRestart={() => { setDone(false); setStep(0); setPanelsOwn(0); }} />
         )}
       </div>
     </>
   );
 }
 
-type Controls = { batteryKwh: number; setBatteryKwh: (k: number) => void; phase: 'unknown' | 'single' | 'three'; setPhase: (p: 'unknown' | 'single' | 'three') => void; sizeMode: 'usage' | 'roof'; setSizeMode: (m: 'usage' | 'roof') => void; shade: Shade; setShade: (s: Shade) => void; daytime: Daytime; setDaytime: (d: Daytime) => void; battery: boolean; setBattery: (b: boolean) => void; ev: boolean; setEv: (b: boolean) => void; heatpump: boolean; setHeatpump: (b: boolean) => void };
+type Controls = { panelsOwn: number; setPanelsOwn: (n: number) => void; batteryKwh: number; setBatteryKwh: (k: number) => void; phase: 'unknown' | 'single' | 'three'; setPhase: (p: 'unknown' | 'single' | 'three') => void; sizeMode: 'usage' | 'roof'; setSizeMode: (m: 'usage' | 'roof') => void; shade: Shade; setShade: (s: Shade) => void; daytime: Daytime; setDaytime: (d: Daytime) => void; battery: boolean; setBattery: (b: boolean) => void; ev: boolean; setEv: (b: boolean) => void; heatpump: boolean; setHeatpump: (b: boolean) => void };
 
 /** The roof from above, with the building outline and the panels of the suggested system drawn on it. */
 function SolarMap({ map, panels, address, plain = false }: { map: RoofMap; panels: number; address: string; plain?: boolean }) {
@@ -502,7 +509,7 @@ function SolarMap({ map, panels, address, plain = false }: { map: RoofMap; panel
       <div className="est-mapbox">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={map.imageUrl} alt={`Satellite picture of ${address}`} onError={() => setFailed(true)} />
-        <svg viewBox={`0 0 ${MAP_SIZE} ${MAP_SIZE}`} aria-hidden="true">
+        <svg viewBox={`0 0 ${MAP_SIZE} ${MAP_SIZE}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
           {outline && (
             <>
               {/* The rest of the picture is dimmed a little, and the property lit with a light wash, so it is clear which building we mean. */}
@@ -555,7 +562,7 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   /** The answers (never prices) the server works the quote out from. */
   const quotePayload = () => ({
-    inputs: { who: inputs.who, yieldKwhPerKwp: inputs.yieldKwhPerKwp, monthlyPerKwp: inputs.monthlyPerKwp, shade: inputs.shade, usage: inputs.usage, daytime: inputs.daytime, battery: inputs.battery, batteryKwh: inputs.batteryKwh, ev: inputs.ev, heatpump: inputs.heatpump, maxPanels: inputs.maxPanels, sizeMode: inputs.sizeMode, phase: inputs.phase },
+    inputs: { who: inputs.who, yieldKwhPerKwp: inputs.yieldKwhPerKwp, monthlyPerKwp: inputs.monthlyPerKwp, shade: inputs.shade, usage: inputs.usage, daytime: inputs.daytime, battery: inputs.battery, batteryKwh: inputs.batteryKwh, ev: inputs.ev, heatpump: inputs.heatpump, maxPanels: inputs.maxPanels, sizeMode: inputs.sizeMode, phase: inputs.phase, panels: inputs.panels },
     imp: settings.importPence,
     exp: settings.exportPence,
     postcode,
@@ -597,199 +604,142 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
   const placeLine = roofHit ? roofHit.address : [town, postcode].filter(Boolean).join(' · ');
   const hasMap = !!roofHit?.map;
   // Side-by-side choices for a home: solar on its own, or with each battery on offer. The estimate re-runs for whichever is picked.
-  const choices = home
-    ? [
-        { key: 'none', title: 'Solar only', sub: 'Panels and inverter', battery: false, kwh: 0 },
-        ...settings.batteries.filter((b) => b.active).map((b) => ({ key: String(b.kwh), title: `Solar + ${b.kwh} kWh`, sub: b.name, battery: true, kwh: b.kwh })),
-      ]
-    : [];
+  const choices = systemChoices(inputs, settings);
+  const chosen = chosenKey(inputs, r, choices);
   const batteryName = r.batteryKwh ? (settings.batteries.find((b) => Math.abs(b.kwh - r.batteryKwh) < 0.01)?.name ?? `${r.batteryKwh} kWh battery`) : null;
   const pkgOf = settings.packages.find((p) => p.active && p.kind === (r.batteryKwh ? 'solar_battery' : 'solar'));
-  const included = includedItems({ panels: r.panels, inverter: r.inverter, batteryName, scaffolding: settings.costs.scaffoldingOn || !home, workmanshipYears: settings.workmanshipYears, packageIncludes: pkgOf?.includes });
+  const included = includedItems({ panels: r.panels, inverter: r.inverter, batteryName, scaffolding: settings.costs.scaffoldingOn || !home, workmanshipYears: settings.workmanshipYears, packageIncludes: pkgOf?.includes, panelModel: settings.panelModel });
   const upsell = (['ev', 'heatpump'] as const).map((k) => ({ k, label: k === 'ev' ? 'An electric car' : 'A heat pump', on: !!inputs[k], delta: estimate({ ...inputs, [k]: !inputs[k] }, settings).saving - r.saving }));
   return (
     <div className="est-res">
-      <div className="est-reporthead">
-        <div className="est-rh-l">
-          <span className="est-suns" role="img" aria-label={`${pot.suns} out of 5 suns`}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <svg key={n} viewBox="0 0 24 24" width="22" height="22" className={n <= pot.suns ? 'on' : ''} aria-hidden="true">
-                <circle cx="12" cy="12" r="4.5" fill="currentColor" />
-                {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
-                  <path key={a} d="M12 2.5 V5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" transform={`rotate(${a} 12 12)`} />
-                ))}
-              </svg>
-            ))}
-          </span>
-          <div>
-            <h2>{pot.label}</h2>
-            <p>
-              {placeLine ? `${placeLine} · ` : ''}about <b>{num(inputs.yieldKwhPerKwp * SHADE_FACTOR[inputs.shade])} kWh</b> a year from each kWp
-            </p>
-          </div>
-        </div>
-        <div className="est-rh-r">
-          <button type="button" className="est-link" onClick={openQuote}>
-            Email me this as a PDF
-          </button>
-          <button type="button" className="est-link" onClick={onRestart}>
-            Start again
-          </button>
-        </div>
-      </div>
-
-      <div className={`est-dash${hasMap || roofHit ? '' : ' single'}`}>
-        {roofHit && (
-          <div className="est-card est-roofcard">
-            {roofHit.map && <SolarMap map={roofHit.map} panels={r.panels} address={roofHit.address} />}
-            <div className="est-facts">
-              <span><b>{compassWord(roofHit.roof.bearing)}</b> facing</span>
-              <span><b>{roofHit.roof.angle}°</b> pitch</span>
-              <span><b>{roofHit.roof.areaM2} m²</b> main roof face</span>
-              <span><b>{roofHit.roof.maxPanels}</b> panels fit</span>
-            </div>
-            {r.roofLimited && <p className="est-note">Your roof has room for about {roofHit.roof.maxPanels} panels, so that is the most we have sized for.</p>}
-            {r.roofPanels > r.panelsWanted && (
-              <div className="est-chips" role="group" aria-label="System size">
-                <button type="button" className={controls.sizeMode === 'usage' ? 'on' : ''} aria-pressed={controls.sizeMode === 'usage'} onClick={() => controls.setSizeMode('usage')}>
-                  Match my usage
-                </button>
-                <button type="button" className={controls.sizeMode === 'roof' ? 'on' : ''} aria-pressed={controls.sizeMode === 'roof'} onClick={() => controls.setSizeMode('roof')}>
-                  Fill my roof ({r.roofPanels} panels)
-                </button>
-              </div>
-            )}
+      <section className={`est-v4-roof${hasMap ? '' : ' no-map'}`} aria-labelledby="est-roof-h">
+        {hasMap && roofHit?.map && (
+          <div className="est-v4-roof__map">
+            <SolarMap map={roofHit.map} panels={r.panels} address={roofHit.address} />
           </div>
         )}
-        <div className="est-col">
-          <div className="est-card est-head">
-            <div className="glow" />
-            <div className="z">
-              <span className="lab">Your estimate</span>
-              <div className="big">
-                {gbpRound(r.costLow)} – {gbpRound(r.costHigh)} <small>{home ? 'fitted, 0% VAT' : 'fitted, + VAT'}</small>
-              </div>
-              <div className="est-headsave">
-                saving about <b>{gbpRound(r.savingLow)} – {gbpRound(r.savingHigh)}</b> a year
-              </div>
-              <div className="sub">
-                {r.panels} panels · {r.kwp.toFixed(2)} kWp{r.inverter ? ` · ${r.inverter}` : ''}{r.batteryKwh ? ` · ${r.batteryKwh} kWh battery` : ''}
-              </div>
-              <div className="est-headbtns">
-                <button type="button" className="btn btn-solar est-headcta" onClick={openQuote}>
-                  Send me my full quote
-                </button>
-                {requested ? (
-                  <span className="est-headdone est-headdone--inline" role="status">
-                    <b>✓ Survey request received</b>
-                  </span>
-                ) : (
-                  <button type="button" className="btn est-btn-ghost est-headcta" onClick={bookSurvey}>
-                    Book my free survey
-                  </button>
-                )}
-              </div>
-              <div className="est-headlinks">
-                <a href={PHONE_HREF} onClick={() => track('est_call_click', { from: 'headline' })}>
-                  Call {PHONE}
-                </a>
-                <a href={whatsappHref('Hi Heliaxis, I have just used your solar estimator.')} target="_blank" rel="noopener noreferrer" onClick={() => track('est_whatsapp_click', { from: 'headline' })}>
-                  WhatsApp us
-                </a>
-              </div>
-            </div>
-          </div>
-          <div className="est-card est-stats">
-            <div className="tile">
-              <div className="k">Grid connection</div>
-              <div className="v">We handle it</div>
-              <small>{r.gridRoute === 'G99' ? 'Your network operator approves this size first (G99)' : r.gridRoute === 'G98' ? 'We notify your network operator (G98)' : 'Agreed at survey'}</small>
-            </div>
-            <div className="tile">
-              <div className="k">Pays for itself in</div>
-              <div className="v">
-                {yrs(r.paybackLow)} – {yrs(r.paybackHigh)} <small>years</small>
-              </div>
-            </div>
-            <div className="tile">
-              <div className="k">Makes a year</div>
-              <div className="v">
-                {num(r.generation)} <small>kWh</small>
-              </div>
-              <small>{num(r.selfUsed)} used at home · {num(r.exported)} exported</small>
-            </div>
-            <div className="tile">
-              <div className="k">After 25 years</div>
-              <div className="v">{gbpRound(r.net25, 100)}</div>
-              <small>saved, after paying for it</small>
-            </div>
-          </div>
-          <div className="est-card est-pad est-chartcard">
-            <h3>What it makes, month by month</h3>
-            <svg className="est-chart" viewBox="0 0 320 130" role="img" aria-label="Solar generation by month in kilowatt hours">
-              {[0, 0.5, 1].map((t) => (
-                <g key={t}>
-                  <line x1="28" x2="316" y1={100 - t * 84} y2={100 - t * 84} stroke="currentColor" opacity=".12" />
-                  <text x="24" y={103 - t * 84} textAnchor="end" fontSize="8" fill="currentColor" opacity=".6">
-                    {num(max * t)}
-                  </text>
-                </g>
+        <div className="est-v4-roof__info">
+          <span className="est-v4-eyebrow">{roofHit ? 'Your roof' : home ? 'Your home' : 'Your building'}</span>
+          <div className="est-v4-roof__rating">
+            <span className="est-suns" role="img" aria-label={`${pot.suns} out of 5 suns`}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <svg key={n} viewBox="0 0 24 24" width="20" height="20" className={n <= pot.suns ? 'on' : ''} aria-hidden="true">
+                  <circle cx="12" cy="12" r="4.5" fill="currentColor" />
+                  {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+                    <path key={a} d="M12 2.5 V5.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" transform={`rotate(${a} 12 12)`} />
+                  ))}
+                </svg>
               ))}
-              {r.monthly.map((m, i) => {
-                const h = (m / max) * 84;
-                return (
-                  <g key={i}>
-                    <title>{`${MONTH_NAMES[i]}: ${num(m)} kWh`}</title>
-                    <rect x={32 + i * 24} y={100 - h} width="17" height={h} fill="var(--solar)" />
-                    <text x={40.5 + i * 24} y="114" textAnchor="middle" fontSize="9" fill="currentColor" opacity=".7">
-                      {MONTHS[i]}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-            <p className="est-note">{source === 'pvgis' ? `Satellite weather data${town ? ` for ${town}` : ''}, for your roof's direction and pitch.` : 'Typical South Wales sunshine for your roof.'} Summer makes several times more than winter.</p>
+            </span>
+            <h2 id="est-roof-h">{pot.label}</h2>
+          </div>
+          <p className="est-v4-roof__place">
+            {placeLine ? `${placeLine} · ` : ''}about {num(inputs.yieldKwhPerKwp * SHADE_FACTOR[inputs.shade])} kWh a year from each kWp
+          </p>
+          {roofHit && (
+            <div className="est-v4-roof__facts">
+              <span><b>{compassWord(roofHit.roof.bearing)}</b> facing</span>
+              <span><b>{roofHit.roof.angle}°</b> pitch</span>
+              <span><b>{roofHit.roof.maxPanels}</b> panels fit</span>
+            </div>
+          )}
+          <div className="est-v4-size">
+            <span className="est-v4-size__lab">System size</span>
+            <div className="est-v4-size__ctl" role="group" aria-label="Number of panels">
+              <button type="button" aria-label="One panel fewer" disabled={r.panels <= r.panelsMin} onClick={() => { track('est_panels_changed', { dir: -1 }); controls.setPanelsOwn(r.panels - 1); }}>
+                −
+              </button>
+              <div className="est-v4-size__v" aria-live="polite">
+                <b>{r.panels} panels</b>
+                <small>{r.kwp.toFixed(2)} kWp</small>
+              </div>
+              <button type="button" aria-label="One panel more" disabled={r.panels >= r.panelsMax} onClick={() => { track('est_panels_changed', { dir: 1 }); controls.setPanelsOwn(r.panels + 1); }}>
+                +
+              </button>
+            </div>
+            <p className="est-v4-size__note">
+              {controls.panelsOwn && r.panels !== r.panelsSuggested ? (
+                <>
+                  Your choice.{' '}
+                  <button type="button" className="est-link" onClick={() => controls.setPanelsOwn(0)}>
+                    Back to our suggestion ({r.panelsSuggested} panels)
+                  </button>
+                </>
+              ) : (
+                <>Sized for about {num(r.consumption)} kWh a year{inputs.ev || inputs.heatpump ? `, with ${[inputs.ev ? 'an electric car' : '', inputs.heatpump ? 'a heat pump' : ''].filter(Boolean).join(' and ')}` : ''}.</>
+              )}
+              {roofHit && r.roofPanels > r.panels && r.panelsMax >= r.roofPanels && (
+                <>
+                  {' · '}
+                  <button type="button" className="est-link" onClick={() => { track('est_panels_changed', { dir: 'fill' }); controls.setPanelsOwn(r.roofPanels); }}>
+                    Fill my roof ({r.roofPanels} panels)
+                  </button>
+                </>
+              )}
+            </p>
+            {r.roofLimited && roofHit && <p className="est-v4-size__note">Your roof has room for about {roofHit.roof.maxPanels} panels, so that is the most we have sized for.</p>}
+            {r.phaseCapped && <p className="est-v4-size__note">On a single-phase supply the biggest system we can fit is about {r.phaseCapKwp.toFixed(1)} kWp. A three-phase supply allows more.</p>}
+          </div>
+          <div className="est-v4-roof__links">
+            <button type="button" className="est-link" onClick={openQuote}>
+              Email me this as a PDF
+            </button>
+            <button type="button" className="est-link" onClick={onRestart}>
+              Start again
+            </button>
           </div>
         </div>
-      </div>
+      </section>
 
-      {home && choices.length > 1 && (
-        <section className="est-choice" aria-label="Choose your system">
-          <h3 className="est-choice__h">Choose your system</h3>
-          <div className="est-choice__grid">
-            {choices.map((c) => {
-              const e = estimate({ ...inputs, battery: c.battery, batteryKwh: c.battery ? c.kwh : undefined }, settings);
-              const on = c.battery ? inputs.battery && Math.abs(r.batteryKwh - c.kwh) < 0.01 : !inputs.battery;
-              return (
-                <button
-                  key={c.key}
-                  type="button"
-                  className={`est-pick-card${on ? ' on' : ''}`}
-                  aria-pressed={on}
-                  onClick={() => {
-                    track('est_package_changed', { battery_kwh: c.battery ? c.kwh : 0 });
-                    controls.setBattery(c.battery);
-                    if (c.battery) controls.setBatteryKwh(c.kwh);
-                  }}
-                >
-                  <b>{c.title}</b>
-                  <small>{c.sub}</small>
-                  <span className="est-pick-card__price">
-                    {gbpRound(e.costLow)} – {gbpRound(e.costHigh)}
-                  </span>
-                  <span className="est-pick-card__meta">
-                    saves about {gbpRound(e.savingLow)} – {gbpRound(e.savingHigh)} a year
-                  </span>
-                  <span className="est-pick-card__meta">
-                    pays back in {yrs(e.paybackLow)} – {yrs(e.paybackHigh)} years
-                  </span>
-                  {on && <em className="est-pick-card__tag">Your choice</em>}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      <SystemCards
+        choices={choices}
+        chosen={chosen}
+        home={home}
+        panelModel={settings.panelModel}
+        panelWatts={settings.panelWatts}
+        onQuote={openQuote}
+        onChoose={(c) => {
+          track('est_package_changed', { battery_kwh: c.battery ? c.kwh : 0 });
+          controls.setBattery(c.battery);
+          if (c.battery) controls.setBatteryKwh(c.kwh);
+        }}
+      />
+
+      <ul className="est-v4-assure" aria-label="What the price covers">
+        {home && settings.costs.scaffoldingOn && (
+          <li>
+            <BrandIcon k="check" size={20} /> Scaffolding included in the price
+          </li>
+        )}
+        {r.gridRoute && (
+          <li>
+            <BrandIcon k="bolt" size={20} /> We handle the grid {r.gridRoute === 'G99' ? 'application (G99)' : 'notification (G98)'}
+          </li>
+        )}
+        <li>
+          <BrandIcon k="shield" size={20} /> MCS certified installer
+        </li>
+        <li>
+          <BrandIcon k="document" size={20} /> A fixed price in writing after your free survey
+        </li>
+      </ul>
+      <div className="est-v4-next">
+        {requested ? (
+          <span className="est-headdone est-headdone--inline" role="status">
+            <b>Survey request received</b>
+          </span>
+        ) : (
+          <button type="button" className="btn est-btn-ghost" onClick={bookSurvey}>
+            Book my free survey
+          </button>
+        )}
+        <a href={PHONE_HREF} onClick={() => track('est_call_click', { from: 'cards' })}>
+          <BrandIcon k="phone" size={18} /> Call {PHONE}
+        </a>
+        <a href={whatsappHref('Hi Heliaxis, I have just used your solar estimator.')} target="_blank" rel="noopener noreferrer" onClick={() => track('est_whatsapp_click', { from: 'cards' })}>
+          WhatsApp us
+        </a>
+      </div>
 
       <div className="est-resgrid two">
         <div className="est-card est-pad">
@@ -807,6 +757,66 @@ function Result({ knownAddress, rates, setRates, roofHit, r, withBattery, inputs
           <QuoteCapture buildPayload={quotePayload} onDone={setQuoteDone} onBook={bookSurvey} done={quoteDone} pixelData={{ currency: 'GBP', value: Math.round(r.cost), kwp: Number(r.kwp.toFixed(2)), battery: r.batteryKwh > 0 }} />
         </div>
       </div>
+
+      <ProofBand accreditations={settings.accreditations} reviews={settings.reviews} />
+
+      <div className="est-v4-how">
+        <h2>How we worked it out</h2>
+        <p>The figures for the system you are looking at, and what to change if something is not right.</p>
+      </div>
+        <div className="est-card est-stats">
+          <div className="tile">
+            <div className="k">Used at home</div>
+            <div className="v">
+              {Math.round(usedPct)}<small>%</small>
+            </div>
+            <small>of what the panels make{r.batteryKwh ? ', with the battery' : ''}</small>
+          </div>
+          <div className="tile">
+            <div className="k">Pays for itself in</div>
+            <div className="v">
+              {yrs(r.paybackLow)} – {yrs(r.paybackHigh)} <small>years</small>
+            </div>
+          </div>
+          <div className="tile">
+            <div className="k">Makes a year</div>
+            <div className="v">
+              {num(r.generation)} <small>kWh</small>
+            </div>
+            <small>{num(r.selfUsed)} used at home · {num(r.exported)} exported</small>
+          </div>
+          <div className="tile">
+            <div className="k">After 25 years</div>
+            <div className="v">{gbpRound(r.net25, 100)}</div>
+            <small>saved, after paying for it</small>
+          </div>
+        </div>
+        <div className="est-card est-pad est-chartcard">
+          <h3>What it makes, month by month</h3>
+          <svg className="est-chart" viewBox="0 0 320 130" role="img" aria-label="Solar generation by month in kilowatt hours">
+            {[0, 0.5, 1].map((t) => (
+              <g key={t}>
+                <line x1="28" x2="316" y1={100 - t * 84} y2={100 - t * 84} stroke="currentColor" opacity=".12" />
+                <text x="24" y={103 - t * 84} textAnchor="end" fontSize="8" fill="currentColor" opacity=".6">
+                  {num(max * t)}
+                </text>
+              </g>
+            ))}
+            {r.monthly.map((m, i) => {
+              const h = (m / max) * 84;
+              return (
+                <g key={i}>
+                  <title>{`${MONTH_NAMES[i]}: ${num(m)} kWh`}</title>
+                  <rect x={32 + i * 24} y={100 - h} width="17" height={h} fill="var(--solar)" />
+                  <text x={40.5 + i * 24} y="114" textAnchor="middle" fontSize="9" fill="currentColor" opacity=".7">
+                    {MONTHS[i]}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+          <p className="est-note">{source === 'pvgis' ? `Satellite weather data${town ? ` for ${town}` : ''}, for your roof's direction and pitch.` : 'Typical South Wales sunshine for your roof.'} Summer makes several times more than winter.</p>
+        </div>
 
       <div className="est-resgrid two">
         <div className="est-card est-pad">

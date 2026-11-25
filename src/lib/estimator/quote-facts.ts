@@ -88,7 +88,7 @@ export function buildQuoteFacts(args: { reference: string; customerName: string;
     priceLow: round50(r.costLow),
     priceHigh: round50(r.costHigh),
     vatLabel: home ? 'fitted, 0% VAT' : 'fitted, plus VAT',
-    included: includedItems({ panels: r.panels, inverter: r.inverter, batteryName, scaffolding: settings.costs.scaffoldingOn || !home, workmanshipYears: settings.workmanshipYears, packageIncludes: pkg?.includes }),
+    included: includedItems({ panels: r.panels, inverter: r.inverter, batteryName, scaffolding: settings.costs.scaffoldingOn || !home, workmanshipYears: settings.workmanshipYears, packageIncludes: pkg?.includes, panelModel: settings.panelModel }),
     lines,
     lineTotal,
     award: settings.award.on ? settings.award : null,
