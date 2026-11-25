@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fillText } from '@/lib/crm/settings-shared';
-import { PACK_ITEMS, slotDef } from '@/lib/handover/slots';
+import { docItem, PACK_ITEMS, slotDef } from '@/lib/handover/slots';
 import { hasPrintVersion, PRINT_LABEL, PRINT_TITLE, printHref } from '@/lib/documents/print-shared';
 import type { TrackerStep } from '@/lib/crm/tracker';
 import './extras.css';
@@ -365,7 +365,7 @@ export function DocumentsTab({
                     {DOC_LABEL[d.category] || 'Document'} · {short(d.created_at)}
                     {d.generated_key || (d.version ?? 1) > 1 ? ` · v${d.version ?? 1}` : ''}
                     {d.archived_at ? ` · archived ${short(d.archived_at)}` : ''}
-                    {handover && d.handover_slot && d.handover_slot !== 'PACK' ? ` · handover pack: ${slotDef(d.handover_slot)?.title ?? d.handover_slot}` : ''}
+                    {handover && d.handover_slot && d.handover_slot !== 'PACK' ? ` · handover pack: ${slotDef(docItem(d))?.title ?? d.handover_slot}` : ''}
                   </small>
                 </a>
                 {isSignedQuote && portal?.accepted && (

@@ -654,7 +654,7 @@ await afterReply();
 eq('EV: signed, its own PO', [s4.status, s4.body.po?.po_number], [200, 'PO-0002']);
 eq('the call goes over Christmas and the Boxing Day holiday: Tuesday 29th', tasks('site-call:').filter((x) => x.projectId === p2.id).map((x) => [x.title, x.dueDate]), [['Handover call: go through the pack and the charger app with Jane', '2026-12-29']]);
 eq('the DNO to-do: notify within 28 days', tasks('site-dno-ev:').map((x) => [x.title, x.dueDate]), [['Notify the DNO about the EV charger (connect and notify) · 12 High Street, NP20 4AB', '2027-01-14']]);
-eq('the EV record, in the other-certificates handover item; no string tests', db.rows('crm_documents').filter((d) => d.project_id === p2.id && d.generated_key && !d.generated_key.startsWith('PO')).map((d) => [d.generated_key, d.handover_slot]), [['HX-EV-01', 'HX-HO-19']]);
+eq('the EV record, in its own handover item (HX-EV-01); no string tests', db.rows('crm_documents').filter((d) => d.project_id === p2.id && d.generated_key && !d.generated_key.startsWith('PO')).map((d) => [d.generated_key, d.handover_slot]), [['HX-EV-01', 'HX-EV-01']]);
 
 // An honest phone that signed off without signal and sent it the next morning: the server words the
 // declaration itself, for the day it was signed, so each record's statement is what the phone showed

@@ -1,7 +1,7 @@
 /**
  * The customer handover pack's catalogue (SPEC 4.1, HANDOVER 1; codes and titles: CODE-MAP): every
  * document in the pack, by Heliaxis's own code (HX-HO-01 … HX-HO-19, HX-PV-01 … HX-PV-03, HX-BAT-01 …
- * HX-BAT-04), plus the combined PACK, each with the customer's one plain line, its contents group, the technologies it belongs to, who makes it, its place in the pack and
+ * HX-BAT-04, HX-HP-02 … HX-HP-05, HX-EV-01 … HX-EV-04), plus the combined PACK, each with the customer's one plain line, its contents group, the technologies it belongs to, who makes it, its place in the pack and
  * when it isn't needed. Then each item's state on a job (D7: Complete, Missing, Waiting, Not needed,
  * Out of date), the headline ("18 of 23 complete · 3 waiting · 2 missing · 2 not needed"), whether
  * the pack can go to the customer yet (D23) and the contents in customer order (HANDOVER 2.6).
@@ -67,9 +67,13 @@ export type SlotCode =
   | 'HX-HP-03'
   | 'HX-HP-04'
   | 'HX-HP-05'
+  | 'HX-EV-01'
+  | 'HX-EV-02'
+  | 'HX-EV-03'
+  | 'HX-EV-04'
   | 'PACK';
 
-/** What applies() looks at: the job's technologies, its DNO route and two design details. */
+/** What applies() looks at: the job's technologies, its DNO route and three design details. */
 export type AppliesCtx = {
   products: string[];
   /** paperwork.dno_route: g98 · g99 · demand · not_needed, or null when it hasn't been chosen. */
@@ -78,6 +82,8 @@ export type AppliesCtx = {
   pas63100: boolean | null;
   /** system.maintenance_plan: a maintenance plan was sold. */
   maintenancePlan: boolean | null;
+  /** system.ozev_grant: the job claims the OZEV grant for its charger (Job details). Missing reads as not claimed. */
+  ozevGrant?: boolean | null;
 };
 
 export type SlotDef = {
@@ -115,6 +121,8 @@ const pvOrBattery = (c: AppliesCtx) => (has(c, 'solar', 'battery') ? null : NO_P
 const any = () => null;
 const heatpump = (c: AppliesCtx) => (has(c, 'heatpump') ? null : 'No heat pump on this job');
 const evOrHeatpump = (c: AppliesCtx) => (has(c, 'ev', 'heatpump') ? null : 'No EV charger or heat pump on this job');
+const ev = (c: AppliesCtx) => (has(c, 'ev') ? null : 'No EV charger on this job');
+const ozev = (c: AppliesCtx) => ev(c) ?? (c.ozevGrant === true ? null : 'No OZEV grant claimed on this job (Job details)');
 /** MCS certifies solar, batteries and heat pumps: not an EV charger on its own. */
 const mcs = (c: AppliesCtx) => (has(c, 'solar', 'battery', 'heatpump') ? null : 'No MCS certificate for this job’s technologies');
 const pas = (c: AppliesCtx) => battery(c) ?? (c.pas63100 === true ? null : 'PAS 63100 isn’t ticked for this battery (Job details)');
@@ -222,6 +230,32 @@ export const SLOTS: SlotDef[] = [
     applies: heatpump,
     category: 'certificate',
     pick: 'Heat pump handover certificate',
+  },
+  {
+    code: 'HX-EV-03',
+    title: 'EV charger commissioning and handover certificate',
+    customer: 'What we installed for your charger, how it’s set up, and what we showed you about using it safely.',
+    group: 'certificates',
+    tech: ['ev'],
+    // Made at the electrician's sign-off from their EV record (site/electrician-docs.ts), like HX-EV-01.
+    kind: 'G',
+    maker: 'site',
+    order: 56,
+    applies: ev,
+    category: 'commissioning',
+  },
+  {
+    code: 'HX-EV-02',
+    title: 'Smart charge point statement of compliance',
+    customer: 'The charger maker’s statement that your charger meets the Electric Vehicles (Smart Charge Points) Regulations 2021.',
+    group: 'certificates',
+    tech: ['ev'],
+    kind: 'C',
+    maker: 'office',
+    order: 57,
+    applies: ev,
+    category: 'certificate',
+    pick: 'Smart charge point statement of compliance',
   },
   {
     code: 'HX-HO-06',
@@ -412,6 +446,18 @@ export const SLOTS: SlotDef[] = [
     category: 'commissioning',
   },
   {
+    code: 'HX-EV-01',
+    title: 'EV charge point installation record',
+    customer: 'Our electrician’s checks and readings on your charger’s installation.',
+    group: 'tests',
+    tech: ['ev'],
+    kind: 'G',
+    maker: 'site',
+    order: 195,
+    applies: ev,
+    category: 'commissioning',
+  },
+  {
     code: 'HX-BAT-03',
     title: 'Battery location check (PAS 63100)',
     customer: 'Our checks on where your battery is fitted, against PAS 63100, the fire safety specification for home batteries.',
@@ -483,7 +529,7 @@ export const SLOTS: SlotDef[] = [
   {
     code: 'HX-HO-21',
     title: 'Grid notice (EV charger or heat pump)',
-    customer: 'The notice that tells your electricity network (DNO) about your new EV charger or heat pump.',
+    customer: 'The notice that tells your electricity network (DNO) about the new equipment we connected.',
     group: 'grid',
     tech: ['ev', 'heatpump'],
     kind: 'C',
@@ -534,6 +580,19 @@ export const SLOTS: SlotDef[] = [
     pick: 'Construction phase plan',
   },
   {
+    code: 'HX-EV-04',
+    title: 'OZEV grant claim',
+    customer: 'Confirmation of the government (OZEV) grant claimed towards your charger.',
+    group: 'other',
+    tech: ['ev'],
+    kind: 'C',
+    maker: 'office',
+    order: 247,
+    applies: ozev,
+    category: 'handover',
+    pick: 'OZEV grant claim confirmation',
+  },
+  {
     code: 'HX-HO-19',
     title: 'Other useful documents',
     customer: 'Anything else that’s useful to keep.',
@@ -570,8 +629,25 @@ export const PACK_ITEMS = SLOTS.filter((s) => s.code !== 'PACK');
 /** "Which is it?" for + Add a document, ending with Something else. */
 export const UPLOAD_PICKS = PACK_ITEMS.filter((s) => s.pick).sort((a, b) => (a.code === 'HX-HO-19' ? 1 : b.code === 'HX-HO-19' ? -1 : 0));
 
+/**
+ * Generated documents that have their own item now but were filed elsewhere by an earlier version:
+ * the EV record (HX-EV-01) went in HX-HO-19, Other useful documents, before it had its own. They're
+ * read where they belong, by generated_key, so nothing is moved in the database and a rollback reads
+ * them as before.
+ */
+const OWN_ITEM: Record<string, SlotCode> = { 'HX-EV-01': 'HX-EV-01' };
+/** The item a stored document is read in: its own (OWN_ITEM) when it was filed in HX-HO-19, else where it's filed. */
+export const docItem = (d: { handover_slot?: string | null; generated_key?: string | null }): string =>
+  d.generated_key && OWN_ITEM[d.generated_key] && d.handover_slot === 'HX-HO-19' ? OWN_ITEM[d.generated_key] : String(d.handover_slot);
+
 /** The documents the electrician's sign-off and certificate make: all of them Complete before Send (D23). */
-export const SITE_SLOTS: SlotCode[] = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-BAT-03', 'HX-BAT-04', 'HX-HO-02', 'HX-HO-04'];
+export const SITE_SLOTS: SlotCode[] = ['HX-PV-01', 'HX-PV-02', 'HX-PV-03', 'HX-BAT-01', 'HX-BAT-02', 'HX-BAT-03', 'HX-BAT-04', 'HX-EV-01', 'HX-EV-03', 'HX-HO-02', 'HX-HO-04'];
+/**
+ * The office's EV documents that hold Send too (the owner, 25 Nov 2026): an EV job's pack goes only
+ * once every EV item is Complete or Not needed. The DNO notice (HX-HO-21) can follow: it's due after.
+ */
+export const EV_HOLD_SLOTS: SlotCode[] = ['HX-EV-02', 'HX-EV-04'];
+const holdsSend = (code: SlotCode) => SITE_SLOTS.includes(code) || EV_HOLD_SLOTS.includes(code);
 /** Chased by the office after the pack goes ("On its way"). */
 export const FOLLOW_SLOTS: SlotCode[] = ['HX-HO-18', 'HX-HO-05', 'HX-HO-07', 'HX-HO-03'];
 
@@ -736,6 +812,8 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
     case 'HX-PV-03':
     case 'HX-BAT-01':
     case 'HX-BAT-02':
+    case 'HX-EV-01':
+    case 'HX-EV-03':
       return siteState(docs, c);
     case 'HX-BAT-03':
     case 'HX-BAT-04':
@@ -807,6 +885,10 @@ function stateFor(d: SlotDef, docs: SlotDoc[], c: StateCtx): Partial0 {
     case 'HX-HP-03':
     case 'HX-HP-04':
       return docs.length ? docsState(docs) : { state: 'missing', why: 'Upload it.', fix: 'upload' };
+    case 'HX-EV-02':
+      return docs.length ? docsState(docs) : { state: 'missing', why: 'Upload the charger maker’s statement of compliance (the electrician handed the customer a copy).', fix: 'upload' };
+    case 'HX-EV-04':
+      return docs.length ? docsState(docs) : { state: 'missing', why: 'Upload the OZEV claim confirmation, or its reference.', fix: 'upload' };
     case 'HX-HO-09':
       // The switching-off page makes it Complete; the manufacturers' procedures from the library go with it.
       return genState('HX-HO-09', docs.filter((x) => x.source !== 'library'), c);
@@ -861,14 +943,15 @@ export function headline(views: SlotView[]): Headline {
 }
 
 /**
- * Can the pack go to the customer (D23)? Every site document for the job's technologies Complete;
- * the office's own (MCS certificate, warranty insurance, Building Regulations, invoice) and the rest can
- * follow, shown as "On its way". `blocking` lists what stops it, `following` what will follow.
+ * Can the pack go to the customer (D23)? Every site document for the job's technologies Complete, and
+ * on an EV job every EV item (EV_HOLD_SLOTS); the office's own (MCS certificate, warranty insurance,
+ * Building Regulations, invoice) and the rest can follow, shown as "On its way". `blocking` lists what
+ * stops it, `following` what will follow.
  */
 export function sendCheck(views: SlotView[]): { ok: boolean; blocking: SlotView[]; following: SlotView[] } {
   const open = views.filter((v) => !v.hidden && v.counted && v.state !== 'complete' && v.state !== 'na');
-  const blocking = open.filter((v) => SITE_SLOTS.includes(v.code));
-  return { ok: blocking.length === 0, blocking, following: open.filter((v) => !SITE_SLOTS.includes(v.code)) };
+  const blocking = open.filter((v) => holdsSend(v.code));
+  return { ok: blocking.length === 0, blocking, following: open.filter((v) => !holdsSend(v.code)) };
 }
 
 /**

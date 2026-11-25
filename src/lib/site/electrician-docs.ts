@@ -36,7 +36,7 @@ type DocDef = {
   /** The generated document's key, its code (HX-PV-01…). */
   key: string;
   title: string;
-  /** The handover pack item (handover/slots.ts): its own code, or HX-HO-19 for the EV and heat pump records. */
+  /** The handover pack item (handover/slots.ts): its own code, or HX-HO-19 for the heat pump record. */
   slot: string;
   section: string;
   products: string[];
@@ -49,7 +49,8 @@ export const ELECTRICIAN_DOCS: DocDef[] = [
   { key: 'HX-PV-03', title: PV_SWITCHON_TITLE, slot: 'HX-PV-03', section: 'pvswitchon', products: ['solar'], make: makePvSwitchOn },
   { key: 'HX-BAT-01', title: BAT_INSPECT_TITLE, slot: 'HX-BAT-01', section: 'battery', products: ['battery'], make: makeBatteryInspection },
   { key: 'HX-BAT-02', title: BAT_TESTS_TITLE, slot: 'HX-BAT-02', section: 'battery', products: ['battery'], make: makeBatteryTests },
-  { key: 'HX-EV-01', title: EV_TITLE, slot: 'HX-HO-19', section: 'ev', products: ['ev'], make: makeEvRecord },
+  // Its own item since 25 Nov 2026 (one made before is read there too: handover/facts.ts docItem).
+  { key: 'HX-EV-01', title: EV_TITLE, slot: 'HX-EV-01', section: 'ev', products: ['ev'], make: makeEvRecord },
   { key: 'HX-HP-01', title: HP_TITLE, slot: 'HX-HO-19', section: 'heatpump', products: ['heatpump'], make: makeHpRecord },
 ];
 /** Answers the office writes on the assignment (eic/design.ts), not the electrician: left out of what their documents are hashed on. */
