@@ -163,4 +163,10 @@ async function send(text, threadId, emit) {
   }
 }
 
-module.exports = { login, logout, restore, history, listThreads, newThread, patchThread, downloadDocument, send, hapBase: base, isSignedIn: () => !!session, setOnExpired: (f) => (onExpired = f), ApiError };
+/** Where updates are published and the oldest version HAP still supports (both from HAP, so they can change without a new build). */
+async function updateInfo() {
+  const c = await config();
+  return { url: c.updateUrl || null, minVersion: c.minDesktopVersion || null };
+}
+
+module.exports = { updateInfo, login, logout, restore, history, listThreads, newThread, patchThread, downloadDocument, send, hapBase: base, isSignedIn: () => !!session, setOnExpired: (f) => (onExpired = f), ApiError };

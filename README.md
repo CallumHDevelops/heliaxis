@@ -34,3 +34,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Metis Desktop
+
+A Windows app for Metis lives in [`desktop/`](desktop/README.md): how to run it in development, build the installer, add a product to the price book and add a new document template are all there. Its server side is under `src/app/api/desktop` and `src/lib/assistant`.

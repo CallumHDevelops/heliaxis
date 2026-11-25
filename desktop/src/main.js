@@ -206,6 +206,54 @@ app.whenReady().then(() => {
   });
 });
 
+/**
+ * Auto-update (installed copies only). The update address and the oldest supported version come from HAP's config, so a
+ * new feed or a forced upgrade needs no new build. Updates download quietly and install when Metis is next quit, or when
+ * the person presses "Restart to update". Signed installers verify the publisher; an unsigned build still updates from the
+ * address you control.
+ */
+const semverLess = (a, b) => {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) < (pb[i] || 0);
+  return false;
+};
+let updater = null;
+async function setupUpdater() {
+  if (!app.isPackaged) return;
+  let info;
+  try {
+    info = await api.updateInfo();
+  } catch {
+    return; // offline: try again at the next check
+  }
+  if (info.minVersion && semverLess(app.getVersion(), info.minVersion)) send('update:status', { state: 'required', version: info.minVersion });
+  if (!info.url) return;
+  try {
+    if (!updater) {
+      ({ autoUpdater: updater } = require('electron-updater'));
+      updater.autoDownload = true;
+      updater.autoInstallOnAppQuit = true;
+      updater.on('update-available', (i) => send('update:status', { state: 'downloading', version: i.version }));
+      updater.on('update-downloaded', (i) => send('update:status', { state: 'ready', version: i.version }));
+      updater.on('error', () => {}); // a failed check is quiet: the next one tries again
+    }
+    updater.setFeedURL({ provider: 'generic', url: info.url });
+    await updater.checkForUpdates();
+  } catch {
+    /* quiet */
+  }
+}
+ipcMain.handle('update:install', () => {
+  quitting = true;
+  if (updater) updater.quitAndInstall();
+});
+
+app.whenReady().then(() => {
+  setTimeout(setupUpdater, 30_000);
+  setInterval(setupUpdater, 4 * 3600_000);
+});
+
 app.on('before-quit', () => (quitting = true));
 app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed', () => {

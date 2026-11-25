@@ -373,6 +373,15 @@
     show('login');
   });
 
+  // --- updates
+  window.metis.onUpdate((u) => {
+    const text = u.state === 'downloading' ? `Downloading Metis ${u.version}…` : u.state === 'ready' ? `Metis ${u.version} is ready.` : `This version of Metis is too old for HAP. Please update to ${u.version} or later.`;
+    $('update-text').textContent = text;
+    $('update-btn').hidden = u.state !== 'ready';
+    $('update-banner').hidden = false;
+  });
+  $('update-btn').addEventListener('click', () => window.metis.installUpdate());
+
   window.metis.onExpired(() => {
     signedIn = false;
     finish();

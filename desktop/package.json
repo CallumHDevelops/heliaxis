@@ -3,17 +3,43 @@
   "productName": "Metis",
   "version": "0.1.0",
   "description": "Metis for Windows: the Heliaxis assistant on your desktop",
+  "author": "Heliaxis Limited",
   "private": true,
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "test": "node --test test"
+    "test": "node --test test",
+    "dist": "electron-builder --win nsis --x64 --publish never",
+    "pack": "electron-builder --win dir --x64 --publish never"
   },
   "dependencies": {
+    "electron-updater": "^6.6.2",
     "marked": "^18.1.1"
   },
   "devDependencies": {
-    "electron": "^39.0.0"
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "uk.co.heliaxis.metis",
+    "productName": "Metis",
+    "copyright": "Heliaxis Limited",
+    "directories": { "output": "dist" },
+    "files": ["src/**/*", "renderer/**/*", "assets/**/*", "package.json"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Metis",
+      "artifactName": "Metis-Setup-${version}.${ext}"
+    },
+    "publish": [{ "provider": "generic", "url": "https://updates.invalid/metis" }]
   }
 }

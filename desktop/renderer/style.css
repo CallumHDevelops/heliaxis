@@ -110,3 +110,6 @@ input[type="email"], input[type="password"], input[type="text"], input[type="url
 .btns button:disabled { opacity: 0.6; }
 
 html.mica body { background: transparent; }
+
+.banner.info { background: rgba(248, 188, 30, 0.14); border-color: var(--accent); display: flex; align-items: center; gap: 10px; }
+.primary.small { padding: 3px 10px; font-size: 12.5px; }

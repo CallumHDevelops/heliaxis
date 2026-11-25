@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET() {
   return NextResponse.json(
-    { supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? null, supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? null, minDesktopVersion: '0.1.0' },
+    { supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? null, supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? null, minDesktopVersion: process.env.METIS_MIN_VERSION || '0.1.0', updateUrl: process.env.METIS_UPDATE_URL || null },
     { headers: { 'Cache-Control': 'no-store' } }
   );
 }
