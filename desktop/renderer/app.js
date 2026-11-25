@@ -136,6 +136,8 @@
     $('hotkey-error').textContent = hotkeyProblem || '';
   }
 
+  if (window.metis.platform === 'darwin') $('startup-label').textContent = 'Start Metis when I log in';
+
   async function boot() {
     const r = await window.metis.state();
     if (!r.ok) {

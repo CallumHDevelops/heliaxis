@@ -82,11 +82,14 @@ export function AppDownload({
   release,
   sendToPhone,
   appearance,
+  desktop,
 }: {
   release: Release;
   sendToPhone?: React.ReactNode;
   /** Light / Dark / Match phone for this person (the page's first card). */
   appearance?: React.ReactNode;
+  /** Metis for Windows and Mac (a server-rendered card). */
+  desktop?: React.ReactNode;
 }) {
   const android = useSyncExternalStore(
     noop,
@@ -221,6 +224,8 @@ export function AppDownload({
           </p>
         )}
       </section>
+
+      {desktop}
 
       <h2 className="ad-sub">On an iPhone or iPad?</h2>
       <IphoneSteps installed={false} />

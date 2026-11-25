@@ -1,0 +1,84 @@
+name: Metis Desktop
+
+# Builds the Windows installer and the Mac app. Run it by hand (Actions > Metis Desktop > Run workflow) or by pushing a tag
+# like metis-v0.2.0. The artifacts are attached to the run. A Mac can only be built on a Mac, which is why this exists.
+#
+# Optional repository secrets:
+#   Windows signing:  WIN_CSC_LINK (base64 .pfx), WIN_CSC_KEY_PASSWORD
+#   Mac signing:      MAC_CSC_LINK (base64 Developer ID Application .p12), MAC_CSC_KEY_PASSWORD
+#   Mac notarising:   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+#   Publishing:       SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY   (uploads the release for HAP and auto-update)
+# With no secrets the apps are unsigned: Windows shows a SmartScreen warning and macOS asks you to right-click > Open.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Upload the build to the update bucket'
+        type: boolean
+        default: false
+  push:
+    tags: ['metis-v*']
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults: { run: { working-directory: desktop } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: desktop/package-lock.json }
+      - run: npm ci
+      - run: npm run dist
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metis-windows
+          path: |
+            desktop/dist/Metis-Setup-*.exe
+            desktop/dist/Metis-Setup-*.exe.blockmap
+            desktop/dist/latest.yml
+
+  mac:
+    runs-on: macos-latest
+    defaults: { run: { working-directory: desktop } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: desktop/package-lock.json }
+      - run: npm ci
+      - name: Build (notarised when the Apple secrets are set)
+        run: |
+          if [ -n "$APPLE_ID" ]; then npx electron-builder --mac --publish never -c.mac.notarize=true; else npx electron-builder --mac --publish never; fi
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: metis-mac
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/*.blockmap
+            desktop/dist/latest-mac.yml
+
+  publish:
+    needs: [windows, mac]
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish) || startsWith(github.ref, 'refs/tags/metis-v') }}
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: desktop } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/download-artifact@v4
+        with: { path: desktop/dist, merge-multiple: true }
+      - run: node scripts/publish.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

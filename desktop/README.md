@@ -55,6 +55,37 @@ npm run dist
 and add `"publisherName": ["Heliaxis Limited"]` under `build.win` in `package.json` so updates verify the publisher. The
 certificate is not in this repository and must not be.
 
+## Mac
+
+The app is cross-platform: on a Mac it uses the menu bar, the Keychain for your sign-in, vibrancy instead of Mica, and an Edit
+menu so copy and paste work. A Mac app can only be built on a Mac, so either run this on one:
+
+```bash
+cd desktop && npm ci && npm run dist:mac     # dist/Metis-<version>-mac.dmg and a .zip for auto-update
+```
+
+or use GitHub: **Actions → Metis Desktop → Run workflow** builds Windows and Mac together (and on a pushed tag `metis-v0.2.0`).
+It is untested on a Mac so far: the first build there is the first real check.
+
+To give Mac users no warnings it needs an **Apple Developer** account (paid, yearly): create a *Developer ID Application*
+certificate, then add `MAC_CSC_LINK` (base64 `.p12`), `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and
+`APPLE_TEAM_ID` as repository secrets and the workflow signs and notarises it. Mac auto-update only works for a signed app.
+Unsigned, users right-click the app and choose **Open** the first time. iPhone and iPad already use HAP from Safari's
+Add to Home Screen (see the App page), including Metis at `/admin/assistant`.
+
+## Publishing, and the App page
+
+HAP's **App** page (`/admin/app`) has a *Metis for your computer* card that reads the published version and offers the download.
+The files are not in the site (the installer is about 100 MB): they live in a public storage folder, and a new version is just a
+new upload, never a new deploy.
+
+1. Make a public Supabase Storage bucket called `metis-desktop` (raise its file size limit above the installer's size).
+2. Build, then upload: set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in your terminal and run `npm run publish`
+   (installers first, the `latest*.yml` files last). The workflow's *publish* step does the same from GitHub.
+3. In Vercel set `METIS_UPDATE_URL` to `https://<project>.supabase.co/storage/v1/object/public/metis-desktop`. That one address
+   feeds the App page download **and** the in-app auto-update. Set `METIS_SIGNED=1` once the installers are signed, to hide the
+   "not code-signed" note.
+
 ## Auto-update
 
 An installed copy checks for updates 30 seconds after it starts and every four hours, downloads quietly, and installs when

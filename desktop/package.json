@@ -11,7 +11,9 @@
     "dev": "electron . --dev",
     "test": "node --test test",
     "dist": "electron-builder --win nsis --x64 --publish never",
-    "pack": "electron-builder --win dir --x64 --publish never"
+    "pack": "electron-builder --win dir --x64 --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "publish": "node scripts/publish.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.6.2",
@@ -25,10 +27,24 @@
     "appId": "uk.co.heliaxis.metis",
     "productName": "Metis",
     "copyright": "Heliaxis Limited",
-    "directories": { "output": "dist" },
-    "files": ["src/**/*", "renderer/**/*", "assets/**/*", "package.json"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "assets/icon.png"
     },
     "nsis": {
@@ -40,6 +56,36 @@
       "shortcutName": "Metis",
       "artifactName": "Metis-Setup-${version}.${ext}"
     },
-    "publish": [{ "provider": "generic", "url": "https://updates.invalid/metis" }]
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.invalid/metis"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "artifactName": "Metis-${version}-mac.${ext}"
+    }
   }
 }

@@ -22,7 +22,9 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => showWindow());
 }
 
-const icon = () => nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'tray.png')).resize({ width: 32, height: 32 });
+const IS_MAC = process.platform === 'darwin';
+// The menu-bar icon on a Mac is small; Windows scales a larger one.
+const icon = () => nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'tray.png')).resize(IS_MAC ? { width: 18, height: 18 } : { width: 32, height: 32 });
 const send = (channel, payload) => win && !win.isDestroyed() && win.webContents.send(channel, payload);
 
 function createWindow() {
@@ -34,12 +36,12 @@ function createWindow() {
     title: 'Metis',
     icon: icon(),
     // Windows 11 (build 22621+) gets the Mica material; anything older gets a solid window, so text is never on a see-through background.
-    ...(MICA ? { backgroundMaterial: 'mica', backgroundColor: '#00000000' } : { backgroundColor: nativeTheme.shouldUseDarkColors ? '#211f18' : '#f7f2e7' }),
+    ...(IS_MAC ? { vibrancy: 'under-window', visualEffectState: 'active', backgroundColor: '#00000000' } : MICA ? { backgroundMaterial: 'mica', backgroundColor: '#00000000' } : { backgroundColor: nativeTheme.shouldUseDarkColors ? '#211f18' : '#f7f2e7' }),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false },
   });
   win.setMenuBarVisibility(false);
   // The page paints its own solid background unless Mica is behind it.
-  win.webContents.on('did-finish-load', () => MICA && win.webContents.executeJavaScript("document.documentElement.classList.add('mica')").catch(() => {}));
+  win.webContents.on('did-finish-load', () => (MICA || IS_MAC) && win.webContents.executeJavaScript("document.documentElement.classList.add('mica')").catch(() => {}));
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   // Esc hides, Ctrl+N starts a new chat (also handled in the page for focus cases).
   win.webContents.on('before-input-event', (e, input) => {
@@ -47,7 +49,7 @@ function createWindow() {
     if (input.key === 'Escape') {
       e.preventDefault();
       win.hide();
-    } else if (input.control && input.key.toLowerCase() === 'n') {
+    } else if ((input.control || input.meta) && input.key.toLowerCase() === 'n') {
       e.preventDefault();
       send('app:new-chat');
     }
@@ -99,7 +101,7 @@ function registerHotkey() {
   } catch {
     ok = false;
   }
-  hotkeyProblem = ok ? null : `Windows wouldn’t register ${hotkey.replace('Control', 'Ctrl')}: another app is probably using it. Pick a different shortcut in Settings.`;
+  hotkeyProblem = ok ? null : `${IS_MAC ? 'macOS' : 'Windows'} wouldn’t register ${hotkey.replace('Control', 'Ctrl')}: another app is probably using it. Pick a different shortcut in Settings.`;
   send('hotkey:status', { hotkey, problem: hotkeyProblem });
   return ok;
 }
@@ -194,6 +196,8 @@ function ipc() {
 
 app.whenReady().then(() => {
   app.setAppUserModelId('uk.co.heliaxis.metis');
+  // A Mac only gives Cmd+C, Cmd+V and friends to a window through an Edit menu.
+  if (IS_MAC) Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }]));
   createWindow();
   buildTray();
   ipc();
@@ -256,6 +260,8 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => (quitting = true));
 app.on('will-quit', () => globalShortcut.unregisterAll());
+// Clicking the Dock icon brings Metis back (a Mac app stays running with no window open).
+app.on('activate', () => showWindow());
 app.on('window-all-closed', () => {
   /* stay in the tray */
 });

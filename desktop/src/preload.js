@@ -24,6 +24,7 @@ const invoke = (ch, ...a) => ipcRenderer.invoke(ch, ...a);
 const on = (ch, fn) => ipcRenderer.on(ch, (_e, p) => fn(p));
 
 contextBridge.exposeInMainWorld('metis', {
+  platform: process.platform,
   render: (text) => md.parse(String(text ?? '')),
   state: () => invoke('auth:state'),
   login: (email, password) => invoke('auth:login', email, password),

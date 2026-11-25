@@ -7,7 +7,9 @@ import { APP_LINK_TTL_DAYS, appLinkUrl, createAppLinkToken, qrSvg } from '@/lib/
 import { themeContext } from '@/lib/theme/server';
 import { THEME_GROUP_LABEL } from '@/lib/theme/shared';
 import release from '../../../../public/app/version.json';
+import { readMetisRelease } from '@/lib/metis-release';
 import { AppDownload } from './AppDownload';
+import { MetisDesktop } from './MetisDesktop';
 import { SendToPhone } from './SendToPhone';
 
 export const dynamic = 'force-dynamic';
@@ -27,11 +29,13 @@ export default async function AppPage() {
   const qr = link ? await qrSvg(link) : '';
   // This person's Light / Dark / Match phone (also in the avatar menu on every page).
   const { pref } = await themeContext();
+  const metis = await readMetisRelease();
 
   return (
     <AdminShell active="app">
       <AppDownload
         release={release}
+        desktop={<MetisDesktop release={metis} signed={process.env.METIS_SIGNED === '1'} />}
         appearance={
           <section className="ad-card ad-appearance" aria-labelledby="ad-appearance">
             <h2 id="ad-appearance">{THEME_GROUP_LABEL}</h2>
