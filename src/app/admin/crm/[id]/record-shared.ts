@@ -27,6 +27,10 @@ export type Project = {
   owner_id: string | null;
   address: string | null;
   postcode: string | null;
+  /** The pin: from the postcode, or where the customer put it (location_confirmed_at). */
+  site_lat?: number | null;
+  site_lng?: number | null;
+  location_confirmed_at?: string | null;
   survey_at: string | null;
   install_at: string | null;
   simpliheat_url: string | null;
@@ -246,8 +250,14 @@ export function phoneShown(c: Pick<Customer, 'phone'>, waNumber: string | null):
   return waNumber ? `+${waNumber}` : null;
 }
 
-/** Google Maps directions to the site (address and postcode). */
-export const directionsHref = (place: string) => `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`;
+/**
+ * Google Maps directions to the site: the job's pin when it has one (the customer may have moved it to their
+ * door), else `place` (address and postcode).
+ */
+export const directionsHref = (place: string, p?: Pick<Project, 'site_lat' | 'site_lng'> | null) =>
+  typeof p?.site_lat === 'number' && typeof p?.site_lng === 'number'
+    ? `https://www.google.com/maps/dir/?api=1&destination=${p.site_lat.toFixed(6)},${p.site_lng.toFixed(6)}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}`;
 
 /** The site's postcode: the job's own, else the customer's. */
 export const sitePostcodeOf = (p: Pick<Project, 'postcode'>, c: Pick<Customer, 'postcode'>) => p.postcode || c.postcode || '';

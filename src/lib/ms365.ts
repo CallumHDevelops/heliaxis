@@ -124,7 +124,7 @@ export type CalWrite = {
   start?: Date;
   end?: Date;
   allDay?: { from: string; toExclusive: string };
-  location?: { displayName: string; street?: string; city?: string; postalCode?: string };
+  location?: { displayName: string; street?: string; city?: string; postalCode?: string; lat?: number; lng?: number };
   body: string;
   categories?: string[];
   showAs?: 'busy' | 'tentative' | 'free';
@@ -249,6 +249,8 @@ function eventBody(e: Partial<CalWrite>) {
     out.location = {
       displayName: e.location.displayName,
       address: { street: e.location.street || '', city: e.location.city || '', postalCode: e.location.postalCode || '', countryOrRegion: 'United Kingdom' },
+      // The pin: Outlook's map and "Directions" go here rather than to the address.
+      ...(typeof e.location.lat === 'number' && typeof e.location.lng === 'number' ? { coordinates: { latitude: e.location.lat, longitude: e.location.lng } } : {}),
     };
   }
   if (e.categories !== undefined) out.categories = e.categories;

@@ -146,6 +146,13 @@ const directions = (...where: unknown[]) => {
   const to = where.filter((x) => typeof x === 'string' && x.trim()).join(', ');
   return to ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(to)}` : null;
 };
+/** To the job's pin when it has one (the customer may have moved it), else its address. */
+const pinDirections = (p: Row, postcode: string) => {
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  const lat = n(p.site_lat);
+  const lng = n(p.site_lng);
+  return lat != null && lng != null ? `https://www.google.com/maps/dir/?api=1&destination=${lat.toFixed(6)},${lng.toFixed(6)}` : directions(p.address, postcode);
+};
 const DIARY_KIND: Record<string, string> = { site_visit: 'Site visit', install: 'Install', meeting: 'Meeting', personal: 'Personal', other: 'Other' };
 
 /** Reads that may fail (a table not there yet) come back empty. */
@@ -272,7 +279,7 @@ async function todayList(email: string | null, keys: PortalKey[]): Promise<HubTo
           : visit
             ? null
             : { href: `/admin/surveys/start?project=${p.id}&type=${appType}`, label: 'Start survey' },
-      directions: directions(p.address, postcodeOf(p)),
+      directions: pinDirections(p, postcodeOf(p)),
     });
   }
   for (const { p, days } of installs) {
@@ -286,7 +293,7 @@ async function todayList(email: string | null, keys: PortalKey[]): Promise<HubTo
       sub: [days.length > 1 ? `Install, day ${n} of ${days.length}` : 'Install', postcodeOf(p)].filter(Boolean).join(' · '),
       href: `/admin/crm/${p.id}`,
       action: null,
-      directions: directions(p.address, postcodeOf(p)),
+      directions: pinDirections(p, postcodeOf(p)),
     });
   }
   for (const e of [...allDay, ...timed.filter((x) => ukDay(String(x.starts_at)) === today)]) {

@@ -51,9 +51,11 @@ const pinLine = (p: Pick<ProjectRow, 'address' | 'postcode' | 'site_lat' | 'site
   return `Google Maps pin${p.location_confirmed_at ? ' (confirmed by the customer)' : p.site_lat != null ? '' : ' (from the address)'}: ${url}`;
 };
 
-const where = (p: Pick<ProjectRow, 'address' | 'postcode'>): CalWrite['location'] => {
+const where = (p: Pick<ProjectRow, 'address' | 'postcode' | 'site_lat' | 'site_lng'>): CalWrite['location'] => {
   const text = [p.address, p.postcode].filter(Boolean).join(', ');
-  return text ? { displayName: text, street: p.address || undefined, postalCode: p.postcode || undefined } : undefined;
+  // With the pin, so tapping the location in Outlook goes to where the customer put it, not the address.
+  const pin = typeof p.site_lat === 'number' && typeof p.site_lng === 'number' ? { lat: p.site_lat, lng: p.site_lng } : {};
+  return text ? { displayName: text, street: p.address || undefined, postalCode: p.postcode || undefined, ...pin } : undefined;
 };
 
 /**

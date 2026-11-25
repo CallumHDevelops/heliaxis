@@ -22,5 +22,17 @@ export function mapsUrl(p: { lat?: number | null; lng?: number | null; address?:
   return text ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(text)}` : null;
 }
 
+/**
+ * Google Maps directions to the site: to the pin when there is one (the customer may have dragged it to their
+ * door, e.g. a pitch in a caravan park), else the address and postcode. Opens the app's navigation on a phone.
+ */
+export function directionsUrl(p: { lat?: number | null; lng?: number | null; address?: string | null; postcode?: string | null }): string | null {
+  if (typeof p.lat === 'number' && typeof p.lng === 'number' && Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
+  }
+  const text = [p.address, p.postcode].filter(Boolean).join(', ');
+  return text ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(text)}` : null;
+}
+
 /** "35 m" or "1.2 km". */
 export const metresWords = (m: number) => (m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`);

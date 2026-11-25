@@ -1054,6 +1054,9 @@ export type SurveyPayload = {
     ref: string | null;
     address: string | null;
     postcode: string | null;
+    /** The site pin (where the customer confirmed, when they did): Directions go here. */
+    site_lat?: number | null;
+    site_lng?: number | null;
     products: string[];
     stage: string;
     survey_at: string | null;

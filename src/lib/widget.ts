@@ -26,6 +26,30 @@ const ukDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', yea
 const longDay = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short' });
 const shortDay = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short' });
 
+const JOB_LINK = /\/admin\/crm\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+
+/**
+ * Which CRM job each Outlook event is (surveys and installs we copied into Outlook): by the event ids we stored,
+ * else the "In the CRM: …/admin/crm/<id>" line we write in the event. Tapping it in the widget opens that job.
+ */
+async function jobsForEvents(db: Db, events: { id: string; bodyPreview: string }[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!events.length) return out;
+  const ids = events.map((e) => e.id);
+  const [{ data: surveys }, { data: installs }] = await Promise.all([
+    db.from('crm_projects').select('id, survey_event_id').in('survey_event_id', ids).then((r) => r, () => ({ data: null })),
+    db.from('crm_projects').select('id, install_event_ids').overlaps('install_event_ids', ids).then((r) => r, () => ({ data: null })),
+  ]);
+  for (const p of (surveys ?? []) as { id: string; survey_event_id: string | null }[]) if (p.survey_event_id) out.set(p.survey_event_id, p.id);
+  for (const p of (installs ?? []) as { id: string; install_event_ids: string[] | null }[]) for (const e of p.install_event_ids ?? []) if (ids.includes(e)) out.set(e, p.id);
+  for (const e of events) {
+    if (out.has(e.id)) continue;
+    const m = JOB_LINK.exec(e.bodyPreview || '');
+    if (m) out.set(e.id, m[1].toLowerCase());
+  }
+  return out;
+}
+
 /** Everything the widget shows for one person, as plain data (made small by widgetPayload). */
 export async function widgetFor(userId: string, db: Db = createAdminClient()): Promise<WidgetData> {
   const now = new Date();
@@ -43,12 +67,17 @@ export async function widgetFor(userId: string, db: Db = createAdminClient()): P
       const live = events.filter((e) => !e.isCancelled);
       const on = (day: string) =>
         live.filter((e) => (e.isAllDay ? !!e.allDayFrom && e.allDayFrom <= day && (e.allDayTo ?? '') > day : ukDate.format(e.start) === day));
-      const item = (e: (typeof live)[number]) => ({
-        time: e.isAllDay ? 'All day' : hhmm.format(e.start),
-        title: e.subject || '(no title)',
-        where: e.location?.postalCode || e.location?.displayName || '',
-        allDay: e.isAllDay,
-      });
+      const jobs = await jobsForEvents(db, live);
+      const item = (e: (typeof live)[number]) => {
+        const job = jobs.get(e.id);
+        return {
+          time: e.isAllDay ? 'All day' : hhmm.format(e.start),
+          title: e.subject || '(no title)',
+          where: e.location?.postalCode || e.location?.displayName || '',
+          allDay: e.isAllDay,
+          ...(job ? { href: `/admin/crm/${job}` } : {}),
+        };
+      };
       calendar = {
         today: on(today)
           .filter((e) => e.isAllDay || e.end.getTime() > now.getTime())

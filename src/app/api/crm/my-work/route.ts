@@ -3,6 +3,7 @@ import { installDayList, ukBankHolidays, ukDay } from '@/lib/bank-holidays';
 import { crmSession, json } from '@/lib/crm/server';
 import { isSurveyType, noSurveyNeeded, SALES_STAGES, surveyTypeFor } from '@/lib/crm/stages';
 import { canAccess } from '@/lib/portals';
+import { directionsUrl } from '@/lib/booking/location';
 import { schemaReady } from '@/lib/schema-ready';
 import { DUE_GROUPS, dueGroup, plusDays, ukDayStart, type DueGroup } from '@/lib/projects/feed';
 import { readAll, withFallback } from '@/lib/projects/server';
@@ -29,6 +30,8 @@ type Job = {
   stage: string;
   postcode: string | null;
   address?: string | null;
+  site_lat?: number | null;
+  site_lng?: number | null;
   owner_id?: string | null;
   next_step?: string | null;
   next_step_at?: string | null;
@@ -54,7 +57,7 @@ type Item = {
 };
 
 const TASK_COLS = 'id, title, due_date, priority, status, assignee_id, assignee_name, crm_project_id, completed_at';
-const JOB_COLS = 'id, enquiry_id, title, stage, postcode, address, owner_id, next_step, next_step_at, survey_at, install_at';
+const JOB_COLS = 'id, enquiry_id, title, stage, postcode, address, site_lat, site_lng, owner_id, next_step, next_step_at, survey_at, install_at';
 const PRIORITY: Record<string, number> = { high: 0, normal: 1, low: 2 };
 /** Time of day in the UK ("09:30"), to put today's visits in order (day 2 of an install started on another day). */
 const UK_TIME = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
@@ -229,6 +232,7 @@ export async function GET(req: Request) {
         day: 1,
         days: 1,
         address: j.address ?? null,
+        directions: directionsUrl({ lat: j.site_lat, lng: j.site_lng, address: j.address, postcode: j.postcode }),
         job: chip(j.id),
         // Infrared, an EV charger or LEDs only: a home visit, with no survey form.
         visit: noSurveyNeeded(j),
@@ -238,7 +242,7 @@ export async function GET(req: Request) {
     }),
     ...installToday.map((j) => {
       const dates = installDayList(ukDay(j.install_at!), Math.max(1, Number(j.install_days) || 1), hols);
-      return { kind: 'install' as const, at: j.install_at!, day: dates.indexOf(today) + 1, days: dates.length, address: j.address ?? null, job: chip(j.id) };
+      return { kind: 'install' as const, at: j.install_at!, day: dates.indexOf(today) + 1, days: dates.length, address: j.address ?? null, directions: directionsUrl({ lat: j.site_lat, lng: j.site_lng, address: j.address, postcode: j.postcode }), job: chip(j.id) };
     }),
   ].sort((a, b) => UK_TIME.format(new Date(a.at)).localeCompare(UK_TIME.format(new Date(b.at))));
 

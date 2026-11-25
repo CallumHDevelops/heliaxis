@@ -13,11 +13,12 @@ export type WidgetData = {
   /** Null when your mailbox isn't connected to Hestia. */
   email: { need: number; urgent: number; top: { who: string; what: string; urgent: boolean; href: string }[] } | null;
 };
-export type WidgetEvent = { time: string; title: string; where: string; allDay: boolean };
+/** href: the job a survey / install appointment is for (/admin/crm/<id>), when we know it. */
+export type WidgetEvent = { time: string; title: string; where: string; allDay: boolean; href?: string };
 
 /**
  * The phone's format, version 1:
- * { v, at, d (day), c (today's events) / m (tomorrow's): [{t time, n title, w where}], k (tasks): [{n, d due, l late 1/0,
+ * { v, at, d (day), c (today's events) / m (tomorrow's): [{t time, n title, w where, h href (a CRM job, when it's one of ours)}], k (tasks): [{n, d due, l late 1/0,
  * s sub, h href}], e (email): {n need, u urgent, i: [{n who, s what, u 1/0, h href}]} }. c, m or e are left out when
  * there's nothing to read (so the widget can say "Calendar not connected").
  */
@@ -36,7 +37,7 @@ export function widgetPayload(w: WidgetData, maxBytes = WIDGET_MAX_BYTES): strin
   ];
   let out = '';
   for (const { items, text } of shapes) {
-    const ev = (e: WidgetEvent) => ({ t: e.time, n: cut(e.title, text), ...(e.where ? { w: cut(e.where, 20) } : {}) });
+    const ev = (e: WidgetEvent) => ({ t: e.time, n: cut(e.title, text), ...(e.where ? { w: cut(e.where, 20) } : {}), ...(e.href ? { h: e.href } : {}) });
     const body: Record<string, unknown> = { v: 1, at: w.at, d: w.day };
     if (w.calendar) {
       body.c = w.calendar.today.slice(0, items).map(ev);

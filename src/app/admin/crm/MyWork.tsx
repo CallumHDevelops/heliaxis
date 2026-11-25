@@ -29,6 +29,8 @@ type Visit = {
   day: number;
   days: number;
   address: string | null;
+  /** Google Maps directions: to the pin when the job has one. */
+  directions?: string | null;
   job: JobChip | null;
   /** A survey date on a job that needs no survey (infrared, an EV charger or LEDs only): a home visit. */
   visit?: boolean;
@@ -248,10 +250,10 @@ export function MyWork({
                     Start survey
                   </a>
                 ) : (
-                  (v.address || v.job?.postcode) && (
+                  (v.directions || v.address || v.job?.postcode) && (
                     <a
                       className="crm-btn crm-btn--ghost crm-btn--small"
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(v.address || v.job?.postcode || '')}`}
+                      href={v.directions || `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(v.address || v.job?.postcode || '')}`}
                       target="_blank"
                       rel="noreferrer"
                     >

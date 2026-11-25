@@ -171,7 +171,11 @@ export async function buildPack(db: Db, a: AssignmentRow): Promise<SitePack> {
       address,
       short: siteShort(String(project.address ?? ''), postcode),
       postcode,
-      map: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([...address, postcode].filter(Boolean).join(', '))}`,
+      // The pin when there is one (where the customer confirmed), else the address.
+      map:
+        typeof project.site_lat === 'number' && typeof project.site_lng === 'number'
+          ? `https://www.google.com/maps/search/?api=1&query=${project.site_lat.toFixed(6)},${project.site_lng.toFixed(6)}`
+          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([...address, postcode].filter(Boolean).join(', '))}`,
       customer: { name: String(c.name ?? ''), first: firstNameOf(String(c.name ?? '')), phone: a.share_customer_phone ? str(c.phone) : null },
       install_dates: installDates,
       scaffold_up_on: str(project.scaffold_up_on),

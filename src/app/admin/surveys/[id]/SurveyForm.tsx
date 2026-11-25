@@ -671,7 +671,7 @@ export function SurveyForm() {
   const a3 = (answers.A3 ?? null) as { address?: string; postcode?: string } | null;
   const address = (a3?.address || payload.project.address || '').trim();
   const postcode = (a3?.postcode || payload.project.postcode || '').trim();
-  const directions = directionsUrl(address, postcode);
+  const directions = directionsUrl(address, postcode, { lat: payload.project.site_lat, lng: payload.project.site_lng });
   const when = isOpen(survey.status) ? payload.project.survey_at : survey.completed_at;
   const customer = payload.customer?.name || payload.project.title || 'Customer';
   const saved = saveWords(status, online, lockedReason);

@@ -53,7 +53,9 @@ export function pitchFrom(x: number, y: number, z: number): number | null {
 }
 
 /** Google Maps directions to the site (a plain link out). */
-export function directionsUrl(address?: string | null, postcode?: string | null): string | null {
+export function directionsUrl(address?: string | null, postcode?: string | null, pin?: { lat?: number | null; lng?: number | null } | null): string | null {
+  // The site pin first: the customer may have moved it to their door (a caravan park pitch, a farm track).
+  if (typeof pin?.lat === 'number' && typeof pin?.lng === 'number') return `https://www.google.com/maps/dir/?api=1&destination=${pin.lat.toFixed(6)},${pin.lng.toFixed(6)}`;
   const dest = [address, postcode].map((s) => (s || '').trim()).filter(Boolean).join(', ');
   return dest ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(dest)}` : null;
 }

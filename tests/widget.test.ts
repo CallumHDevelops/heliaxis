@@ -20,6 +20,14 @@ describe('the widget payload', () => {
     expect(p.e.i[0]).toMatchObject({ n: 'Sarah Davies', u: 1, h: '/admin/mail?t=1' });
   });
 
+  it('links a survey or install to its job', () => {
+    const p = JSON.parse(
+      widgetPayload({ ...base, calendar: { today: [{ time: '10:30', title: 'Survey: Merrie Rees', where: 'CF32 8DR', allDay: false, href: '/admin/crm/687c1a54-977d-47a0-9d83-d6258f29457a' }], tomorrow: [] } })
+    );
+    expect(p.c[0].h).toBe('/admin/crm/687c1a54-977d-47a0-9d83-d6258f29457a');
+    expect(JSON.parse(widgetPayload(base)).c[0].h).toBeUndefined();
+  });
+
   it('leaves out the calendar and email when they can’t be read', () => {
     const p = JSON.parse(widgetPayload({ ...base, calendar: null, email: null }));
     expect(p.c).toBeUndefined();

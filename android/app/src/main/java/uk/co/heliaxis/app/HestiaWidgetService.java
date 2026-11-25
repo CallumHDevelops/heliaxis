@@ -112,7 +112,8 @@ public class HestiaWidgetService extends RemoteViewsService {
 
         private Line event(JSONObject e) {
             if (e == null) return new Line(false, "", "", "", "/admin", 0);
-            return new Line(false, e.optString("t"), e.optString("n"), e.optString("w"), "/admin", 0);
+            // A survey or install of ours opens that customer's job; anything else, the home page.
+            return new Line(false, e.optString("t"), e.optString("n"), e.optString("w"), e.optString("h", "/admin"), 0);
         }
 
         @Override

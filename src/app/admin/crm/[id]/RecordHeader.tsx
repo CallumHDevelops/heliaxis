@@ -177,7 +177,7 @@ export function RecordHeader({
           {project.products.length > 0 && <span>{productsShort(project.products)}</span>}
           {(project.postcode || customer.postcode) &&
             (site ? (
-              <a className="crmr-meta__pc" href={directionsHref(site)} target="_blank" rel="noreferrer" title="Directions">
+              <a className="crmr-meta__pc" href={directionsHref(site, project)} target="_blank" rel="noreferrer" title="Directions">
                 {project.postcode || customer.postcode}
               </a>
             ) : (
@@ -219,7 +219,12 @@ export function RecordHeader({
           </div>
           <div>
             <dt>Address</dt>
-            <dd>{site ? <a href={directionsHref(site)} target="_blank" rel="noreferrer">{site}</a> : <span className="crm-muted">No address yet</span>}</dd>
+            <dd>
+              {site ? <a href={directionsHref(site, project)} target="_blank" rel="noreferrer">{site}</a> : <span className="crm-muted">No address yet</span>}
+              {site && project.location_confirmed_at && typeof project.site_lat === 'number' && (
+                <small className="crm-muted crm-small"> · Opens the pin {customer.name.split(/\s+/)[0] || 'they'} confirmed</small>
+              )}
+            </dd>
           </div>
           <button type="button" className="crm-link crmr-glance__more" onClick={onName}>
             All details and editing →
@@ -241,7 +246,7 @@ export function RecordHeader({
             </button>
           )}
           {site ? (
-            <a className="crm-btn crm-btn--ghost crmr-contact__dir" href={directionsHref(site)} target="_blank" rel="noreferrer">
+            <a className="crm-btn crm-btn--ghost crmr-contact__dir" href={directionsHref(site, project)} target="_blank" rel="noreferrer">
               <Icon k="pin" size={16} />
               Directions
             </a>

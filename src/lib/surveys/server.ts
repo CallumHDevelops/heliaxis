@@ -353,6 +353,8 @@ export async function buildPayload(db: Db, s: SurveyRow, known?: { project?: Pro
       ref: (project.project_ref as string | null | undefined) ?? null,
       address: project.address,
       postcode: project.postcode,
+      site_lat: typeof project.site_lat === 'number' ? project.site_lat : null,
+      site_lng: typeof project.site_lng === 'number' ? project.site_lng : null,
       products: productsOf(project),
       stage: project.stage,
       survey_at: project.survey_at,
