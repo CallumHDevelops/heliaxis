@@ -11,6 +11,14 @@ import { TOOLS, runTool, type Actor, type AssistantAction } from './tools';
 
 export const ASSISTANT_MODEL = 'claude-opus-5-5';
 const MAX_TURNS = 12;
+
+/**
+ * Strict tool schemas are checked hard by the API, which also caps how many tools can be strict and how many "or null"
+ * parameters they can hold between them. These are the tools HAP's Metis has always run strictly. The newer ones (design,
+ * pricing, quotes, contracts, diary) run without it: their inputs are checked in our own code, and a schema mistake in one
+ * of them can then never stop Metis answering at all.
+ */
+export const STRICT_TOOLS = new Set(['search_customers', 'get_customer', 'my_day', 'list_team', 'create_task', 'add_note', 'set_next_step', 'draft_email', 'draft_whatsapp', 'ai_spend', 'lead_sources', 'ad_performance', 'search_help', 'create_opportunity', 'find_organisation', 'find_contact', 'add_contact']);
 const KEEP_MESSAGES = 40;
 
 export type Msg = Anthropic.Beta.BetaMessageParam;
@@ -92,7 +100,7 @@ export async function runAssistant(history: Msg[], text: string, me: Actor, opts
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       system: system(me),
-      tools: TOOLS.map((t) => ({ ...t, strict: true })) as Anthropic.Beta.BetaTool[],
+      tools: TOOLS.map((t) => (STRICT_TOOLS.has(t.name) ? { ...t, strict: true } : t)) as Anthropic.Beta.BetaTool[],
       messages,
     });
 

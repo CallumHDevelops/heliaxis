@@ -24,7 +24,7 @@ export const DESIGN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'find_product',
     description: 'Search the Heliaxis price book for a product by make, model or SKU (optionally within a category). Returns SKUs to use with the design and pricing tools, and whether each has the datasheet figures and a price. Never state a product, spec or price that this does not return.',
-    input_schema: obj({ query: str, category: { type: ['string', 'null'], enum: [...CATS, null] } }),
+    input_schema: obj({ query: str, category: { type: 'string', enum: ['any', ...CATS], description: 'A category to search within, or "any".' } }),
   },
   {
     name: 'layout_panels',
@@ -120,7 +120,7 @@ export async function priceFromInput(input: Record<string, unknown>): Promise<{ 
 export async function runDesignTool(name: string, input: Record<string, unknown>, me?: { id: string; name: string }): Promise<string> {
   switch (name) {
     case 'find_product': {
-      const r = await searchBook(s(input.query), s(input.category) || null);
+      const r = await searchBook(s(input.query), CATS.includes(s(input.category)) ? s(input.category) : null);
       if ('error' in r) return r.error;
       if (!r.rows.length) return 'No matching products in the price book. Say so: do not guess a product or price.';
       return JSON.stringify(

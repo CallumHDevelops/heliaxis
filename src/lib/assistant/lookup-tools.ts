@@ -26,7 +26,7 @@ export const LOOKUP_TOOLS: Anthropic.Tool[] = [
   {
     name: 'list_quotes',
     description: 'Quotes (number, status, total inc VAT, customer). Filter by opportunity (project_id) and/or status. Totals are calculated by the system.',
-    input_schema: obj({ project_id: nullable('Opportunity id, or null for all recent quotes.'), status: { type: ['string', 'null'], enum: ['draft', 'sent', 'accepted', 'declined', 'expired', null] } }),
+    input_schema: obj({ project_id: nullable('Opportunity id, or null for all recent quotes.'), status: { type: 'string', enum: ['any', 'draft', 'sent', 'accepted', 'declined', 'expired'], description: 'A status to filter by, or "any".' } }),
   },
   {
     name: 'list_surveys',
