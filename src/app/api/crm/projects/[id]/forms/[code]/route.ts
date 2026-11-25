@@ -4,6 +4,8 @@ import { formView, reviseForm, saveAnswers, signLine, type Who } from '@/lib/tem
 import { mergeValues } from '@/lib/documents/templates/render';
 import { templateByCode } from '@/lib/templates/registry';
 import { formsReady, jobHeadFor, supabaseStore } from '@/lib/templates/store';
+import { readApprovals } from '@/lib/templates/approval';
+import { canIssue, WHY_NOT_SIGNABLE } from '@/lib/templates/legal';
 
 export const dynamic = 'force-dynamic';
 type Ctx = { params: Promise<{ id: string; code: string }> };
@@ -68,6 +70,8 @@ export async function POST(req: Request, { params }: Ctx) {
   const log = (body: string) => logActivity({ enquiryId: t.enquiryId, projectId: id, kind: 'system', body, byId: by.id }).catch(() => null);
   try {
     if (b.action === 'sign') {
+      // Fixed wording that has not been through legal review cannot be signed.
+      if (!canIssue(t.template, await readApprovals(t.db))) return json({ error: WHY_NOT_SIGNABLE }, 409);
       const r = await signLine(store, t.template, id, String(b.line ?? ''), { name: String(b.name ?? ''), image: typeof b.image === 'string' ? b.image : undefined }, by, 'hap', new Date().toISOString());
       if (!r.ok) return json({ error: r.why }, 409);
       await log(`${t.template.title}: signed by ${String(b.name).trim()} in HAP`);

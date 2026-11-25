@@ -3,10 +3,11 @@
  * people make, read from the database, alongside them.
  */
 import { HEAT_PUMP_TEMPLATES } from './seed/heat-pump';
+import { OFF_GRID_TEMPLATES } from './seed/off-grid';
 import { SOLAR_BATTERY_TEMPLATES } from './seed/solar-battery';
 import type { DocTemplate } from './types';
 
-export const TEMPLATES: DocTemplate[] = [...SOLAR_BATTERY_TEMPLATES, ...HEAT_PUMP_TEMPLATES];
+export const TEMPLATES: DocTemplate[] = [...SOLAR_BATTERY_TEMPLATES, ...HEAT_PUMP_TEMPLATES, ...OFF_GRID_TEMPLATES];
 
 export const templateByCode = (code: string): DocTemplate | null => TEMPLATES.find((t) => t.code === code) ?? null;
 

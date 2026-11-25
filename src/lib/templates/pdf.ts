@@ -2,6 +2,8 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { docFileName, variantOf } from '@/lib/documents/pdf-kit';
 import { renderTemplate } from '@/lib/documents/templates/render';
+import { readApprovals } from './approval';
+import { forPrinting } from './legal';
 import { templateByCode } from './registry';
 import { jobHeadFor, supabaseStore } from './store';
 
@@ -19,7 +21,7 @@ export async function formPdf(db: SupabaseClient, projectId: string, code: strin
   const row = await supabaseStore(db).live(projectId, template.code);
   const signed = Object.fromEntries(Object.entries(row?.signed ?? {}).map(([k, v]) => [k, { name: v.name, at: v.at, png: v.image ?? null }]));
   try {
-    const bytes = await renderTemplate({ template, job, answers: row?.answers, signed, draft: row?.status !== 'signed', revision: row?.issue ?? null });
+    const bytes = await renderTemplate({ template: forPrinting(template, await readApprovals(db)), job, answers: row?.answers, signed, draft: row?.status !== 'signed', revision: row?.issue ?? null });
     return { ok: true, bytes, fileName: docFileName(job.ref, template.code, template.title, row?.revision ?? 1) };
   } catch (e) {
     return { ok: false, status: 500, error: e instanceof Error ? e.message : 'Could not make the PDF' };

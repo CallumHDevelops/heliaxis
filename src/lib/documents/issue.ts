@@ -38,6 +38,15 @@ export const ISSUE: Record<string, string> = {
   'HX-PP-01': 'Issue 1',
   'HX-PP-04': 'Issue 1',
   'HX-PP-08': 'Issue 1',
+  // The off-grid (non-MCS) contract pack (src/lib/templates/seed/off-grid.ts). Draft until approved after legal review.
+  'HX-OG-01': 'Issue 1',
+  'HX-OG-02': 'Issue 1',
+  'HX-OG-03': 'Issue 1',
+  'HX-OG-04': 'Issue 1',
+  'HX-OG-05': 'Issue 1',
+  'HX-OG-06': 'Issue 1',
+  // The desktop design pack (src/lib/pvdesign/design-pdf.ts).
+  'HX-DS-01': 'Issue 1',
   PACK: 'Issue 1',
 };
 export const issueOf = (code: string) => ISSUE[code] ?? 'Issue 1';

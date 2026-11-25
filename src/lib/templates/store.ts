@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { addressLines } from '@/lib/handover/facts';
 import type { JobHead } from '@/lib/handover/inputs';
 import { formView, type FormRow, type FormStore } from './forms';
-import { templatesForProducts } from './registry';
+import { templateByCode, templatesForProducts } from './registry';
 
 /** The forms' storage in the database (supabase/template-documents.sql). The rules are in forms.ts. */
 export function supabaseStore(db: SupabaseClient): FormStore {
@@ -68,7 +68,10 @@ export async function jobHeadFor(db: SupabaseClient, projectId: string, variant?
 export async function listForms(db: SupabaseClient, projectId: string, products: string[]) {
   const { data } = await db.from('template_documents').select('*').eq('project_id', projectId).neq('status', 'superseded');
   const rows = new Map(((data ?? []) as FormRow[]).map((r) => [r.template_code, r]));
-  return templatesForProducts(products).map((t) => {
+  // Forms made for this job show even when its products would not offer them (the off-grid pack is made by Metis, not offered by product).
+  const offered = templatesForProducts(products);
+  const extra = [...rows.keys()].map((c) => templateByCode(c)).filter((t): t is NonNullable<typeof t> => !!t && !offered.includes(t));
+  return [...offered, ...extra].map((t) => {
     const v = formView(t, rows.get(t.code) ?? null);
     return { code: v.code, title: v.title, purpose: v.purpose, status: v.status, revision: v.revision, progress: v.progress, signed: Object.keys(v.signed), updatedAt: v.updatedAt };
   });

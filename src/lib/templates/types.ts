@@ -81,7 +81,7 @@ export type SignSection = { type: 'sign'; title?: string; signers: { key: string
 export type TemplateSection = FieldsSection | TextSection | SignSection;
 
 /** The technologies a template is for (the job's products): empty means every job. */
-export type TemplateTech = 'solar' | 'battery' | 'ev' | 'heatpump';
+export type TemplateTech = 'solar' | 'battery' | 'ev' | 'heatpump' | 'offgrid';
 
 export type DocTemplate = {
   /** Which version of this format it is written in. */
@@ -94,6 +94,13 @@ export type DocTemplate = {
   /** A note under the site box, before the first section. */
   intro?: string;
   tech: TemplateTech[];
+  /**
+   * The wording is fixed and needs a solicitor's sign-off. Until an admin approves this exact wording in HAP it prints
+   * "DRAFT — awaiting legal review" and cannot be signed. Changing the wording withdraws the approval.
+   */
+  legalReview?: boolean;
+  /** Set only when printing (templates/legal.ts forPrinting): the wording is not yet approved, so the page says so. Never stored. */
+  legalDraft?: boolean;
   sections: TemplateSection[];
 };
 

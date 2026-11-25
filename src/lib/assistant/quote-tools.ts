@@ -101,9 +101,9 @@ export const QUOTE_TOOLS: Anthropic.Tool[] = [
 
 export const QUOTE_NAMES = new Set(QUOTE_TOOLS.map((t) => t.name));
 
-type ProjectInfo = { id: string; enquiry_id: string; title: string; address: string | null; postcode: string | null; project_ref: string | null; customer: string; email: string | null };
+export type ProjectInfo = { id: string; enquiry_id: string; title: string; address: string | null; postcode: string | null; project_ref: string | null; customer: string; email: string | null };
 
-async function loadProject(id: string): Promise<ProjectInfo | string> {
+export async function loadProject(id: string): Promise<ProjectInfo | string> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return 'Unknown project_id: search for the customer first.';
   const db = createAdminClient();
   const { data: p } = await db.from('crm_projects').select('id, enquiry_id, title, address, postcode, project_ref').eq('id', id).maybeSingle();
@@ -113,13 +113,13 @@ async function loadProject(id: string): Promise<ProjectInfo | string> {
 }
 
 /** A survey that has been completed on this job: until then everything is indicative. */
-async function surveyLinked(projectId: string): Promise<boolean> {
+export async function surveyLinked(projectId: string): Promise<boolean> {
   const { data } = await createAdminClient().from('crm_surveys').select('id').eq('project_id', projectId).not('completed_at', 'is', null).limit(1);
   return !!data?.length;
 }
 
-type Resolved = { panel: BookRow; inv: BookRow; bat: BookRow | null };
-async function resolveProducts(panelSku: string, invSku: string, batSku: string): Promise<Resolved | string> {
+export type Resolved = { panel: BookRow; inv: BookRow; bat: BookRow | null };
+export async function resolveProducts(panelSku: string, invSku: string, batSku: string): Promise<Resolved | string> {
   const book = await loadBook([panelSku, invSku, batSku]);
   if ('error' in book) return book.error;
   const panel = product(book.rows, panelSku, 'panel');
@@ -135,9 +135,9 @@ async function resolveProducts(panelSku: string, invSku: string, batSku: string)
   return { panel, inv, bat };
 }
 
-const label = (r: BookRow) => `${r.make} ${r.model}`.trim();
+export const label = (r: BookRow) => `${r.make} ${r.model}`.trim();
 
-function checkFor(r: Resolved, input: Record<string, unknown>, panelCount: number, minTempC: number) {
+export function checkFor(r: Resolved, input: Record<string, unknown>, panelCount: number, minTempC: number) {
   return checkDesign({
     panel: toPanelSpec(r.panel.specs),
     panelCount,

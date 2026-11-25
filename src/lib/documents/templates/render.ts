@@ -166,14 +166,16 @@ export async function renderTemplate(i: RenderInput): Promise<Uint8Array> {
     if (missing.length) throw new MissingAnswer(missing[0].label);
   }
   const merge = mergeValues(job);
-  const kit = await newDocument({ code: t.code, label: t.code, title: t.title, revision: i.revision ?? issueOf(t.code), jobRef: job.ref, issued: job.issued, variant: job.variant, draft: i.draft });
+  const kit = await newDocument({ code: t.code, label: t.code, title: t.title, revision: i.revision ?? issueOf(t.code), jobRef: job.ref, issued: job.issued, variant: job.variant, draft: i.draft, ...(t.legalDraft ? { footer: { sub: 'DRAFT — awaiting legal review' } } : {}) });
   kit.header({ meta: [['Project', job.ref ?? '–'], ['Date', longDate(job.issued)]] });
   kit.idGrid([
     ['Address', job.address.join(', ')],
     ['Customer', job.customer],
     ['Installer', HELIAXIS_COMPANY.tradingName],
-    ['MCS certification number', HELIAXIS_COMPANY.mcsNumber],
+    // An off-grid installation is not MCS: the installer's MCS number would mislead on its documents.
+    ...(t.tech.includes('offgrid') ? [] : ([['MCS certification number', HELIAXIS_COMPANY.mcsNumber]] as [string, string][])),
   ]);
+  if (t.legalDraft) kit.paragraph('DRAFT — awaiting legal review. This wording has not been approved and must not be issued to a customer or signed.', { bold: true, color: RED });
   if (t.intro) kit.note(fillMerge(t.intro, merge));
   const vis = visibility(t, answers);
   for (const [n, s] of t.sections.entries()) {
