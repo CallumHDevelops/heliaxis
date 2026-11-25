@@ -17,6 +17,8 @@ import { LOOKUP_NAMES, LOOKUP_TOOLS, runLookup } from './lookup-tools';
 import { DESIGN_NAMES, DESIGN_TOOLS, runDesignTool } from './design-tools';
 import { QUOTE_NAMES, QUOTE_TOOLS, runQuoteTool } from './quote-tools';
 import { CONTRACT_NAMES, CONTRACT_TOOLS, runContractTool } from './contract-tools';
+import { QUOTE_EDIT_NAMES, QUOTE_EDIT_TOOLS, runQuoteEditTool } from './quote-edit-tools';
+import { DIARY_NAMES, DIARY_TOOLS, runDiaryTool } from './diary-tools';
 import { adPerformanceAnswer, aiSpendAnswer, leadSourcesAnswer } from './insights';
 
 /**
@@ -28,7 +30,7 @@ export type Actor = { id: string; name: string };
 /** Shown under the reply as chips ("Task for Esther", "Email draft — Jane Smith"). */
 /** A button on a card in the desktop app: open a HAP page, open a stored file, or ask Metis something (a `prompt`). */
 export type ActionButton = { label: string; href?: string; documentId?: string; prompt?: string };
-export type AssistantAction = { kind: 'task' | 'note' | 'next_step' | 'draft' | 'opportunity' | 'contact' | 'report' | 'quote' | 'design' | 'contract'; label: string; href: string; /** Lines under the label (totals, warnings). */ detail?: string[]; buttons?: ActionButton[]; /** An SVG picture to show on the card (the desktop app). */ preview?: string };
+export type AssistantAction = { kind: 'task' | 'note' | 'next_step' | 'draft' | 'opportunity' | 'contact' | 'report' | 'quote' | 'design' | 'contract' | 'confirm' | 'diary'; label: string; href: string; /** Lines under the label (totals, warnings). */ detail?: string[]; buttons?: ActionButton[]; /** An SVG picture to show on the card (the desktop app). */ preview?: string };
 
 const str = { type: 'string' } as const;
 const nullable = (description: string) => ({ type: ['string', 'null'], description }) as const;
@@ -45,6 +47,8 @@ export const TOOLS: Anthropic.Tool[] = [
   ...DESIGN_TOOLS,
   ...QUOTE_TOOLS,
   ...CONTRACT_TOOLS,
+  ...QUOTE_EDIT_TOOLS,
+  ...DIARY_TOOLS,
   {
     name: 'search_customers',
     description:
@@ -196,6 +200,8 @@ export async function runTool(name: string, input: Input, me: Actor, actions: As
   if (DESIGN_NAMES.has(name)) return runDesignTool(name, input, me);
   if (QUOTE_NAMES.has(name)) return runQuoteTool(name, input, me, actions);
   if (CONTRACT_NAMES.has(name)) return runContractTool(name, input, me, actions);
+  if (QUOTE_EDIT_NAMES.has(name)) return runQuoteEditTool(name, input, me, actions);
+  if (DIARY_NAMES.has(name)) return runDiaryTool(name, input, me, actions);
   const db = createAdminClient();
   switch (name) {
     case 'search_customers': {

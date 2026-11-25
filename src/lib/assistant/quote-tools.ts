@@ -18,6 +18,7 @@ import { buildSld } from '@/lib/pvdesign/sld';
 import { toBatterySpec, toInverterSpec, toPanelSize, toPanelSpec } from '@/lib/pvdesign/specs';
 import { draftQuoteContent, quoteTitle, unsupportedVat } from '@/lib/quotes/from-design';
 import { customerRefOf, readQuote, renderQuote } from '@/lib/quotes/server';
+import { saveVersion, type QuoteMeta } from '@/lib/quotes/versions';
 import { totalsOf } from '@/lib/quotes/types';
 import { gbp, n, priceFromInput, product, s, DESIGN_TOOLS } from './design-tools';
 import type { AssistantAction } from './tools';
@@ -323,6 +324,10 @@ export async function runQuoteTool(name: string, input: Record<string, unknown>,
         }
       }
       await logActivity({ enquiryId: proj.enquiry_id, projectId: proj.id, kind: 'system', body: `Quote ${row.number} drafted by Metis`, byId: me.id });
+      // Version 1, with the design inputs, so a later change ("swap to 10 panels") can re-run the checks. Never blocks the quote.
+      const meta: QuoteMeta = { customerType: input.customer_type === 'commercial' ? 'commercial' : 'domestic', systemType, panelSku: s(input.panel_sku) || null, panelCount: count || null, inverterSku: s(input.inverter_sku) || null, batterySku: s(input.battery_sku) || null, batteryCount: Math.max(1, Math.round(n(input.battery_count) ?? 1)), dailyLoadKwh: n(input.daily_load_kwh), peakLoadKw: n(input.peak_load_kw), generatorBackup: input.generator_backup === true, kwp };
+      const v1 = await saveVersion(db, row.id as string, { title: quoteTitle({ systemType, kwp }, proj.customer), content, validUntil, meta, summary: 'Created by Metis', changes: [], by: me.id });
+      const versionsNote = 'error' in v1 ? v1.error : undefined;
       const totals = totalsOf(content);
       const missing = priced.lines.filter((l) => l.priceRequired).length;
       const designDoc = s(input.design_document_id);
@@ -360,6 +365,7 @@ export async function runQuoteTool(name: string, input: Record<string, unknown>,
         design_issues: issues.filter((x) => x.severity !== 'info'),
         pdf_saved: !!docId,
         ...(pdfNote ? { pdf_note: pdfNote } : {}),
+        ...(versionsNote ? { versions_note: versionsNote } : {}),
         note: 'It is a draft. Nothing has been sent to the customer: the user presses Send in HAP. Tell the user the total, panels and kWp, and every warning and missing price.',
       });
     }

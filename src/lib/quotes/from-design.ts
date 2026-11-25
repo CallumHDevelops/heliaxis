@@ -37,6 +37,31 @@ const asQuoteLine = (l: PriceResult['lines'][number]): QuoteLine => {
 /** VAT rates the quote builder can hold. A rate outside them would be silently zeroed there, so we refuse it. */
 export const unsupportedVat = (priced: PriceResult) => [...new Set(priced.lines.map((l) => l.vat_rate))].filter((r) => !(VAT_RATES as readonly number[]).includes(r));
 
+
+export const DESIGN_HEADING = 'System design (indicative)';
+
+/** The wording of the design block: the panel count and size, and every warning and problem from the checks (not the notes). */
+export function designBlockBody(panelCount: number | null, kwp: number | null, issues: { severity: 'error' | 'warn' | 'info'; message: string }[]): string {
+  const design: string[] = [];
+  if (panelCount != null) design.push(`${panelCount} solar panels${kwp != null ? `, ${kwp} kWp in total` : ''}. The panel layout is indicative and is confirmed at survey.`);
+  const notes = issues.filter((x) => x.severity !== 'info');
+  if (notes.length) design.push(`Design points to resolve:\n${notes.map((x) => `- ${x.message}`).join('\n')}`);
+  return design.join('\n\n');
+}
+
+/** The quote with its design block replaced by new wording (added after "What is included" if there was none, removed if empty). */
+export function refreshDesignBlock(content: QuoteContent, body: string): QuoteContent {
+  const has = content.blocks.some((b) => b.type === 'text' && b.heading === DESIGN_HEADING);
+  let blocks = content.blocks;
+  if (has) blocks = body ? blocks.map((b) => (b.type === 'text' && b.heading === DESIGN_HEADING ? { ...b, body } : b)) : blocks.filter((b) => !(b.type === 'text' && b.heading === DESIGN_HEADING));
+  else if (body) {
+    const at = blocks.findIndex((b) => b.type === 'text' && b.heading === 'What is included');
+    const block: QuoteBlock = { id: `d${blocks.length + 1}x`, type: 'text', heading: DESIGN_HEADING, body };
+    blocks = at >= 0 ? [...blocks.slice(0, at + 1), block, ...blocks.slice(at + 1)] : [...blocks, block];
+  }
+  return cleanContent({ ...content, blocks });
+}
+
 export function draftQuoteContent(i: DraftQuoteInput): QuoteContent {
   const blocks: QuoteBlock[] = [];
   let n = 0;
@@ -48,11 +73,8 @@ export function draftQuoteContent(i: DraftQuoteInput): QuoteContent {
   if (i.priced.lines.some((l) => l.priceRequired)) included.push('Some items are still waiting for a price and are marked PRICE REQUIRED. This quote must not be sent until they are priced.');
   blocks.push({ id: id(), type: 'text', heading: 'What is included', body: included.join('\n\n') });
 
-  const design: string[] = [];
-  if (i.panelCount != null) design.push(`${i.panelCount} solar panels${i.kwp != null ? `, ${i.kwp} kWp in total` : ''}. The panel layout is indicative and is confirmed at survey.`);
-  const notes = i.designIssues.filter((x) => x.severity !== 'info');
-  if (notes.length) design.push(`Design points to resolve:\n${notes.map((x) => `- ${x.message}`).join('\n')}`);
-  if (design.length) blocks.push({ id: id(), type: 'text', heading: 'System design (indicative)', body: design.join('\n\n') });
+  const designBody = designBlockBody(i.panelCount, i.kwp, i.designIssues);
+  if (designBody) blocks.push({ id: id(), type: 'text', heading: DESIGN_HEADING, body: designBody });
   if (i.systemType === 'off-grid') blocks.push({ id: id(), type: 'text', heading: 'Off-grid installation', body: OFF_GRID_BODY });
 
   return cleanContent({
