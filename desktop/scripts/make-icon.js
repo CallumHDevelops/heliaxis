@@ -1,6 +1,6 @@
 'use strict';
-// Draws the placeholder tray/app icon (near-black tile, yellow disc) as PNGs with no dependencies.
-// Replace desktop/assets/*.png with the real Heliaxis mark when the brand artwork is exported.
+// Draws a plain neutral tray/app icon (dark grey tile, white disc) as PNGs with no dependencies.
+// Replace desktop/assets/*.png with a real icon whenever one exists.
 const zlib = require('node:zlib');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -32,7 +32,7 @@ function png(size) {
       const dx = Math.max(Math.abs(x + 0.5 - r) - (r - corner), 0), dy = Math.max(Math.abs(y + 0.5 - r) - (r - corner), 0);
       const inTile = dx * dx + dy * dy <= corner * corner;
       const inDisc = (x + 0.5 - r) ** 2 + (y + 0.5 - r) ** 2 <= rad * rad;
-      const px = !inTile ? [0, 0, 0, 0] : inDisc ? [248, 188, 30, 255] : [11, 11, 12, 255];
+      const px = !inTile ? [0, 0, 0, 0] : inDisc ? [245, 245, 245, 255] : [58, 58, 62, 255];
       raw.set(px, o);
     }
   }
