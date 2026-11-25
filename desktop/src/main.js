@@ -6,6 +6,8 @@ const store = require('./store');
 const api = require('./api');
 
 const MICA = process.platform === 'win32' && Number(process.getSystemVersion().split('.')[2]) >= 22621;
+/** Set only by automated tests, so they never launch a browser or a PDF reader on someone's computer. */
+const NO_OPEN = process.env.METIS_TEST_NO_OPEN === '1';
 const COMPACT = { width: 640, height: 150 };
 const EXPANDED = { width: 980, height: 700 };
 
@@ -65,6 +67,7 @@ function createWindow() {
 }
 
 function openExternal(url) {
+  if (NO_OPEN) return;
   try {
     const u = new URL(url);
     if (u.protocol === 'https:' || u.protocol === 'http:') shell.openExternal(u.toString());
@@ -171,6 +174,7 @@ function ipc() {
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, path.basename(name).replace(/[\\/:*?"<>|]+/g, '-') || 'document.pdf');
     fs.writeFileSync(file, bytes);
+    if (NO_OPEN) return { file };
     const err = await shell.openPath(file);
     if (err) throw new Error(`Saved ${file} but Windows could not open it: ${err}`);
     return { file };
