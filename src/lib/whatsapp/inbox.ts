@@ -1,4 +1,5 @@
 import 'server-only';
+import { appointmentReplyAlert } from '@/lib/crm/appointment-alert';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { clearChatNotifications, clearReplyNotifications, notify, type NotificationInput } from '@/lib/notify';
 import { chatHref, chatRef, chatTag, replyRef } from '@/lib/notification-refs';
@@ -223,6 +224,9 @@ export async function handleInboundMessage(m: InboundMessage, profileName: strin
 
   // "Call me at 12": check the diary and ask whether to add it (the task above already covers "today" and "tomorrow" on their own).
   if (kind === 'text' && !word && !callBack?.created) await suggestCall({ enquiryId: enquiry.id, name: enquiry.name || '', body, source: `wa:${m.id}`, via: 'whatsapp', receivedAt: at }, (t, b, h) => notifyEnquiryTeam(t, b, h)).catch(() => null);
+
+  // Confirming, cancelling or moving an appointment coming up in the next three days: tell the team (src/lib/crm/appointment-alert.ts).
+  if (kind === 'text' && !word) await appointmentReplyAlert(enquiry.id, enquiry.name || '', body, (t, b, h) => notifyEnquiryTeam(t, b, h)).catch(() => null);
 
   const who = enquiry.name || `+${m.from}`;
   const lines = [body.slice(0, 140)];

@@ -197,3 +197,6 @@
 .as-msg.is-assistant { position: relative; margin-left: 30px; }
 .as-avatar { position: absolute; left: -30px; bottom: 0; }
 .as-msg.is-assistant.is-busy { margin-left: 30px; }
+
+.as-head-btns { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }
+.as-new[aria-pressed='true'] { background: var(--inverse); color: var(--inverse-text); }

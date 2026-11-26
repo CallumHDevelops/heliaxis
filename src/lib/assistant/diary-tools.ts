@@ -34,6 +34,7 @@ export const DIARY_TOOLS: Anthropic.Tool[] = [
       postcode: nullable('Needed when where_kind is address.'),
       address: nullable('Street address, or null.'),
       project_id: nullable('The customer’s opportunity id, or null.'),
+      allow_clash: { type: 'boolean', description: 'false normally. true only after the user has seen a clash and said to book it anyway.' },
     }),
   },
 ];
@@ -64,6 +65,22 @@ export async function runDiaryTool(name: string, input: Record<string, unknown>,
   }
   const made = await entryFromInput(raw, null, settings);
   if ('error' in made) return `Not added: ${made.error}`;
+  // Never double-book without saying: anything already in that diary at that time is shown first.
+  if (!allDay && input.allow_clash !== true && made.row.starts_at && made.row.ends_at) {
+    const { data: clash } = await db
+      .from('diary_entries')
+      .select('title, kind, starts_at, ends_at')
+      .eq('surveyor_key', mine[0].key)
+      .is('deleted_at', null)
+      .eq('all_day', false)
+      .lt('starts_at', made.row.ends_at)
+      .gt('ends_at', made.row.starts_at)
+      .limit(5);
+    if (clash?.length) {
+      const at = (iso: unknown) => new Date(String(iso)).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' });
+      return `Not booked: that clashes with ${clash.map((c) => `${c.title || c.kind} ${at(c.starts_at)}–${at(c.ends_at)}`).join(', ')}. Tell the user, suggest another time (list_diary shows the day), and only book it anyway if they say so (allow_clash true).`;
+    }
+  }
   const { data, error } = await db.from('diary_entries').insert({ ...made.row, created_by: me.id }).select('*').single();
   if (error || !data) return `Not added: ${error?.message ?? 'no row'}`;
   const v = entryView(data as EntryRow);
@@ -72,5 +89,5 @@ export async function runDiaryTool(name: string, input: Record<string, unknown>,
     if (p) await logActivity({ enquiryId: p.enquiry_id as string, projectId: made.row.project_id, kind: 'system', body: `Diary: ${v.title || v.kindLabel} added by Metis`, byId: me.id });
   }
   actions.push({ kind: 'diary', label: `Diary: ${v.title || v.kindLabel}, ${v.day ?? ''}${v.start ? ` ${v.start}–${v.end}` : ''}`, href: '/admin/surveys' });
-  return JSON.stringify({ added: true, title: v.title, kind: v.kindLabel, day: v.day, start: v.start, end: v.end, postcode: v.postcode, note: 'It is in the user’s own diary. HAP’s calendar sync copies it to Outlook as it does for any diary entry. No one else was invited.' });
+  return JSON.stringify({ added: true, title: v.title, kind: v.kindLabel, day: v.day, start: v.start, end: v.end, postcode: v.postcode, note: 'It is in the user’s own diary. HAP’s calendar sync copies it to Outlook as it does for any diary entry. No one else was invited. Offer to send the customer a confirmation (draft_whatsapp or draft_email) if the entry is about a customer.' });
 }

@@ -60,6 +60,13 @@ export const LOOKUP_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
+LOOKUP_TOOLS.push({
+  name: 'briefing',
+  description:
+    'Everything for a morning or "what\'s urgent?" briefing in one call: today and tomorrow in the diary, what is overdue, tasks due, emails waiting for a reply (urgent first), unread WhatsApps and new enquiries. Use it whenever the user asks for a briefing, an update, what is urgent or how the day looks, then speak it as in the briefing rules.',
+  input_schema: obj({}),
+});
+
 export const LOOKUP_NAMES = new Set(LOOKUP_TOOLS.map((t) => t.name));
 
 async function profileOf(id: string) {
@@ -158,6 +165,29 @@ export async function runLookup(name: string, input: Record<string, unknown>, me
         today,
         overdue_tasks: tasks.data ?? [],
         overdue_follow_ups: (follow.data ?? []).map((f) => ({ project_id: f.id, title: f.title, stage: stageLabel(f.stage), next_step: f.next_step, was_due: f.next_step_at })),
+      });
+    }
+
+    case 'briefing': {
+      const today = todayISO();
+      const tomorrow = new Date(Date.parse(`${today}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+      const [overdue, diary, box, unread, fresh, due] = await Promise.all([
+        runLookup('whats_overdue', {}, me),
+        runLookup('list_diary', { from: today, to: tomorrow }, me),
+        runLookup('list_my_mail', { needs_reply_only: true }, me),
+        db.from('enquiries').select('name, wa_unread, wa_last_inbound_at').gt('wa_unread', 0).order('wa_last_inbound_at', { ascending: false }).limit(10),
+        db.from('enquiries').select('name, postcode, interest, source, created_at').eq('status', 'new').order('created_at', { ascending: false }).limit(10),
+        db.from('tasks').select('title, due_date, priority').eq('assignee_id', me.id).neq('status', 'done').lte('due_date', today).order('due_date').limit(15),
+      ]);
+      return JSON.stringify({
+        today,
+        tomorrow,
+        diary: diary.startsWith('[') ? JSON.parse(diary) : [],
+        overdue: JSON.parse(overdue),
+        tasks_due: due.data ?? [],
+        emails_needing_reply: box.startsWith('[') ? JSON.parse(box) : [],
+        unread_whatsapp: unread.data ?? [],
+        new_enquiries: fresh.data ?? [],
       });
     }
 

@@ -23,7 +23,10 @@ type Draft = {
 };
 
 const STARTERS = [
+  'Give me my briefing',
+  'What’s urgent?',
   'What’s on today?',
+  'Book me in: I’ve agreed a survey with ',
   'Just left a survey with ',
   'Get Esther to send the EV guide to ',
   'Draft a WhatsApp chasing ',
@@ -106,6 +109,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
   const [text, setText] = useState(initialText);
   const box = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
+  const [aloud, setAloud] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [listening, setListening] = useState(false);
   const canListen = useSyncExternalStore(noSubscribe, hasSpeech, () => false);
@@ -220,6 +224,7 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
         body: JSON.stringify({ text: t }),
       });
       const d = await r.json().catch(() => ({}));
+      if (r.ok && aloud && d.reply) say(d.reply);
       setLines((l) => [
         ...l,
         r.ok
@@ -232,6 +237,20 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Reads a reply out loud (the phone's own voice), for when you are driving. */
+  function say(t: string) {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t.replace(/\/admin\/\S+/g, '').replace(/[*_#`]/g, ''));
+    u.lang = 'en-GB';
+    window.speechSynthesis.speak(u);
+  }
+
+  function toggleAloud() {
+    if (aloud && typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    setAloud((a) => !a);
   }
 
   async function fresh() {
@@ -247,11 +266,16 @@ export function AssistantView({ firstName, initialText = '' }: { firstName: stri
           <h1><MetisIcon size={36} /> Metis</h1>
           <p>Tell me what happened and I’ll add the notes, tasks and drafts.</p>
         </div>
-        {lines.length > 0 && (
-          <button type="button" className="as-new" onClick={fresh}>
-            New chat
+        <div className="as-head-btns">
+          <button type="button" className="as-new" aria-pressed={aloud} onClick={toggleAloud}>
+            {aloud ? 'Reading aloud' : 'Read aloud'}
           </button>
-        )}
+          {lines.length > 0 && (
+            <button type="button" className="as-new" onClick={fresh}>
+              New chat
+            </button>
+          )}
+        </div>
       </header>
 
       {!configured && (

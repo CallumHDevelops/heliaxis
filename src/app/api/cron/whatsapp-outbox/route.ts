@@ -12,6 +12,7 @@ import { newPart, plainText } from '@/lib/email/call-request';
 import { notifyEnquiryTeam } from '@/lib/whatsapp/inbox';
 import { finishMergeFiles } from '@/lib/crm/merge';
 import { flushDocumentNotices } from '@/lib/crm/portal-notify';
+import { sendMorningBriefings } from '@/lib/assistant/morning';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,8 @@ export async function GET(req: Request) {
   // Tasks with a time: the 30 and 15 minute reminders, and their copy in Outlook.
   const tasksSoon = await remindTimedTasks().catch(() => 0);
   const tasksCalendar = await syncTimedTasks().catch(() => 0);
+  // 07:30 on weekdays: Metis's morning briefing push (src/lib/assistant/morning.ts).
+  const briefings = await sendMorningBriefings().catch(() => 0);
   const crm = await runCrmAutomations().catch((e) => ({ error: e instanceof Error ? e.message : 'failed' }));
   const emails = await pollMailbox(async (enquiryId, name, subject, extra) => {
     await notifyEnquiryTeam(`Email from ${name}`, subject, `/admin/crm?enquiry=${enquiryId}`, { tag: `em-${enquiryId}` });
@@ -56,5 +59,5 @@ export async function GET(req: Request) {
   const portalDocs = await flushDocumentNotices(createAdminClient()).catch((e) => `error: ${e instanceof Error ? e.message : 'failed'}`);
   // Last, so a long Outlook copy never holds up the customer messages or the mailbox.
   const booking = await runBookingJobs({ until: started + 40_000 }).catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ok: true, ...result, reminded, followUps, tasksDue, tasksSoon, tasksCalendar, booking, crm, emails, mergeFiles, portalDocs });
+  return NextResponse.json({ ok: true, ...result, reminded, followUps, tasksDue, tasksSoon, tasksCalendar, briefings, booking, crm, emails, mergeFiles, portalDocs });
 }
