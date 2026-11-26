@@ -18,7 +18,7 @@ export default async function MetisChatPage() {
   const { profile } = await getSessionProfile();
   const firstName = (profile?.full_name || profile?.email || '').split(/[\s@]/)[0];
   return (
-    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
+    <main style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', padding: 'max(env(safe-area-inset-top), 0.9rem) 1.1rem max(env(safe-area-inset-bottom), 0.9rem)', boxSizing: 'border-box' }}>
       <AssistantView firstName={firstName} initialText="" />
     </main>
   );
