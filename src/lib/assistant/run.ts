@@ -27,7 +27,7 @@ export function assistantConfigured() {
   return !!process.env.ANTHROPIC_API_KEY;
 }
 
-function system(me: Actor) {
+export function system(me: Actor) {
   const now = new Date().toLocaleString('en-GB', {
     timeZone: 'Europe/London',
     weekday: 'long',
@@ -37,7 +37,9 @@ function system(me: Actor) {
     hour: '2-digit',
     minute: '2-digit',
   });
-  return `You are Metis, the assistant inside Heliaxis's own CRM (named after the Greek goddess of wisdom and counsel). Heliaxis Ltd is a small UK installer of solar PV, batteries, air source heat pumps and EV chargers (about five staff, some working remotely). You're talking to ${me.name}. It is ${now} (UK time).
+  // The long, unchanging instructions come first and are cached (reading a cached prompt is a tenth of the price and much
+  // faster to start). Who you are talking to and the time change every request, so they sit after it, in a short block.
+  const stable = `You are Metis, the assistant inside Heliaxis's own CRM (named after the Greek goddess of wisdom and counsel). Heliaxis Ltd is a small UK installer of solar PV, batteries, air source heat pumps and EV chargers (about five staff, some working remotely).
 
 People often talk to you straight after a meeting or from the van, by voice, so their messages can be rambling or mis-transcribed (voice typing often hears your name as Mattis, Matisse or similar — that's you). Pull out what needs doing and do it: add notes to the customer, create tasks (for them or a colleague), set next steps, and draft emails and WhatsApps. Use the tools rather than describing what you would do. Look customers up with search_customers before acting on them; if two customers match and it's unclear which, ask. Use list_team to find a colleague's id when a task is for someone else. Businesses we deal with (commercial customers, landlords, schools, partners who refer work, suppliers) and the people there are organisations and their contacts: find them with find_organisation or find_contact (a contact can be part of an organisation or on their own), not search_customers; add one with add_contact.
 
@@ -60,6 +62,25 @@ Diary: create_diary_entry adds an entry to the user's own diary (never anyone el
 Contract packs: for an OFF-GRID (non-MCS) job, create_offgrid_contract_pack makes HX-OG-01 to 06 from a quote. First ask the user, plainly, to confirm that there is NO grid connection and no part of the system connects to a grid-connected installation; if there is any, it is not off-grid: tell them it needs the grid-tied (MCS) rules (G98/G99, DNO) and HAP's existing MCS documents, and do not make the off-grid pack. The wording of those documents is fixed and awaiting legal review: you only supply the variables, you never write or change a clause, and you cannot sign or approve anything. Ask for what you need in one message: consumer or business, the payment stages (what, percentage, when), the manufacturer warranty years, and anything the quote or design lacks. Tell the user the documents are drafts that cannot be signed until an admin approves the wording in HAP, that the customer signs the Non-MCS Disclosure (HX-OG-02) separately, and what each document still needs. For grid-tied (MCS) jobs, point them to HAP's existing MCS documents, which you have not changed.
 
 Reply briefly in plain text (it may be read aloud): say what you did in a line or two, then anything you need from them.`;
+  return [
+    { type: 'text', text: stable, cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: `You're talking to ${me.name}. It is ${now} (UK time).` },
+  ] as Anthropic.Beta.BetaTextBlockParam[];
+}
+
+/**
+ * The conversation so far with a cache mark on its last block, so each step of a tool loop reuses everything before it
+ * instead of paying for it again. Works on a copy: the saved history never carries the mark.
+ */
+export function withCacheMark(messages: Msg[]): Msg[] {
+  const last = messages[messages.length - 1];
+  if (!last) return messages;
+  const content: Anthropic.Beta.BetaContentBlockParam[] = typeof last.content === 'string' ? [{ type: 'text', text: last.content }] : [...last.content];
+  const i = content.length - 1;
+  const b = content[i] as { type: string };
+  if (!b || !['text', 'tool_result'].includes(b.type)) return messages;
+  content[i] = { ...(content[i] as object), cache_control: { type: 'ephemeral' } } as Anthropic.Beta.BetaContentBlockParam;
+  return [...messages.slice(0, -1), { ...last, content }];
 }
 
 /** Keep the history short enough to send, starting at a real user message. */
@@ -91,18 +112,31 @@ export async function runAssistant(history: Msg[], text: string, me: Actor, opts
   const actions: AssistantAction[] = [];
   let reply = '';
 
-  for (let turn = 0; turn < MAX_TURNS; turn++) {
-    const res = await client.beta.messages.create({
+  // Prompt caching makes every request cheaper and quicker to start. If the API ever refuses the cache fields, carry on
+  // without them (for the rest of this conversation turn) rather than failing: Metis must always be able to answer.
+  let useCache = true;
+  const ask = (cache: boolean) =>
+    client.beta.messages.create({
       model: ASSISTANT_MODEL,
       max_tokens: 8000,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'medium' },
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
-      system: system(me),
+      system: cache ? system(me) : (system(me) as { text: string }[]).map((b) => ({ type: 'text' as const, text: b.text })),
       tools: TOOLS.map((t) => (STRICT_TOOLS.has(t.name) ? { ...t, strict: true } : t)) as Anthropic.Beta.BetaTool[],
-      messages,
+      messages: cache ? withCacheMark(messages) : messages,
     });
+
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    let res: Awaited<ReturnType<typeof ask>>;
+    try {
+      res = await ask(useCache);
+    } catch (e) {
+      if (!useCache || !/cache_control|cache control/i.test(e instanceof Error ? e.message : '')) throw e;
+      useCache = false;
+      res = await ask(false);
+    }
 
     await recordAi('assistant', res.model, res.usage, opts.ref);
     if (res.stop_reason === 'refusal') {
