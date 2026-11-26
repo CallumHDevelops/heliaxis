@@ -1,12 +1,12 @@
 {
-  "versionCode": 8,
-  "versionName": "1.0.7",
+  "versionCode": 9,
+  "versionName": "1.0.8",
   "minVersionCode": 1,
   "releasedAt": "2026-11-26",
   "notes": [
-    "Metis is now the name of your assistant everywhere, and it has its own app icon that opens the chat."
+    "Metis is now its own app (chat only). The Heliaxis app no longer carries a second Metis icon."
   ],
   "apk": "/app/heliaxis.apk",
-  "sizeBytes": 5131632,
-  "sha256": "4209935307d08be0d4671d728746303cf6a7833a31d2a427390fd1cf2ebf26f5"
+  "sizeBytes": 5119792,
+  "sha256": "21ed7c39ab6f8246d8f0ebbeaace5fb0b9de792943b12f32fcf67ffdf76e807f"
 }
