@@ -1,12 +1,12 @@
 {
-  "versionCode": 7,
-  "versionName": "1.0.6",
+  "versionCode": 8,
+  "versionName": "1.0.7",
   "minVersionCode": 1,
-  "releasedAt": "2026-11-25",
+  "releasedAt": "2026-11-26",
   "notes": [
-    "Tapping a survey or install in the Metis widget now opens that customer's job, and Directions go to the pin the customer confirmed."
+    "Metis is now the name of your assistant everywhere, and it has its own app icon that opens the chat."
   ],
   "apk": "/app/heliaxis.apk",
-  "sizeBytes": 5119796,
-  "sha256": "162d2f732eecf8529fb1138bf5dbba7d9602573959461ebe4716cd0d5d8d8864"
+  "sizeBytes": 5131632,
+  "sha256": "4209935307d08be0d4671d728746303cf6a7833a31d2a427390fd1cf2ebf26f5"
 }
