@@ -122,7 +122,7 @@ create table if not exists public.mail_threads (
   kind             text,                               -- customer, prospect, supplier, grid, partner, finance, team, personal, other
   summary          text,                               -- one line: what they want
   tone             text,                               -- how they come across: happy, neutral, anxious, frustrated, angry, formal…
-  opportunity      text,                               -- a chance Hestia spotted (a referral, an add-on, a review, a new lead)
+  opportunity      text,                               -- a chance Metis spotted (a referral, an add-on, a review, a new lead)
   action_only      boolean not null default false,     -- needs you to do something, but not a reply (a portal, a payment, a form)
   alerted_at       timestamptz,                        -- when your phone was told it's urgent
   why              text,                               -- why it matters / why it needs a reply

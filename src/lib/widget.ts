@@ -7,9 +7,9 @@ import { todayISO } from '@/lib/tasks';
 import { widgetPayload, type WidgetData } from '@/lib/widget-shared';
 
 /**
- * The Hestia widget on the Android app's home screen (android/…/HestiaWidget.java): today's calendar, your tasks and
+ * The Metis widget on the Android app's home screen (android/…/MetisWidget.java): today's calendar, your tasks and
  * the emails that need you. The phone never asks for it: the site sends it, as a data message on the same Firebase
- * channel as notifications, every 15 minutes (the mail job), when Hestia has sorted something new, and whenever the
+ * channel as notifications, every 15 minutes (the mail job), when Metis has sorted something new, and whenever the
  * app is opened. Only to app builds that have the widget (WIDGET_FROM_APP_VERSION).
  */
 
@@ -136,7 +136,7 @@ export async function widgetFor(userId: string, db: Db = createAdminClient()): P
     }),
   ];
 
-  // Hestia: the emails that need you, the most important first.
+  // Metis: the emails that need you, the most important first.
   const mail = await mailForHome(userId).catch(() => null);
   const emails: WidgetData['email'] =
     mail && mail !== 'none'

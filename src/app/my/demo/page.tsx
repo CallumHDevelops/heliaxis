@@ -134,7 +134,7 @@ function demo(stage: string): PortalData {
             ]),
       ],
     },
-    hestia: true,
+    metis: true,
     phone: '01633 965205',
     whatsapp: '07700900123',
     email: 'hello@heliaxis.co.uk',

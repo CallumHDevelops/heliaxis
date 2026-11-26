@@ -99,7 +99,7 @@ export async function threadsFor(db: Db, boxId: string, view: View): Promise<Thr
       .lt('last_out_at', new Date(Date.now() - 3 * DAY).toISOString())
       .gt('last_out_at', new Date(Date.now() - 42 * DAY).toISOString());
   else if (view === 'people') q = q.not('prospect', 'is', null).is('enquiry_id', null);
-  // Opportunities Hestia spotted in the last two months.
+  // Opportunities Metis spotted in the last two months.
   else if (view === 'opps') q = q.not('opportunity', 'is', null).gt('last_in_at', new Date(Date.now() - 60 * DAY).toISOString());
   else if (view === 'fyi') q = q.in('state', ['fyi', 'done']).gt('last_in_at', new Date(Date.now() - 14 * DAY).toISOString());
   else q = q.eq('state', 'marketing');

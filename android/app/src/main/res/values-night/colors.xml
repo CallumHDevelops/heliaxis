@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Hestia widget when the phone is in dark mode. -->
+<!-- The Metis widget when the phone is in dark mode. -->
 <resources>
     <color name="widgetBackground">#211F18</color>
     <color name="widgetInk">#F4EFE4</color>

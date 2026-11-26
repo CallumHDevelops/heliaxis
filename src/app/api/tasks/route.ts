@@ -9,7 +9,7 @@ import { defaultOwnerId } from '@/lib/crm/default-owner';
 import { canAccess } from '@/lib/portals';
 import { pushWidget } from '@/lib/widget';
 
-/** A task added, changed or removed: the Hestia widget on the assignees' phones shows it now, not in 15 minutes. */
+/** A task added, changed or removed: the Metis widget on the assignees' phones shows it now, not in 15 minutes. */
 async function refreshWidgets(userIds: (string | null | undefined)[]) {
   for (const u of new Set(userIds.filter((x): x is string => !!x))) await pushWidget(u).catch(() => null);
 }

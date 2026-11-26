@@ -4,7 +4,7 @@
   "minVersionCode": 1,
   "releasedAt": "2026-11-25",
   "notes": [
-    "Tapping a survey or install in the Hestia widget now opens that customer's job, and Directions go to the pin the customer confirmed."
+    "Tapping a survey or install in the Metis widget now opens that customer's job, and Directions go to the pin the customer confirmed."
   ],
   "apk": "/app/heliaxis.apk",
   "sizeBytes": 5119796,

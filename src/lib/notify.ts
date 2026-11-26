@@ -101,7 +101,7 @@ async function webPush(admin: Admin, n: NotificationInput, id: string | undefine
 function channelFor(kind: string) {
   if (kind === 'whatsapp') return 'whatsapp';
   if (kind === 'crm_new_lead' || kind === 'crm_first_response') return 'leads';
-  // Hestia's urgent emails: their own high-priority channel (apps before it have no such channel and use "Other").
+  // Metis's urgent emails: their own high-priority channel (apps before it have no such channel and use "Other").
   if (kind === 'email') return 'email';
   if (kind.startsWith('task')) return 'tasks';
   if (kind.startsWith('crm_')) return 'jobs';

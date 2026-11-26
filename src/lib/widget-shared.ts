@@ -1,5 +1,5 @@
 /**
- * The Hestia widget's content, and the small JSON the phone gets (android/…/HestiaWidget.java reads it). Pure, so
+ * The Metis widget's content, and the small JSON the phone gets (android/…/MetisWidget.java reads it). Pure, so
  * it's tested on its own (tests/widget.test.ts). Field names are short because a Firebase message must stay under
  * 4 KB: the widget shows a handful of lines anyway, so lists and text are trimmed until it fits.
  */
@@ -10,7 +10,7 @@ export type WidgetData = {
   /** Null when your Outlook calendar can't be read. */
   calendar: { today: WidgetEvent[]; tomorrow: WidgetEvent[] } | null;
   tasks: { title: string; due: string; late: boolean; sub: string; href: string }[];
-  /** Null when your mailbox isn't connected to Hestia. */
+  /** Null when your mailbox isn't connected to Metis. */
   email: { need: number; urgent: number; top: { who: string; what: string; urgent: boolean; href: string }[] } | null;
 };
 /** href: the job a survey / install appointment is for (/admin/crm/<id>), when we know it. */

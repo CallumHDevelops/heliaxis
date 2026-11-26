@@ -286,7 +286,7 @@ export async function draftState(address: string, id: string): Promise<{ isDraft
   }
 }
 
-/** Inbox emails whose flag you've ticked complete in Outlook (up to 100): Hestia reads that as "dealt with". */
+/** Inbox emails whose flag you've ticked complete in Outlook (up to 100): Metis reads that as "dealt with". */
 export async function completedInInbox(address: string): Promise<string[]> {
   const q = new URLSearchParams({ $filter: "flag/flagStatus eq 'complete'", $select: 'id', $top: '100' });
   const r = await graph<{ value: { id: string }[] }>(`${box(address)}/mailFolders/inbox/messages?${q}`, { headers: { Prefer: IMMUTABLE } });
@@ -302,7 +302,7 @@ export async function deleteDraft(address: string, id: string): Promise<void> {
 
 /**
  * The folders you already have, at the top of the mailbox and inside the Inbox, as paths ("Inbox/GoodWe", with a "/"
- * in a folder's own name kept as NAME_SLASH), so Hestia files into yours rather than making her own alongside.
+ * in a folder's own name kept as NAME_SLASH), so Metis files into yours rather than making her own alongside.
  */
 export async function listFolders(address: string): Promise<{ path: string; name: string; id: string }[]> {
   const q = new URLSearchParams({ $select: 'id,displayName', $top: '250' });

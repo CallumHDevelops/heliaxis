@@ -143,7 +143,7 @@ export async function loadPortal(token: string) {
     pack,
     hasProposal: !!(quoteRows?.[0]?.content as { proposal?: { options?: unknown[] } } | undefined)?.proposal?.options?.length,
     extras,
-    hestia: !!process.env.ANTHROPIC_API_KEY,
+    metis: !!process.env.ANTHROPIC_API_KEY,
     phone: process.env.NEXT_PUBLIC_PHONE_NUMBER || '01633 965205',
     whatsapp: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || null,
     email: process.env.MS_MAILBOX || 'hello@heliaxis.co.uk',

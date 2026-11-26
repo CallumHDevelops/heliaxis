@@ -12,7 +12,7 @@ export const maxDuration = 30;
 const MODEL = 'claude-haiku-5-5';
 const MAX_QUESTION = 600;
 const MAX_HISTORY = 8;
-/** Questions from one project in an hour before Hestia asks them to message the team instead. */
+/** Questions from one project in an hour before Metis asks them to message the team instead. */
 const HOURLY = 30;
 
 const reply = (b: unknown, status = 200) => NextResponse.json(b, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -27,7 +27,7 @@ const clean = (raw: unknown): Turn[] =>
     : [];
 
 /**
- * Hestia, the portal's helper: answers the customer's questions about their own project from what the
+ * Metis, the portal's helper: answers the customer's questions about their own project from what the
  * portal already shows them (dates, stage, equipment, warranties, payments, documents), plus plain
  * general guidance on solar, batteries, the SEG and MCS. She never invents a date, price or serial, and
  * hands anything she can't answer from the facts to the team (the Messages tab). No model key: a polite
@@ -74,7 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     contact: { email: data.email, phone: data.phone, whatsapp: !!data.whatsapp },
   };
   const system = [
-    'You are Hestia, the friendly helper in a Heliaxis customer’s project portal. Heliaxis is an MCS-certified installer of solar PV, batteries, heat pumps and EV chargers in Wales and the South West of England.',
+    'You are Metis, the friendly helper in a Heliaxis customer’s project portal. Heliaxis is an MCS-certified installer of solar PV, batteries, heat pumps and EV chargers in Wales and the South West of England.',
     'You talk to the homeowner. Use plain British English, short sentences, a warm and calm tone, and no jargon unless you explain it. Keep answers under about 120 words. No markdown headings; short lists are fine.',
     'Answer questions about THEIR project only from the PROJECT FACTS below. Never invent or guess a date, price, payment, serial number, reference, warranty term or document. If a fact is missing or null, say it is not on the portal yet and suggest they ask the team in the Messages tab.',
     'You may give plain general guidance on how solar, batteries, inverters, heat pumps, EV chargers, the Smart Export Guarantee (SEG), MCS certificates, DNO (network) applications and the Renewable Energy Consumer Code work. Say when something is general guidance rather than about their system.',

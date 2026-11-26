@@ -26,12 +26,12 @@ export function EmailPanel({ mail }: { mail: HomeMail }) {
   return (
     <section className="nu hub-mail" aria-labelledby="nu-mail-h">
       <div className="nu-head">
-        <h2 id="nu-mail-h">Hestia: email that needs you</h2>
+        <h2 id="nu-mail-h">Metis: email that needs you</h2>
         {counts.reply > 0 && <span className="nu-count">{counts.reply}</span>}
         {counts.urgent > 0 && <span className="nu-today">{counts.urgent} important</span>}
       </div>
       {top.length === 0 ? (
-        <p className="nu-empty">{mail.reading ? 'Hestia is going through your inbox for the first time. Emails that need you appear here as she goes.' : 'Nothing waiting on you.'}</p>
+        <p className="nu-empty">{mail.reading ? 'Metis is going through your inbox for the first time. Emails that need you appear here as she goes.' : 'Nothing waiting on you.'}</p>
       ) : (
         <ul className="nu-list">
           {top.map((t) => {

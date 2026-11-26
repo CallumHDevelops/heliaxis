@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Hestia widget (HestiaWidget.java): header, then a list that scrolls (HestiaWidgetService.java). -->
+<!-- The Metis widget (MetisWidget.java): header, then a list that scrolls (MetisWidgetService.java). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background"
     android:layout_width="match_parent"

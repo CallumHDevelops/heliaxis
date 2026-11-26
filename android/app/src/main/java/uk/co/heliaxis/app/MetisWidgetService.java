@@ -15,10 +15,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The lines in the Hestia widget's list, from the last widget the site sent (HestiaWidget.saved):
+ * The lines in the Metis widget's list, from the last widget the site sent (MetisWidget.saved):
  * Today (calendar), Needs you (emails, urgent first), Tasks, then Tomorrow.
  */
-public class HestiaWidgetService extends RemoteViewsService {
+public class MetisWidgetService extends RemoteViewsService {
     @Override
     public RemoteViewsFactory onGetViewFactory(Intent intent) {
         return new Lines(getApplicationContext());
@@ -62,7 +62,7 @@ public class HestiaWidgetService extends RemoteViewsService {
         @Override
         public void onDataSetChanged() {
             lines.clear();
-            JSONObject w = HestiaWidget.saved(context);
+            JSONObject w = MetisWidget.saved(context);
             if (w == null) return; // the empty view says to open the app once
 
             // Today: the rest of today's calendar.
@@ -76,7 +76,7 @@ public class HestiaWidgetService extends RemoteViewsService {
                 lines.add(new Line(false, "", context.getString(R.string.widgetNoCalendar), "", "/admin", 0));
             }
 
-            // Needs you: Hestia's emails, the most important first.
+            // Needs you: Metis's emails, the most important first.
             JSONObject email = w.optJSONObject("e");
             JSONArray mails = email != null ? email.optJSONArray("i") : null;
             if (mails != null && mails.length() > 0) {
@@ -144,8 +144,8 @@ public class HestiaWidgetService extends RemoteViewsService {
             int colour = l.mark == 2 ? R.color.widgetUrgent : l.mark == 1 ? R.color.widgetGold : android.R.color.transparent;
             v.setInt(R.id.widget_line_mark, "setBackgroundColor", ContextCompat.getColor(context, colour));
             v.setTextColor(R.id.widget_line_left, ContextCompat.getColor(context, l.mark == 2 ? R.color.widgetUrgent : R.color.widgetMuted));
-            // Tapping the line opens its page (the template is in HestiaWidget).
-            v.setOnClickFillInIntent(R.id.widget_line, new Intent().setData(HestiaWidget.page(l.href)));
+            // Tapping the line opens its page (the template is in MetisWidget).
+            v.setOnClickFillInIntent(R.id.widget_line, new Intent().setData(MetisWidget.page(l.href)));
             return v;
         }
 

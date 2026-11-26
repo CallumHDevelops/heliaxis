@@ -17,8 +17,8 @@
     <string name="shortcutMetis">Metis</string>
     <string name="shortcutMetisLong">Ask Metis</string>
 
-    <!-- The Hestia widget (HestiaWidget.java). -->
-    <string name="widgetName">Hestia</string>
+    <!-- The Metis widget (MetisWidget.java). -->
+    <string name="widgetName">Metis</string>
     <string name="widgetDescription">Your day at a glance: today\'s calendar, the emails that need you and your tasks</string>
     <string name="widgetToday">Today</string>
     <string name="widgetTomorrow">Tomorrow</string>
@@ -27,7 +27,7 @@
     <string name="widgetUrgent">Urgent</string>
     <string name="widgetNothingToday">Nothing else today</string>
     <string name="widgetNoCalendar">Calendar not connected</string>
-    <string name="widgetFirstRun">Open the Heliaxis app once and Hestia fills this in.</string>
+    <string name="widgetFirstRun">Open the Heliaxis app once and Metis fills this in.</string>
     <string name="widgetNothing">All clear: nothing needs you.</string>
     <string name="widgetUpdated">Updated %1$s</string>
     <string name="widgetPreviewBadge">3 need you</string>

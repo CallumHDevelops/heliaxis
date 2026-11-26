@@ -22,19 +22,19 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * Hestia on the home screen: today's calendar, the emails that need you and your tasks, in a list that scrolls.
+ * Metis on the home screen: today's calendar, the emails that need you and your tasks, in a list that scrolls.
  *
  * The phone never fetches it: the site sends it as a Firebase data message ({ type: "widget", w: "<json>" }, see
- * src/lib/widget.ts) every 15 minutes, whenever Hestia has sorted something new, and whenever the app is opened.
+ * src/lib/widget.ts) every 15 minutes, whenever Metis has sorted something new, and whenever the app is opened.
  * It's kept in SharedPreferences, so the widget shows the last one straight away, even offline. Tapping a line opens
  * that page in the app; tapping the header opens the dashboard.
  */
-public class HestiaWidget extends AppWidgetProvider {
+public class MetisWidget extends AppWidgetProvider {
     static final String PREF_KEY = "hestiaWidget";
     /** Older than this and the header says when it was last updated. */
     private static final long STALE_MS = 2 * 60 * 60 * 1000L;
 
-    /** A new widget from the site: keep it and redraw every Hestia widget on the home screens. */
+    /** A new widget from the site: keep it and redraw every Metis widget on the home screens. */
     static void save(Context context, @Nullable String json) {
         if (json == null || json.isEmpty()) return;
         try {
@@ -59,7 +59,7 @@ public class HestiaWidget extends AppWidgetProvider {
 
     static void updateAll(Context context) {
         AppWidgetManager mgr = AppWidgetManager.getInstance(context);
-        int[] ids = mgr.getAppWidgetIds(new ComponentName(context, HestiaWidget.class));
+        int[] ids = mgr.getAppWidgetIds(new ComponentName(context, MetisWidget.class));
         if (ids == null || ids.length == 0) return;
         for (int id : ids) mgr.updateAppWidget(id, build(context, id));
         mgr.notifyAppWidgetViewDataChanged(ids, R.id.widget_list);
@@ -72,7 +72,7 @@ public class HestiaWidget extends AppWidgetProvider {
     }
 
     private static RemoteViews build(Context context, int widgetId) {
-        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_hestia);
+        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_metis);
         JSONObject w = saved(context);
 
         // Header: the day, and how many emails need you (urgent ones called out).
@@ -103,14 +103,14 @@ public class HestiaWidget extends AppWidgetProvider {
         }
 
         // The list: one adapter per widget (the data URI keeps them apart).
-        Intent adapter = new Intent(context, HestiaWidgetService.class)
+        Intent adapter = new Intent(context, MetisWidgetService.class)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
         adapter.setData(Uri.parse(adapter.toUri(Intent.URI_INTENT_SCHEME)));
         v.setRemoteAdapter(R.id.widget_list, adapter);
         v.setEmptyView(R.id.widget_list, R.id.widget_empty);
         v.setTextViewText(R.id.widget_empty, context.getString(w == null ? R.string.widgetFirstRun : R.string.widgetNothing));
 
-        // Each line fills in its own page (HestiaWidgetService); the header opens the dashboard.
+        // Each line fills in its own page (MetisWidgetService); the header opens the dashboard.
         Intent template = new Intent(Intent.ACTION_VIEW, null, context, HeliaxisLauncherActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         int mutable = Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0;

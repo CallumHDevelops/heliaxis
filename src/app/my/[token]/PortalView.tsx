@@ -12,7 +12,7 @@ import { useNow } from '@/lib/use-now';
 import { THEME_GROUP_LABEL, type ThemePref } from '@/lib/theme/shared';
 import { forgetProject, InstallApp, registerPortalWorker, rememberProject } from '../InstallApp';
 import { HandoverSection, SignCard } from './HandoverSection';
-import { Hestia } from './Hestia';
+import { Metis } from './Metis';
 import { ComingRow, dayParts, dayText, DocGroup, DocRow, Icon, money, whenText } from './parts';
 import { useEngagement } from './useEngagement';
 import './portal.css';
@@ -43,7 +43,7 @@ const fmtDate = (iso: string, withTime = false) => whenText(iso, withTime);
  * with the proposal pack beside it. From Won it's their project in five tabs: Home (the next thing to
  * do, where it's up to, dates and photos), Documents (proposal pack, handover pack, invoices, the rest,
  * each with View and Download), My system (equipment, serial numbers, warranties), Payments (the price,
- * what's paid, the balance) and Help (Hestia, messages, call / WhatsApp / email, log a complaint).
+ * what's paid, the balance) and Help (Metis, messages, call / WhatsApp / email, log a complaint).
  * `themePref`: their Light / Dark / Match phone as the server rendered it. `preview`: staff looking.
  */
 export function PortalView({
@@ -443,7 +443,7 @@ function QuotePage({ data, openAccept, themePref }: { data: PortalData; openAcce
       <Split
         side={
           <>
-            {data.hestia && <Hestia token={data.token} suggestions={['What happens after I sign?', 'Can I cancel if I change my mind?', 'How does the deposit work?']} onHandoff={ask} />}
+            {data.metis && <Metis token={data.token} suggestions={['What happens after I sign?', 'Can I cancel if I change my mind?', 'How does the deposit work?']} onHandoff={ask} />}
             <ContactCard data={data} onMessage={() => ask('')} onComplaint={() => setComplaint(true)} />
             <InstallApp compact />
           </>
@@ -774,7 +774,7 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
 
       {tab === 'help' && (
         <>
-          <TabTitle title="Help" sub="Ask Hestia for a quick answer, or talk to the team." />
+          <TabTitle title="Help" sub="Ask Metis for a quick answer, or talk to the team." />
           <Split
             side={
               <>
@@ -783,7 +783,7 @@ function FullPortal({ data, paid, justAccepted, openAccept, themePref }: { data:
               </>
             }
           >
-            {data.hestia && <Hestia token={data.token} suggestions={helpSuggestions(data)} onHandoff={ask} />}
+            {data.metis && <Metis token={data.token} suggestions={helpSuggestions(data)} onHandoff={ask} />}
             <PortalMessages token={data.token} first={data.first} focus={query} prefill={prefill} />
           </Split>
         </>
@@ -868,7 +868,7 @@ function QuickLinks({ data, setTab }: { data: PortalData; setTab: (t: Tab) => vo
       tab: 'help',
       icon: 'help',
       title: 'Help',
-      line: data.hestia ? 'Ask Hestia or message the team' : 'Message, call or email us',
+      line: data.metis ? 'Ask Metis or message the team' : 'Message, call or email us',
     },
   ];
   return (
