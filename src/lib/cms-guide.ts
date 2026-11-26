@@ -194,7 +194,7 @@ export const LESSONS: Lesson[] = [
     ],
     callouts: [
       { kind: 'tip', title: 'Which pages to make first', text: 'Do three or four in a sitting, in this order: solar and battery, battery storage, adding a battery to existing solar, battery backup. Then heat pumps, EV chargers, whole-home energy, and the commercial and sector pages.' },
-      { kind: 'watch', title: 'Check the area wording', text: 'The AI may describe Heliaxis as a South Wales installer. Make sure each page says South Wales and the South West, and names only towns we really cover.' },
+      { kind: 'tip', title: 'Fill in the brief', text: 'The AI page builder asks what type of page it is, who it is for, the service, the search phrase and the reader’s biggest doubt. The more you say, the better the page. It writes only from the Facts sheet, adds the quote form and accreditation logos itself, and shows the page checks on the draft before you insert it. Testimonials, case studies and gallery sections are left out until real approved ones exist.' },
       { kind: 'watch', title: 'Templates come with example content', text: 'Landing-page and case-study layouts are full of example figures and made-up customers. Replace them with real details or delete them before publishing.' },
       { kind: 'watch', title: 'One tab while generating', text: 'The CMS saves the whole site in one go. Editing in another tab or on another computer while pages are being written can undo the new pages.' },
       { kind: 'tip', title: 'Names must be unique', text: 'No two pages can share a title or URL slug, and addresses that start /blog/ are kept for blog articles.' },

@@ -2,6 +2,7 @@ import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCmsRendered } from '@/lib/cms-rendered';
 import { generatePage, normalizeBlocks } from '@/lib/cms/ai-page';
+import { readFacts } from '@/lib/cms/facts-server';
 import { generateBlogPost } from '@/lib/blog/ai';
 import { getSetting } from '@/lib/search/server';
 import { clearAction, raiseAction } from '@/lib/search/inbox';
@@ -325,7 +326,9 @@ export async function writeDraft(id: number, by: string, opts: { fixes?: boolean
       draft = baseDraft(c.kind, a.seoTitle || a.title, a.seoDescription || '', a.slug, process.env.AI_BLOG_CLAUDE_MODEL || 'claude-sonnet-5-5', today);
       draft.article = a as unknown as Record<string, unknown>;
     } else {
-      const r = await generatePage(prompt, undefined, { usageRef });
+      const { facts } = await readFacts();
+      const r = await generatePage(prompt, undefined, { usageRef, facts });
+      r.blocks = r.blocks.filter((b) => b.t !== 'accbanner'); // its logos are picked in the editor
       if (!r.blocks.length) throw new Error('The writer returned no usable sections. Try again.');
       draft = baseDraft(c.kind, r.seo.title, r.seo.description, r.seo.slug, r.debug.model, today);
       draft.blocks = withIds(r.blocks);

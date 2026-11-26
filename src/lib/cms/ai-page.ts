@@ -1,5 +1,9 @@
 import { aiConfig, isAiConfigured } from '@/lib/blog/ai';
 import { recordChatUsage } from '@/lib/ai-usage';
+import { DEFAULT_FACTS, type Facts } from './facts';
+import { briefMessage, buildSystemPrompt } from './builder-prompt';
+import { cleanBrief, shapePage, type Brief } from './blueprints';
+import { checkPage, type Issue } from './validate';
 
 export { isAiConfigured };
 
@@ -328,49 +332,9 @@ async function researchTopic(brief: string): Promise<string> {
   }
 }
 
-const SYSTEM = `You are a senior SEO & GEO/AEO content strategist and copywriter for Heliaxis, an MCS-certified solar, battery, heat-pump and EV-charging installer in South Wales, UK. You produce a COMPLETE, genuinely useful web page as CMS sections ("blocks") in reading order.
-
-GOAL: write a page that OUTRANKS and OUT-HELPS the competitor pages provided in the research. Cover everything they cover, then go further — more specific, better organised, more trustworthy.
-
-Write plain, authoritative British English. No hype, no filler, no purple prose. Never invent statistics, prices, percentages, certifications, grants, phone numbers, emails, dates or customer names — if a figure is not established, keep the claim qualitative. Use the research ONLY for topic coverage and structure, never to copy wording or lift unverified numbers.
-
-WRITE FOR THE READER (audience-first — this matters most; earlier drafts were too generic and textbook):
-- Work out WHO the page is for from the brief (e.g. business owners / facilities managers, or homeowners) and write to their actual priorities: cost, payback drivers, disruption, reliability, warranties, and the practical next step.
-- Lead with the reader's outcome and concrete specifics, NOT a dictionary definition. NEVER open a section with "X refers to…", "X is the installation of…", "X is a system that…", or "Understanding X". Assume they already know what solar is — tell them what it means for THEIR site and why it's worth their time.
-- Be concrete and differentiated: name real options/methods and real next steps rather than explaining the concept in the abstract. Good example of the register to hit: "Commercial solar designed around your half-hourly demand, not your roof area — in-roof, on-roof, flat-roof, ground-mount or carport, MCS-certified and built to last." Prefer specific nouns and outcomes over encyclopaedic filler.
-- STAY STRICTLY ON TOPIC AND ON AUDIENCE: every section must serve the EXACT topic and audience of the brief. Do NOT drift into adjacent-but-different subjects or audiences — e.g. a COMMERCIAL page must never introduce residential "owner-occupier vs tenant" or homeowner content, and a finance page must not wander off finance, unless the brief explicitly asks. If a section (especially a two-way split) cannot be made genuinely relevant to THIS audience, omit it rather than forcing a generic or off-topic one.
-
-Return ONLY valid JSON of this exact shape (no prose, no markdown, no code fences):
-{ "seo": { "title": "...", "description": "...", "slug": "kebab-slug" }, "blocks": [ { "t": <type>, "p": { ...fields } }, ... ] }
-
-SEO (for Google indexing):
-- Put the primary keyword/topic naturally in seo.title, the hero headline, the first intro paragraph and the slug.
-- seo.title ~50–60 chars; seo.description 120–160 chars with a clear benefit + the topic; slug = short kebab-case, no leading slash.
-- Give each section a distinct title that targets a relevant sub-topic (clear heading hierarchy).
-
-GEO / AEO (for AI answer engines — Google AI Overviews, ChatGPT, Perplexity):
-- Open the page's first text section with a DIRECT 1–2 sentence answer to the reader's core question, then expand.
-- Include a strong faq block: 5–8 real "People Also Ask"-style questions SPECIFIC to this page's exact topic and audience. Every answer must DIRECTLY and FULLY answer its own question in 2–3 self-contained sentences — never a vague one-liner, and never answer a different question than the one asked (e.g. a care-home page's planning question must answer planning for care homes, not generic "commercial solar").
-- Make claims specific, quotable and citeable; prefer concrete facts and practical takeaways over vague statements.
-
-STRUCTURE — use the RIGHT block for each idea. This is critical: do NOT output a wall of "rich" text sections.
-- Produce 8 to 12 blocks with VARIED types. A strong page looks like:
-  hero → media (intro that leads with the direct answer) → grid (key benefits/features) → steps (how it works / the process) → [optional: stats, split, funding, casestudy, testi] → faq → cta.
-- You MUST include a grid OR a steps block, and you MUST include an faq block (5–8 questions).
-- NEVER place two dark-background sections back-to-back. The hero, funding and explorer blocks all render on a dark band — always separate them with a light section (media, grid, steps, split, faq or stats). e.g. hero → light section(s) → … → funding → light section → cta.
-- Use AT MOST 2 "rich" blocks in the entire page, and NEVER place two rich blocks back-to-back. Turn list-like, step-like, comparison or benefit content into grid / steps / split / stats / funding blocks — these read far better than prose. Reach for "rich" only for genuine long-form explanation that no structured block fits.
-- Each rich block = 2–3 substantial paragraphs. Every section must add DISTINCT value; never repeat a point across sections.
-- Keep sections scannable: steps = 3–8 steps (up to ~10 only for a genuinely detailed end-to-end process), grid = 3 or 4 cards, funding = 3 cards. Card titles are short; card text is 1–2 tight sentences, not a paragraph.
-- BALANCE cards that sit side-by-side in a row (grid items, funding items, split bullets): give them a similar text LENGTH — within ~15 characters of each other — so no card is visibly taller than its neighbours. Trim or pad wording to even them up.
-
-RULES:
-- Use ONLY the block types and fields below. Any other type or field is discarded.
-- Do NOT set image fields (img) — leave images out; the user adds photos afterwards. Do NOT invent ids.
-- BUTTON LABELS: every button/CTA label (hero ctaLabel, cta, funding cta, split card buttons lc/rc, media cta, etc.) MUST be a short action phrase of 2–5 words (e.g. "Book a survey", "See funding options", "Talk to us") — NEVER a full sentence or a claim. Put any explanation in the surrounding text, never on the button.
-
-BLOCK TYPES:
+/** The block-type reference given to the model: which blocks and fields exist. The rules about what to write come from builder-prompt.ts. */
+const BLOCK_DOC = `BLOCK TYPES:
 hero  { eyebrow, headline, sub, ctaLabel, ctaHref, tags, dark:true }  // page banner. headline = the page's main H1.
-stats { items:[{ n:"55 kWp", k:"System size" }] }  // 2-4 short stat items.
 grid  { eyebrow, title, cols:3, items:[{ icon, title, desc }] }  // feature cards. icon from: solar,battery,heatpump,ev,home,building,shield,coin,grant,warehouse,monitor,clock,bolt,sun,leaf,pound,chart,check,star,map,wrench,users,award,factory,plug,target.
 split { lIcon:"home", lt, ld, lb:[".."], lc, rIcon:"building", rt, rd, rb:[".."], rc }  // two side-by-side cards, lb/rb are bullet arrays. Tailor BOTH sides to THIS page's audience and pick fitting icons/titles — do NOT default to generic "home vs business" unless the page genuinely serves both. Only use this block when a real two-way comparison helps the reader.
 media { eyebrow, title, text, side:"right", cta, ctaHref }  // one image-and-text row (image left blank).
@@ -378,10 +342,8 @@ steps { eyebrow, title, items:[{ title, text }] }  // numbered process, 3-8 step
 funding { eyebrow, title, sub, items:[{ title, text }], cta, ctaHref }  // finance/grant cards.
 explorer { eyebrow, title, sub, items:[{ title, text, cta, ctaHref }] }  // dark interactive "feature explorer": 3-6 options a visitor clicks to expand; leave images out.
 faq   { eyebrow, title, items:[{ q, a }] }  // Q&A accordion.
-testi { eyebrow, title, items:[{ stars:5, quote, name, loc }] }  // testimonials. Mark quotes as illustrative in footnote if invented.
+testi { eyebrow, title }  // testimonials: the system fills this from approved reviews. Write no quotes.
 pricing { eyebrow, title, plans:[{ name, price, per, feats:[".."], cta, ctaHref, hl:false }] }  // set hl:true on one recommended plan.
-casestudy { eyebrow, title, items:[{ loc, title, stat, statlabel }] }  // project cards with a headline stat.
-gallery { eyebrow, title, sub, items:[{ loc }] }  // photo grid (captions only).
 cta   { headline, sub, btn, btnHref }  // closing call-to-action band.
 rich  { html }  // long-form prose. Allowed HTML only: <p> <strong> <em> <a> <br> <ul> <ol> <li> <h3> <h4> <blockquote>. No inline styles, images or scripts.
 
@@ -413,11 +375,12 @@ export async function generatePage(
   prompt: string,
   context?: string,
   /** usageRef: saved as ai_usage.ref on every model call, so a caller can sum this run's own cost. */
-  opts: { usageRef?: string } = {},
+  opts: { usageRef?: string; brief?: Partial<Brief>; facts?: Facts; repair?: boolean } = {},
 ): Promise<{
   blocks: CmsBlock[];
   seo: PageSeo;
-  debug: { model: string; rawCount: number; keptCount: number; firstKeys: string[] };
+  issues: Issue[];
+  debug: { model: string; rawCount: number; keptCount: number; firstKeys: string[]; repaired?: boolean };
 }> {
   const { apiKey, baseUrl } = aiConfig();
   if (!apiKey) throw new Error('AI is not configured. Set OPENROUTER_API_KEY (or AI_API_KEY).');
@@ -426,12 +389,15 @@ export async function generatePage(
   const ctx = String(context || '').trim().slice(0, 2000);
   const research = await researchTopic(topic);
 
+  const facts = opts.facts ?? DEFAULT_FACTS;
+  const brief = cleanBrief(opts.brief);
+  const systemPrompt = buildSystemPrompt(facts, brief, BLOCK_DOC);
   const userMessage =
     (ctx ? `Current page context (match its tone; do not duplicate sections that already exist):\n${ctx}\n\n` : '') +
     (research
       ? `RESEARCH — current top-ranking pages for this topic (use for coverage & structure only; never copy wording or unverified numbers):\n${research}\n\n`
       : `No live research was available — write from your own expertise.\n\n`) +
-    `Write the most comprehensive, better-structured and more helpful page than the sources above, for this brief. Return ONLY the JSON object described in the system message:\n\n${topic}`;
+    `Write the most comprehensive, better-structured and more helpful page than the sources above, for this brief. Return ONLY the JSON object described in the system message:\n\n${briefMessage(brief, topic)}`;
 
   // Try the configured/strong model first, then fall back to widely-available models
   // if it is unavailable (e.g. a retired/renamed OpenRouter slug → 404 "no endpoints").
@@ -443,7 +409,7 @@ export async function generatePage(
   const MAX_TOKENS = 6000;
   const CREDITS_MSG =
     'AI credits are low on OpenRouter — top up at https://openrouter.ai/settings/credits, then try again.';
-  const callChat = (model: string, maxTokens: number) =>
+  const callChat = (model: string, maxTokens: number, messages?: { role: string; content: string }[]) =>
     fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -456,8 +422,8 @@ export async function generatePage(
         model,
         temperature: 0.6,
         max_tokens: maxTokens,
-        messages: [
-          { role: 'system', content: SYSTEM },
+        messages: messages ?? [
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },
         ],
       }),
@@ -506,11 +472,55 @@ export async function generatePage(
   const rawCount = rawArr.length;
   const firstKeys =
     rawArr[0] && typeof rawArr[0] === 'object' ? Object.keys(rawArr[0] as object).slice(0, 8) : [];
-  const blocks = mergeAdjacentRich(normalizeBlocks(rawBlocks));
-  const heroBlock = blocks.find((b) => b.t === 'hero');
-  const fallbackTitle = heroBlock ? String((heroBlock.p as Record<string, unknown>).headline || topic) : topic;
-  const seo = sanitizeSeo(Array.isArray(parsed) ? undefined : (parsed as { seo?: unknown }).seo, fallbackTitle);
-  return { blocks, seo, debug: { model: usedModel, rawCount, keptCount: blocks.length, firstKeys } };
+  const kindSlug = (slug: string) =>
+    brief.pageType === 'blog' ? `/blog/${slug}` : brief.pageType === 'area' ? `/areas/${slug}` : brief.pageType === 'case-study' ? `/case-studies/${slug}` : `/${slug}`;
+  const finish = (raw: unknown, rawSeo: unknown) => {
+    const shaped = shapePage(mergeAdjacentRich(normalizeBlocks(raw)), brief, facts) as CmsBlock[];
+    const hero = shaped.find((b) => b.t === 'hero');
+    const fallbackTitle = hero ? String((hero.p as Record<string, unknown>).headline || topic) : topic;
+    const seo = sanitizeSeo(rawSeo, fallbackTitle);
+    // Links to other pages are checked at publish, when the whole site is known; a draft cannot know them yet.
+    const issues = checkPage(
+      { name: seo.title, slug: kindSlug(seo.slug), type: brief.pageType === 'landing' ? 'landing' : 'page', seo: { title: seo.title, desc: seo.description, slug: seo.slug }, blocks: shaped },
+      { facts, pageSlugs: [], images: [], today: new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' }) },
+    ).filter((i) => i.code !== 'broken-link');
+    return { shaped, seo, issues };
+  };
+  const rawSeoIn = Array.isArray(parsed) ? undefined : (parsed as { seo?: unknown }).seo;
+  let { shaped: blocks, seo, issues } = finish(rawBlocks, rawSeoIn);
+
+  // One repair pass for what the writer can fix in words. Pictures, proof and links are not the writer's to fix, so they never trigger it.
+  const FIXABLE = new Set(['placeholder', 'link-mismatch', 'money-figure', 'percentage-figure', 'count-claim', 'years-in-business', 'warranty-not-in-facts', 'credential-not-held', 'funding-expired', 'rating-claim', 'place-in-h1', 'place-names', 'button-repeat', 'button-label']);
+  const fixable = issues.filter((i) => FIXABLE.has(i.code));
+  let repaired = false;
+  if (opts.repair !== false && fixable.length) {
+    try {
+      const fixMsg = `The page you wrote broke these rules. Return the complete corrected JSON (same shape), changing only what is needed to fix them and keeping everything else:\n${fixable.slice(0, 12).map((i) => `- ${i.message}`).join('\n')}`;
+      const res = await callChat(usedModel, MAX_TOKENS, [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content },
+        { role: 'user', content: fixMsg },
+      ]);
+      if (res.ok) {
+        const data = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+        await recordChatUsage('cms_page', usedModel, data.usage, opts.usageRef);
+        const again = data.choices?.[0]?.message?.content;
+        if (again) {
+          const p2 = extractJson(again) as { blocks?: unknown; seo?: unknown } | unknown[];
+          const second = finish(Array.isArray(p2) ? p2 : (p2 as { blocks?: unknown }).blocks, Array.isArray(p2) ? undefined : (p2 as { seo?: unknown }).seo);
+          // Keep the repair only if it is better.
+          if (second.shaped.length >= 6 && second.issues.filter((i) => i.level === 'error').length <= issues.filter((i) => i.level === 'error').length) {
+            ({ shaped: blocks, seo, issues } = second);
+            repaired = true;
+          }
+        }
+      }
+    } catch {
+      /* the first draft stands */
+    }
+  }
+  return { blocks, seo, issues, debug: { model: usedModel, rawCount, keptCount: blocks.length, firstKeys, repaired } };
 }
 
 /** @deprecated use generatePage — kept so existing imports keep working. */

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requirePortal } from '@/lib/auth';
 import { generatePage, isAiConfigured } from '@/lib/cms/ai-page';
+import { readFacts } from '@/lib/cms/facts-server';
 
 export const dynamic = 'force-dynamic';
 // Research + a strong writing model can take well over the default limit. Vercel
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { prompt?: string; context?: string };
+  let body: { prompt?: string; context?: string; brief?: Record<string, unknown> };
   try {
     body = await req.json();
   } catch {
@@ -34,14 +35,15 @@ export async function POST(req: Request) {
   const context = typeof body.context === 'string' ? body.context.slice(0, 2000) : '';
 
   try {
-    const { blocks, seo, debug } = await generatePage(prompt, context);
+    const { facts } = await readFacts();
+    const { blocks, seo, issues, debug } = await generatePage(prompt, context, { brief: body.brief, facts });
     if (!blocks.length) {
       return NextResponse.json(
         { error: 'The AI did not return any usable sections. Try rephrasing your description.', debug },
         { status: 422 },
       );
     }
-    return NextResponse.json({ blocks, seo, debug });
+    return NextResponse.json({ blocks, seo, issues: issues.map((i) => ({ level: i.level, code: i.code, message: i.message })), debug });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Generation failed';
     return NextResponse.json({ error: message }, { status: 500 });
