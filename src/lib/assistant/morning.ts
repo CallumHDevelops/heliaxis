@@ -15,7 +15,7 @@ export async function sendMorningBriefings(now = new Date()): Promise<number> {
   const minutes = uk.getHours() * 60 + uk.getMinutes();
   if (day === 0 || day === 6 || minutes < 7 * 60 + 30 || minutes > 9 * 60) return 0;
   const db = createAdminClient();
-  const { data: people } = await db.from('profiles').select('id, full_name, email').eq('role', 'admin').eq('status', 'active');
+  const { data: people } = await db.from('profiles').select('id, full_name, email').eq('role', 'admin').eq('status', 'approved');
   const midnight = new Date(`${todayISO()}T00:00:00Z`).toISOString();
   let sent = 0;
   for (const p of people ?? []) {
