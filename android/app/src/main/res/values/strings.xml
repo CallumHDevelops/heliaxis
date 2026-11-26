@@ -14,6 +14,9 @@
         <item>https://rams.heliaxis.co.uk</item>
     </string-array>
 
+    <string name="shortcutMetis">Metis</string>
+    <string name="shortcutMetisLong">Ask Metis</string>
+
     <!-- The Hestia widget (HestiaWidget.java). -->
     <string name="widgetName">Hestia</string>
     <string name="widgetDescription">Your day at a glance: today\'s calendar, the emails that need you and your tasks</string>

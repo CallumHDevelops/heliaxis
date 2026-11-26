@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the Heliaxis icon: Metis opens straight to the assistant. Drag it onto the Home Screen for its own Metis icon. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="metis"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_metis"
+        android:shortcutShortLabel="@string/shortcutMetis"
+        android:shortcutLongLabel="@string/shortcutMetisLong">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="https://heliaxis.co.uk/admin/assistant"
+            android:targetPackage="uk.co.heliaxis.app"
+            android:targetClass="uk.co.heliaxis.app.HeliaxisLauncherActivity" />
+    </shortcut>
+</shortcuts>
