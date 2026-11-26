@@ -14,8 +14,6 @@
         <item>https://rams.heliaxis.co.uk</item>
     </string-array>
 
-    <string name="shortcutMetis">Metis</string>
-    <string name="shortcutMetisLong">Ask Metis</string>
 
     <!-- The Metis widget (MetisWidget.java). -->
     <string name="widgetName">Metis</string>

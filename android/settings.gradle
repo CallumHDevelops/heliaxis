@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = 'heliaxis-android'
-include ':app'
+include ':app', ':metis'

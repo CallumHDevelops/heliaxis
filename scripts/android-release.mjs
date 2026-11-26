@@ -59,6 +59,7 @@ execFileSync(gradlew, ['--no-daemon', 'assembleRelease'], { cwd: android, env, s
 const apk = join(android, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
 const out = join(root, 'public', 'app', 'heliaxis.apk');
 copyFileSync(apk, out);
+copyFileSync(join(android, 'metis', 'build', 'outputs', 'apk', 'release', 'metis-release.apk'), join(root, 'public', 'app', 'metis.apk'));
 const bytes = readFileSync(out);
 
 const today = new Date().toISOString().slice(0, 10);

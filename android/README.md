@@ -22,7 +22,6 @@ icon. Web changes reach the app on every deploy; you only need a new APK to chan
   down (`Notifications.dismiss`). Only builds from versionCode 3 get it (`DISMISS_FROM_APP_VERSION`
   in `src/lib/notify.ts`); older ones would show it as a blank notification. Built without
   `google-services.json`, the app falls back to Web Push shown through the `DelegationService`.
-- **Metis icon**: a second launcher icon (`MetisLauncherActivity`) that opens the app straight onto the Metis chat (`/admin/assistant`). Needs a release to reach phones.
 - **Metis widget** (from versionCode 6): a home-screen widget with today's Outlook calendar (and
   tomorrow's first few), the emails Metis says need you (urgent first) and your tasks and follow-ups.
   `MetisWidget.java` draws it, `MetisWidgetService.java` fills its list. The phone never fetches

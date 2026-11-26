@@ -142,6 +142,9 @@ function AndroidPanel({
             ? "Download update"
             : "Download the app"}
         </a>
+        <a className="ad-btn" href={`/app/metis.apk?v=${release.versionCode}`} download="metis.apk">
+          Download Metis (chat only)
+        </a>
         {!onAndroid && (
           <p className="ad-hint">
             You&apos;re not on an Android device. Scan the code or email

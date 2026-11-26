@@ -1,0 +1,55 @@
+// Metis: the assistant chat as its own app (a Trusted Web Activity on /admin/assistant/chat).
+// Same version and signing key as the Heliaxis app; no Firebase yet (notifications stay in the Heliaxis app).
+plugins {
+    id 'com.android.application'
+}
+
+def appRelease = new groovy.json.JsonSlurper().parse(file('../release.json'))
+def host = 'heliaxis.co.uk'
+
+// Signing key lives outside the repo (see android/README.md).
+def keyProps = new Properties()
+def keyFile = file(System.getenv('HELIAXIS_KEYSTORE_PROPS') ?: "${System.getProperty('user.home')}/.heliaxis-secrets/android-keystore.properties")
+if (keyFile.exists()) keyFile.withInputStream { keyProps.load(it) }
+
+android {
+    namespace 'uk.co.heliaxis.metis'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'uk.co.heliaxis.metis'
+        minSdk 24
+        targetSdk 36
+        versionCode appRelease.versionCode
+        versionName appRelease.versionName
+        manifestPlaceholders = [launchUrl: "https://${host}/admin/assistant/chat?app=metis-${appRelease.versionCode}"]
+    }
+
+    signingConfigs {
+        release {
+            if (keyProps['storeFile']) {
+                storeFile file(keyProps['storeFile'])
+                storePassword keyProps['storePassword']
+                keyAlias keyProps['keyAlias']
+                keyPassword keyProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig keyProps['storeFile'] ? signingConfigs.release : null
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
+    implementation 'androidx.core:core:1.13.1'
+}

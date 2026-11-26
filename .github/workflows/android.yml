@@ -134,14 +134,16 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: heliaxis-apk
-          path: public/app/heliaxis.apk
+          path: |
+            public/app/heliaxis.apk
+            public/app/metis.apk
           retention-days: 30
       - name: Publish
         run: |
           version=$(node -p "require('./android/release.json').versionName")
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add android/release.json public/app/heliaxis.apk public/app/version.json
+          git add android/release.json public/app/heliaxis.apk public/app/metis.apk public/app/version.json
           git commit -m "Android app $version"
           # Others may have pushed while this built; put the release on top (a clash on
           # release.json means another release beat this one, so it stops rather than overwrite).
