@@ -271,7 +271,16 @@ async function syncEntry(e: EntryRow, ctx: Ctx): Promise<void> {
       e.where_kind === 'address'
         ? { displayName: [e.address, e.postcode].filter(Boolean).join(', '), street: e.address || undefined, postalCode: e.postcode || undefined }
         : { displayName: e.where_kind === 'home' ? 'Home' : 'Online / phone' },
-    body: `Added in the Heliaxis app${e.project_id ? `: ${siteUrl()}/admin/crm/${e.project_id}` : ''}.`,
+    body: [
+      `Added in the Heliaxis app${e.project_id ? `: ${siteUrl()}/admin/crm/${e.project_id}` : ''}.`,
+      // Where it is, one tap from the Outlook event: to the pin when there is one, else the address.
+      (() => {
+        const map = e.where_kind === 'address' ? mapsUrl({ lat: e.lat, lng: e.lng, address: e.address, postcode: e.postcode }) : null;
+        return map ? `Google Maps: ${map}` : '';
+      })(),
+    ]
+      .filter(Boolean)
+      .join('\n'),
     categories: ['Heliaxis diary'],
     showAs: 'busy',
   };
