@@ -936,13 +936,23 @@ a.pt-doc-print {
   gap: 8px;
   padding: 2px;
 }
-.pt-hestia-log p {
+.pt-hestia-log p,
+.pt-hestia-log .pt-turn > p {
   max-width: 88%;
   padding: 10px 13px;
   border-radius: 16px;
   font-size: 0.95rem;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+.pt-hestia-log .pt-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+.pt-hestia-log .pt-turn > p {
+  max-width: 100%;
 }
 .pt-hestia-log .me {
   align-self: flex-end;
@@ -954,6 +964,50 @@ a.pt-doc-print {
   align-self: flex-start;
   background: var(--bg);
   border-bottom-left-radius: 5px;
+}
+.pt-hestia-log .pt-turn.me,
+.pt-hestia-log .pt-turn.her {
+  background: none;
+  padding: 0;
+  max-width: 88%;
+}
+.pt-hestia-log .pt-turn.me > p {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-bottom-right-radius: 5px;
+}
+.pt-hestia-log .pt-turn.her > p {
+  background: var(--bg);
+  border-bottom-left-radius: 5px;
+}
+.pt-rate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 4px;
+}
+.pt-rate .pt-fine {
+  margin: 0 4px 0 0;
+}
+.pt-rate-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 99px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.pt-rate-btn[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.pt-rate-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 .pt-typing {
   color: var(--muted);

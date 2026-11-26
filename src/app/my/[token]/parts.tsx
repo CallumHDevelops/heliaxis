@@ -96,6 +96,8 @@ const P: Record<string, ReactNode> = {
   close: <path d="M6 6l12 12M18 6 6 18" />,
   arrow: <path d="M5 12h14m0 0-5-5m5 5-5 5" />,
   pen: <path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4" />,
+  thumbup: <path d="M7 11v9H4v-9zM7 11l4-8a2 2 0 0 1 2 2v4h5.5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.3 20H7" />,
+  thumbdown: <path d="M7 13V4H4v9zM7 13l4 8a2 2 0 0 0 2-2v-4h5.5a2 2 0 0 0 2-2.3l-1.2-6A2 2 0 0 0 17.3 4H7" />,
 };
 
 export function Icon({ name, size = 20 }: { name: keyof typeof P | string; size?: number }) {
