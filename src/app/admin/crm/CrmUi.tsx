@@ -84,6 +84,8 @@ const BRAND_ICONS = {
   shield: { wash: 'M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z', line: ['M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z', 'M9 12l2 2 4-4'] },
   award: { wash: 'M12 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10', line: ['M12 3a5 5 0 1 0 0 10 5 5 0 0 0 0-10', 'M9 12l-1 8 4-2 4 2-1-8'] },
   quote: { wash: 'M6 7h4v5a4 4 0 0 1-4 4zM14 7h4v5a4 4 0 0 1-4 4z', line: ['M6 7h4v5a4 4 0 0 1-4 4M14 7h4v5a4 4 0 0 1-4 4'] },
+  // The kit has no question mark yet: drawn in its style (outline, gold wash at 30%). For the "?" help button.
+  help: { wash: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', line: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M9.6 9.6a2.5 2.4 0 1 1 3.6 2.1c-.8.5-1.2 1-1.2 1.9', 'M12 16.9v.3'] },
   gauge: { wash: '', line: ['M12 13a1 1 0 1 0 0-.01', 'M12 13l4-4', 'M5 18a9 9 0 1 1 14 0'] },
   bolt: { wash: 'M13 2L4 14h6l-1 8 9-12h-6z', line: ['M13 2L4 14h6l-1 8 9-12h-6z'] },
   coin: { wash: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', line: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 7v10M9.5 9.5a2.5 2 0 0 1 5 0c0 2.5-5 1-5 3.5a2.5 2 0 0 0 5 0'] },
