@@ -2,6 +2,7 @@ import 'server-only';
 import { unstable_noStore as noStore } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { MenuCol, MenuFeatured, MenuTop, SiteTopbar } from '@/lib/menu-types';
+import { orderBrandLogos, type BrandLogo } from '@/lib/brand-logos';
 
 // Published snapshot is preferred; draft is a fallback so a fresh install still
 // shows the menu after Save (before the first Publish).
@@ -152,4 +153,25 @@ export async function getPublishedTopbar(): Promise<SiteTopbar | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * The manufacturer logos ticked "In banner" in the CMS Logos tab (the same set the homepage banner uses), GoodWe first.
+ * Prefers the published document; falls back to the draft. Never throws.
+ */
+export async function getPublishedLogos(): Promise<BrandLogo[]> {
+  noStore();
+  try {
+    const admin = createAdminClient();
+    for (const key of [PUBLISHED_KEY, DRAFT_KEY]) {
+      const { data } = await admin.from('cms_kv').select('value').eq('key', key).maybeSingle();
+      if (data?.value == null) continue;
+      const state = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+      const logos = (state as { site?: { logos?: unknown } })?.site?.logos;
+      if (Array.isArray(logos) && logos.length) return orderBrandLogos(logos);
+    }
+  } catch {
+    // Fall through to the default.
+  }
+  return orderBrandLogos([]);
 }

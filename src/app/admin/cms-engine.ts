@@ -554,7 +554,7 @@ function renderBlock(b,edit){
    }).join('');
    var xsubHtml=xsub?('<p'+ce(id+'.sub',edit)+'>'+esc(xsub)+'</p>'):'';
    return '<section class="pv-fx'+(edit?' is-edit':'')+'"><div class="pv-fx-glow"></div><div class="wrap"><div class="shead">'+eyebrow(xeb,id+'.eyebrow',edit,true)+'<h2'+ce(id+'.title',edit)+'>'+accentText(xtl)+'</h2>'+xsubHtml+'</div>'+radios+'<div class="pv-fx-inner"><div class="pv-fx-stage">'+shots+'</div><div class="pv-fx-list">'+rows+'</div></div></div></section>';}
- if(t==='banner'){const ls=STATE.site.logos.filter(l=>l.bnr);const chip=l=>'<span class="pv-brand">'+(l.img?'<img src="'+l.img+'">':esc(l.name))+'</span>';
+ if(t==='banner'){const ls=STATE.site.logos.filter(l=>l.bnr);const chip=l=>'<span class="pv-brand">'+(l.img?'<img src="'+l.img+'" alt="'+esc(l.name)+' logo" loading="lazy">':esc(l.name))+'</span>';
    return '<div class="pv-banner"><div class="bh"'+ce(id+'.heading',edit)+'>'+accentText(p.heading)+'</div><div class="pv-bmarq"><div class="trk">'+ls.map(chip).join('')+ls.map(chip).join('')+'</div></div></div>';}
  if(t==='cta'){
    var btns='';

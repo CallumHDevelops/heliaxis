@@ -104,6 +104,8 @@ export const ENV_GROUPS: EnvGroup[] = [
       { name: 'NEXT_PUBLIC_WHATSAPP_NUMBER', secret: false, hint: 'Your number as 447…, for the portal’s WhatsApp button' },
       { name: 'WHATSAPP_TEMPLATE_LANG', secret: false, optional: true, hint: 'en_GB (the default if missing)' },
       { name: 'WHATSAPP_DEFAULT_TEMPLATE', secret: false, optional: true, hint: 'Name of your first-message template, e.g. enquiry_intro' },
+      { name: 'WHATSAPP_ESTIMATE_LANG', secret: false, optional: true, hint: 'Solar estimator template language if not the usual one, e.g. en_US' },
+      { name: 'WHATSAPP_ESTIMATE_TEMPLATE', secret: false, optional: true, hint: 'Solar estimator: the approved Utility template with a PDF header (estimate_ready if missing)' },
       { name: 'WHATSAPP_AUTO_FIRST_MESSAGE', secret: false, optional: true, hint: 'true = message new Meta leads automatically' },
       { name: 'META_PAGE_ACCESS_TOKEN', secret: true, optional: true, hint: 'Only if lead-ad leads don’t come through with the system-user token' },
     ],
@@ -145,10 +147,12 @@ export const ENV_GROUPS: EnvGroup[] = [
   },
   {
     title: 'Meta Ads conversions',
-    what: 'Optional. Sends survey booked / quote sent / won back to Meta.',
+    what: 'Optional. The Meta Pixel on the site (after cookie consent), a Lead for every estimator quote, and survey booked / quote sent / won back to Meta.',
     vars: [
       { name: 'META_PIXEL_ID', secret: false, optional: true, hint: 'Events Manager → your dataset ID' },
+      { name: 'NEXT_PUBLIC_META_PIXEL_ID', secret: false, optional: true, hint: 'The same dataset ID: the browser Pixel (rebuild after adding)' },
       { name: 'META_CAPI_TOKEN', secret: true, optional: true, hint: 'Events Manager → Settings → Conversions API → Generate access token' },
+      { name: 'META_TEST_EVENT_CODE', secret: false, optional: true, hint: 'Events Manager → Test events (e.g. TEST12345). Remove once you have checked one Lead per quote' },
     ],
   },
   {
