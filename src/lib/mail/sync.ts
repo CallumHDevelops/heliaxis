@@ -1,3 +1,4 @@
+import { notePromises } from './promises';
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
@@ -385,7 +386,10 @@ async function ingest(ctx: Context, page: GMessage[], direction: 'in' | 'out'): 
       .eq('id', id);
   }
 
-  await noteOnCrm(ctx, page, direction, new Set((added ?? []).map((a) => a.graph_id as string)));
+  const addedIds = new Set((added ?? []).map((a) => a.graph_id as string));
+  await noteOnCrm(ctx, page, direction, addedIds);
+  // Promises you made in sent mail ("I'll get a quote to you this weekend"): a task on their record (src/lib/mail/promises.ts).
+  if (direction === 'out') await notePromises(db, box, page, addedIds, (a) => ctx.rules.get(`address:${a}`)?.enquiry_id ?? null).catch(() => 0);
   return added?.length ?? 0;
 }
 
