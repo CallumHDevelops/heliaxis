@@ -1,7 +1,7 @@
-import { notePromises } from './promises';
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { msConfigured } from '@/lib/ms365';
+import { notePromises } from './promises';
 import { draftForThread, learnStyle, nameDomains, triageThread, type SentSample, type ThreadForAi, type Voice } from './ai';
 import { CAT_ACTION, CAT_REPLY, CAT_URGENT, completedInInbox, childFolders, deleteFolderIfEmpty, folderMessages, getReplyTo, listFolders, moveToDeleted, wellKnownFolderIds, createReplyDraft, deleteDraft, draftState, ensureCategories, inlineImages, recentSentHtml, type FileToAttach, type InlineImage, ensureFolder, getParentFolder, inboxId, listFolder, markMessage, messageText, moveMessage, type GMessage } from './graph';
 import {
